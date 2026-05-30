@@ -144,20 +144,20 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({ items }) => {
               {isMegaMenu ? (
                 <div
                   className={cn(
-                    'absolute left-1/2 -translate-x-1/2 top-full pt-2 z-50 transition-all duration-200',
+                    'absolute left-0 top-full z-50 w-[560px] max-w-[calc(100vw-2rem)] pt-2 transition-all duration-200 lg:w-[640px] xl:w-[720px]',
                     openDropdown === item.name
                       ? 'opacity-100 visible translate-y-0'
                       : 'opacity-0 invisible pointer-events-none -translate-y-2'
                   )}
                 >
-                  <div className="bg-white dark:bg-slate-800/98 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700/50 overflow-hidden">
+                  <div className="relative bg-white dark:bg-slate-800/98 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-200 dark:border-slate-700/50 overflow-hidden">
                     {/* 顶部装饰线 */}
                     <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
                     {/* 多列布局 */}
-                    <div className="flex p-4 gap-6">
+                    <div className="flex flex-wrap p-4 gap-6">
                       {groups.map((group) => (
-                        <div key={group.id} className="min-w-[180px]">
+                        <div key={group.id} className="min-w-[180px] flex-1">
                           {/* 分组标题 */}
                           {group.titleKey && (
                             <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 border-b border-slate-200 dark:border-slate-700/50 mb-2">
@@ -275,4 +275,3 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({ items }) => {
 }
 
 export default DesktopNav
-

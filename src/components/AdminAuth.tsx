@@ -57,6 +57,9 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     getBootstrapStatus().then(result => {
       if (!cancelled && result.success) {
         setNeedsBootstrap(result.needsBootstrap)
+        if (result.needsBootstrap && !invite) {
+          setStep('register-email')
+        }
       }
     })
     return () => {

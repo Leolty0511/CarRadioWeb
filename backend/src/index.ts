@@ -57,7 +57,6 @@ import './models/LegalPageContent';
 import './models/NewsletterSubscriber';
 import './models/NewsletterCampaign';
 import './models/AdminInvitation';
-import { seedDevAdmin } from './seed/devAdmin';
 import { ensureAdminIndexes } from './services/adminIndexService';
 const _userModelRef = User;
 
@@ -212,9 +211,6 @@ mongoose.connect(MONGODB_URI)
     } catch (error) {
       systemLogger.error({ error }, 'System config initialization failed');
     }
-
-    // 开发环境：创建默认管理员
-    await seedDevAdmin();
 
     isSystemReady = true;
   })
