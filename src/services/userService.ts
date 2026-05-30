@@ -23,12 +23,19 @@ export interface AdminUserRecord {
 export interface CreateUserPayload {
   nickname: string
   permissions: string[]
-  /** OAuth 邀请必填 */
   email?: string
-  /** 自定义登录账号（与 password 一起使用时必填） */
-  loginUsername?: string
-  /** 若提供，则创建为邮箱+本站密码账号；不传或空则仍为 OAuth 占位，首次 Google/GitHub 绑定 */
-  password?: string
+}
+
+interface AdminInvitationRecord {
+  _id: string
+  email: string
+  nickname: string
+  permissions: string[]
+  expiresAt: string
+  acceptedAt: string | null
+  revokedAt: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 interface UpdateUserPayload {
@@ -49,9 +56,9 @@ export async function getPermissions(): Promise<string[]> {
   return res.success && res.data ? res.data : []
 }
 
-/** Create a new admin user (invited) */
+/** Create a new admin invitation */
 export async function createUser(data: CreateUserPayload) {
-  return apiClient.post<AdminUserRecord>('/users', data)
+  return apiClient.post<AdminInvitationRecord>('/users', data)
 }
 
 /** Update admin user */

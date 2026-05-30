@@ -19,6 +19,9 @@ export async function seedDevAdmin(): Promise<void> {
   if (process.env.NODE_ENV === 'production') {
     return
   }
+  if (process.env.SEED_DEV_ADMIN !== 'true') {
+    return
+  }
 
   try {
     // 检查是否已存在

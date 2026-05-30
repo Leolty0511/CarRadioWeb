@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Shield, AlertCircle, Mail, Lock, User, Loader2, ArrowLeft } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
-import { sendVerificationCode, verifyCode as verifyCodeApi, emailLogin, emailRegister, resetPassword } from '@/services/authService'
+import { acceptInvitation, getBootstrapStatus, getInvitation, sendVerificationCode, verifyCode as verifyCodeApi, emailLogin, emailRegister, resetPassword } from '@/services/authService'
 
 interface AdminAuthProps {
   onAuthenticated: () => void
@@ -15,7 +15,7 @@ interface AdminAuthProps {
 
 const MIN_PASSWORD_LENGTH = 10
 
-type AuthStep = 'login' | 'register-email' | 'register-verify' | 'register-password' | 'forgot-email' | 'forgot-verify' | 'forgot-password'
+type AuthStep = 'login' | 'register-email' | 'register-verify' | 'register-password' | 'forgot-email' | 'forgot-verify' | 'forgot-password' | 'accept-invitation'
 
 const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const { t } = useTranslation()
@@ -30,6 +30,39 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const [verifyCode, setVerifyCode] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const [providerInfo, setProviderInfo] = useState<{ name: string; authHelp: string } | null>(null)
+  const [needsBootstrap, setNeedsBootstrap] = useState(false)
+  const [invitationToken, setInvitationToken] = useState('')
+  const [invitationEmail, setInvitationEmail] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const invite = new URLSearchParams(window.location.search).get('invite') || ''
+    if (invite) {
+      setLoading(true)
+      getInvitation(invite).then(result => {
+        if (cancelled) {return}
+        if (result.success && result.invitation) {
+          setInvitationToken(invite)
+          setInvitationEmail(result.invitation.email)
+          setEmail(result.invitation.email)
+          setNickname(result.invitation.nickname)
+          setStep('accept-invitation')
+        } else {
+          setError(t(`adminAuth.errors.${result.error || 'unknown'}`, t('adminAuth.invalidInvitation')))
+        }
+      }).finally(() => {
+        if (!cancelled) {setLoading(false)}
+      })
+    }
+    getBootstrapStatus().then(result => {
+      if (!cancelled && result.success) {
+        setNeedsBootstrap(result.needsBootstrap)
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   // Cooldown timer
   useEffect(() => {
@@ -153,6 +186,40 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     }
   }
 
+  const handleAcceptInvitation = async () => {
+    setError(null)
+
+    if (!invitationToken) {
+      setError(t('adminAuth.invalidInvitation'))
+      return
+    }
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      setError(t('adminAuth.passwordTooShort'))
+      return
+    }
+
+    const hasUppercase = /[A-Z]/.test(password)
+    const hasLowercase = /[a-z]/.test(password)
+    const hasNumber = /[0-9]/.test(password)
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      setError(t('adminAuth.passwordTooWeak'))
+      return
+    }
+
+    setLoading(true)
+    try {
+      const result = await acceptInvitation(invitationToken, password, nickname || undefined)
+      if (result.success) {
+        onAuthenticated()
+      } else {
+        const errorKey = result.error || 'unknown'
+        setError(t(`adminAuth.errors.${errorKey}`, t('adminAuth.acceptInvitationFailed')))
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -249,13 +316,15 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
               >
                 {t('adminAuth.forgotPassword')}
               </button>
-              <button
-                type="button"
-                onClick={() => { setStep('register-email'); setError(null); }}
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-              >
-                {t('adminAuth.noAccount')}
-              </button>
+              {needsBootstrap && (
+                <button
+                  type="button"
+                  onClick={() => { setStep('register-email'); setError(null); }}
+                  className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                >
+                  {t('adminAuth.noAccount')}
+                </button>
+              )}
             </div>
           </>
         )
@@ -487,6 +556,54 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
           </div>
         )
 
+      case 'accept-invitation':
+        return (
+          <div className="space-y-3">
+            <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
+              {invitationEmail}
+            </p>
+
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder={t('adminAuth.nicknamePlaceholder')}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 transition-shadow"
+                autoComplete="name"
+              />
+            </div>
+
+            <div className="relative">
+              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={t('adminAuth.passwordPlaceholder')}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 transition-shadow"
+                autoComplete="new-password"
+                required
+              />
+            </div>
+
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {t('adminAuth.passwordHint')}
+            </p>
+
+            <button
+              type="button"
+              onClick={handleAcceptInvitation}
+              disabled={loading || password.length < MIN_PASSWORD_LENGTH}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t('adminAuth.acceptInvitationButton')}
+            </button>
+          </div>
+        )
+
       case 'forgot-password':
         return (
           <div className="space-y-3">
@@ -542,6 +659,8 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
       case 'forgot-verify':
       case 'forgot-password':
         return t('adminAuth.resetPassword')
+      case 'accept-invitation':
+        return t('adminAuth.acceptInvitation')
     }
   }
 
@@ -561,6 +680,8 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
         return t('adminAuth.forgotVerifyHint')
       case 'forgot-password':
         return t('adminAuth.forgotPasswordHint')
+      case 'accept-invitation':
+        return t('adminAuth.acceptInvitationHint')
     }
   }
 

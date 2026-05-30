@@ -1,42 +1,30 @@
-/**
- * Admin user management page (super_admin only)
- * CRUD for admin users with permission assignment
- */
-
-import { useState, useEffect, useCallback } from 'react'
-import { ShieldCheck, Trash2, Edit2, X, Check, Ban, UserCheck } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Ban, Check, Edit2, ShieldCheck, Trash2, UserCheck, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
-  getUsers,
-  getPermissions,
   createUser,
-  updateUser,
   deleteUser,
+  getPermissions,
+  getUsers,
   updateOwnNickname,
+  updateUser,
   type AdminUserRecord,
   type CreateUserPayload,
 } from '@/services/userService'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 
-const MIN_INVITE_PASSWORD_LENGTH = 8
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-/** 与后端 `loginUsername` 一致：3–32 位，小写字母数字与 _-，不能以符号开头 */
-const LOGIN_ACCOUNT_RE = /^[a-z0-9][a-z0-9_-]{2,31}$/
-
-const CONTACT_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-/** 列表中登录方式展示 */
 const LOGIN_PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
   github: 'GitHub',
   email: '邮箱密码',
 }
 
-/** Permission group labels */
 const PERMISSION_GROUP_LABELS: Record<string, string> = {
   pages: '页面可见性',
   documents: '文档',
@@ -59,18 +47,6 @@ const PERMISSION_GROUP_LABELS: Record<string, string> = {
   visitors: '访客',
 }
 
-/** Group permissions by domain prefix */
-function groupPermissions(perms: string[]): Record<string, string[]> {
-  const groups: Record<string, string[]> = {}
-  for (const p of perms) {
-    const [group] = p.split(':')
-    if (!groups[group]) {groups[group] = []}
-    groups[group].push(p)
-  }
-  return groups
-}
-
-/** Permission action labels */
 const PERMISSION_ACTION_LABELS: Record<string, string> = {
   create: '创建',
   read: '查看',
@@ -80,7 +56,6 @@ const PERMISSION_ACTION_LABELS: Record<string, string> = {
   configure: '配置',
 }
 
-/** Page visibility sub-item labels */
 const PAGE_LABELS: Record<string, string> = {
   dashboard: '仪表盘',
   documents: '文档',
@@ -110,10 +85,19 @@ const PAGE_LABELS: Record<string, string> = {
   'system-monitor': '系统监控',
 }
 
-/** Format permission string for display */
+function groupPermissions(perms: string[]): Record<string, string[]> {
+  const groups: Record<string, string[]> = {}
+  for (const p of perms) {
+    const [group] = p.split(':')
+    if (!groups[group]) { groups[group] = [] }
+    groups[group].push(p)
+  }
+  return groups
+}
+
 function formatPermission(perm: string): string {
   const parts = perm.split(':')
-  if (parts.length < 2) {return perm}
+  if (parts.length < 2) { return perm }
   const [group, action] = parts
   if (group === 'pages') {
     return PAGE_LABELS[action] ?? action
@@ -121,31 +105,18 @@ function formatPermission(perm: string): string {
   return PERMISSION_ACTION_LABELS[action] ?? action
 }
 
-// ─── Create/Edit Dialog ───
-
 interface UserDialogProps {
   user: AdminUserRecord | null
   allPermissions: string[]
-  onSave: (data: {
-    email?: string
-    loginUsername?: string
-    nickname: string
-    permissions: string[]
-    password?: string
-  }) => Promise<void>
+  onSave: (data: CreateUserPayload) => Promise<void>
   onClose: () => void
 }
 
 function UserDialog({ user, allPermissions, onSave, onClose }: UserDialogProps) {
   const [email, setEmail] = useState(user?.email ?? '')
-  const [loginAccount, setLoginAccount] = useState(user?.loginUsername ?? '')
-  const [contactEmail, setContactEmail] = useState('')
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const [selected, setSelected] = useState<Set<string>>(new Set(user?.permissions ?? []))
   const [saving, setSaving] = useState(false)
-  const [inviteLoginType, setInviteLoginType] = useState<'oauth' | 'password'>('oauth')
-  const [initialPassword, setInitialPassword] = useState('')
-  const [initialPasswordConfirm, setInitialPasswordConfirm] = useState('')
   const [localError, setLocalError] = useState<string | null>(null)
   const grouped = groupPermissions(allPermissions)
   const isSuperAdmin = user?.role === 'super_admin'
@@ -170,52 +141,25 @@ function UserDialog({ user, allPermissions, onSave, onClose }: UserDialogProps) 
 
   const handleSubmit = async () => {
     setLocalError(null)
-    if (!nickname.trim()) {return}
+    const cleanNickname = nickname.trim()
+    const cleanEmail = email.trim().toLowerCase()
 
-    if (isNewInvite) {
-      if (inviteLoginType === 'oauth') {
-        if (!email.trim()) {
-          setLocalError('请填写用于绑定的邮箱')
-          return
-        }
-      } else {
-        const lu = loginAccount.trim().toLowerCase()
-        if (!LOGIN_ACCOUNT_RE.test(lu)) {
-          setLocalError('登录账号须 3–32 位小写字母、数字、下划线或连字符，且不能以符号开头')
-          return
-        }
-        const ce = contactEmail.trim().toLowerCase()
-        if (ce && !CONTACT_EMAIL_RE.test(ce)) {
-          setLocalError('联系邮箱格式不正确')
-          return
-        }
-        if (initialPassword.length < MIN_INVITE_PASSWORD_LENGTH) {
-          setLocalError(`初始密码至少 ${MIN_INVITE_PASSWORD_LENGTH} 位`)
-          return
-        }
-        if (initialPassword !== initialPasswordConfirm) {
-          setLocalError('两次输入的密码不一致')
-          return
-        }
-      }
+    if (!cleanNickname) {
+      setLocalError('请填写昵称')
+      return
+    }
+    if (isNewInvite && (!cleanEmail || !EMAIL_RE.test(cleanEmail))) {
+      setLocalError('请填写有效的邀请邮箱')
+      return
     }
 
     setSaving(true)
     try {
-      const payload: Parameters<UserDialogProps['onSave']>[0] = {
-        nickname: nickname.trim(),
+      await onSave({
+        email: isNewInvite ? cleanEmail : undefined,
+        nickname: cleanNickname,
         permissions: [...selected],
-      }
-      if (isNewInvite && inviteLoginType === 'oauth') {
-        payload.email = email.trim().toLowerCase()
-      }
-      if (isNewInvite && inviteLoginType === 'password') {
-        payload.loginUsername = loginAccount.trim().toLowerCase()
-        const ce = contactEmail.trim().toLowerCase()
-        if (ce) {payload.email = ce}
-        payload.password = initialPassword
-      }
-      await onSave(payload)
+      })
     } finally {
       setSaving(false)
     }
@@ -240,136 +184,30 @@ function UserDialog({ user, allPermissions, onSave, onClose }: UserDialogProps) 
             </p>
           )}
 
-          {user && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">
-                  {user.loginUsername ? '登录账号' : '邮箱'}
-                </label>
-                <Input
-                  value={user.loginUsername ?? user.email ?? ''}
-                  disabled
-                  className="bg-slate-100 dark:bg-slate-900/50"
-                />
-              </div>
-              <div>
-                <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">昵称</label>
-                <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="管理员昵称" />
-              </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">
+                {isNewInvite ? '邀请邮箱' : user?.loginUsername ? '登录账号' : '邮箱'}
+              </label>
+              <Input
+                type={isNewInvite ? 'email' : 'text'}
+                value={isNewInvite ? email : user?.loginUsername ?? user?.email ?? ''}
+                onChange={e => setEmail(e.target.value)}
+                disabled={!isNewInvite}
+                placeholder="admin@example.com"
+                className={!isNewInvite ? 'bg-slate-100 dark:bg-slate-900/50' : undefined}
+              />
             </div>
-          )}
+            <div>
+              <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">昵称</label>
+              <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="管理员昵称" />
+            </div>
+          </div>
 
           {isNewInvite && (
-            <>
-              <div className="space-y-3 p-3 bg-slate-50 dark:bg-slate-700/40 rounded-lg border border-slate-200 dark:border-slate-600">
-                <p className="text-sm font-medium text-slate-700 dark:text-slate-200">登录方式</p>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="inviteLoginType"
-                    checked={inviteLoginType === 'oauth'}
-                    onChange={() => {
-                      setInviteLoginType('oauth')
-                      setLocalError(null)
-                    }}
-                    className="mt-1 accent-blue-600"
-                  />
-                  <span className="text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-medium text-slate-800 dark:text-slate-100">Google / GitHub 绑定</span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      填写下方邮箱；被邀请人首次用该邮箱对应的 Google 或 GitHub 登录即可绑定，无需本站密码。
-                    </span>
-                  </span>
-                </label>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="inviteLoginType"
-                    checked={inviteLoginType === 'password'}
-                    onChange={() => {
-                      setInviteLoginType('password')
-                      setLocalError(null)
-                    }}
-                    className="mt-1 accent-blue-600"
-                  />
-                  <span className="text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-medium text-slate-800 dark:text-slate-100">自定义登录账号 + 初始密码</span>
-                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      被邀请人在登录页使用「登录账号 + 密码」（如 admin / admin123）；密码仅保存在本站。可另填联系邮箱便于识别（可选）。
-                    </span>
-                  </span>
-                </label>
-              </div>
-
-              {inviteLoginType === 'oauth' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">绑定邮箱</label>
-                    <Input
-                      type="email"
-                      value={email}
-                      onChange={e => setEmail(e.target.value)}
-                      placeholder="admin@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">昵称</label>
-                    <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="管理员昵称" />
-                  </div>
-                </div>
-              )}
-
-              {inviteLoginType === 'password' && (
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">登录账号</label>
-                      <Input
-                        value={loginAccount}
-                        onChange={e => setLoginAccount(e.target.value)}
-                        placeholder="例如 admin（小写、数字、_ -）"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">昵称</label>
-                      <Input value={nickname} onChange={e => setNickname(e.target.value)} placeholder="管理员昵称" />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">联系邮箱（可选）</label>
-                    <Input
-                      type="email"
-                      value={contactEmail}
-                      onChange={e => setContactEmail(e.target.value)}
-                      placeholder="便于在列表中识别，可不填"
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">
-                        初始密码（至少 {MIN_INVITE_PASSWORD_LENGTH} 位）
-                      </label>
-                      <Input
-                        type="password"
-                        value={initialPassword}
-                        onChange={e => setInitialPassword(e.target.value)}
-                        autoComplete="new-password"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">确认密码</label>
-                      <Input
-                        type="password"
-                        value={initialPasswordConfirm}
-                        onChange={e => setInitialPasswordConfirm(e.target.value)}
-                        autoComplete="new-password"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </>
+            <div className="text-sm text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-700/40 rounded-lg border border-slate-200 dark:border-slate-600 p-3">
+              系统会向该邮箱发送一次性邀请链接，被邀请人通过链接自行设置密码。邀请有效期为 48 小时。
+            </div>
           )}
 
           {!isSuperAdmin && (
@@ -404,24 +242,14 @@ function UserDialog({ user, allPermissions, onSave, onClose }: UserDialogProps) 
 
         <div className="flex justify-end gap-2 p-5 border-t border-slate-200 dark:border-slate-700">
           <Button variant="outline" onClick={onClose}>取消</Button>
-          <Button
-            onClick={handleSubmit}
-            disabled={
-              saving ||
-              !nickname.trim() ||
-              (!!isNewInvite && inviteLoginType === 'oauth' && !email.trim()) ||
-              (!!isNewInvite && inviteLoginType === 'password' && !loginAccount.trim())
-            }
-          >
-            {saving ? '保存中...' : '保存'}
+          <Button onClick={handleSubmit} disabled={saving || !nickname.trim() || (isNewInvite && !email.trim())}>
+            {saving ? '保存中...' : isNewInvite ? '发送邀请' : '保存'}
           </Button>
         </div>
       </div>
     </div>
   )
 }
-
-// ─── Main Component ───
 
 export function UserManagement() {
   const { showToast } = useToast()
@@ -446,76 +274,32 @@ export function UserManagement() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
-  const handleSave = async (data: {
-    email?: string
-    loginUsername?: string
-    nickname: string
-    permissions: string[]
-    password?: string
-  }) => {
+  const handleSave = async (data: CreateUserPayload) => {
     if (dialogUser === 'new') {
-      const lu = data.loginUsername?.trim().toLowerCase() ?? ''
-      const pwd = data.password !== null ? String(data.password) : ''
-      const oauthEmail = data.email?.trim().toLowerCase() ?? ''
-
-      const isAccountPasswordInvite = lu.length > 0 && pwd.length > 0
-
-      let payload: CreateUserPayload
-
-      if (isAccountPasswordInvite) {
-        payload = {
-          nickname: data.nickname,
-          permissions: data.permissions,
-          loginUsername: lu,
-          password: pwd,
-        }
-        if (oauthEmail) {payload.email = oauthEmail}
-      } else if (oauthEmail.length > 0) {
-        payload = {
-          nickname: data.nickname,
-          permissions: data.permissions,
-          email: oauthEmail,
-        }
-      } else {
-        showToast({
-          type: 'error',
-          title:
-            lu.length > 0 && !pwd
-              ? '请填写初始密码（至少 8 位）并再次确认'
-              : pwd.length > 0 && !lu
-                ? '请填写登录账号'
-                : 'OAuth 邀请请填写绑定邮箱；账号+密码邀请需填写登录账号与密码（联系邮箱可不填）',
-        })
-        return
-      }
-
-      const res = await createUser(payload)
+      const res = await createUser(data)
       if (res.success) {
-        showToast({
-          type: 'success',
-          title: data.password
-            ? '管理员已创建（登录账号 + 密码）'
-            : '管理员已创建（OAuth 绑定）',
-        })
+        showToast({ type: 'success', title: '邀请已发送' })
         setDialogUser(null)
         fetchData()
       } else {
-        const err = res.error ?? '创建失败'
         const errMap: Record<string, string> = {
-          password_too_short: '密码至少 8 位',
-          login_username_invalid: '登录账号格式不正确',
-          login_username_taken: '该登录账号已被使用',
-          email_already_exists: '该邮箱已被使用',
-          invalid_contact_email: '联系邮箱格式不正确',
-          email_required: '请填写绑定邮箱',
+          email_required: '请填写邀请邮箱',
+          invalid_email: '邮箱格式不正确',
+          email_already_exists: '该邮箱已存在管理员账号',
+          active_invitation_exists: '该邮箱已有有效邀请，请稍后重试',
           nickname_required: '请填写昵称',
+          invalid_permissions: '权限配置无效，请刷新后重试',
+          smtp_not_configured: '邮件服务未配置，无法发送邀请',
+          send_failed: '邀请邮件发送失败',
+          invite_failed: '邀请失败',
         }
-        const title = errMap[err] ?? (err.includes('password_too_short') ? '密码至少 8 位' : err)
-        showToast({ type: 'error', title })
+        showToast({ type: 'error', title: errMap[res.error ?? ''] ?? res.error ?? '邀请失败' })
       }
-    } else if (dialogUser && typeof dialogUser === 'object') {
+      return
+    }
+
+    if (dialogUser && typeof dialogUser === 'object') {
       if (dialogUser.role === 'super_admin') {
-        // Super admin can only update their own nickname via /me/nickname
         const res = await updateOwnNickname(data.nickname)
         if (res.success) {
           showToast({ type: 'success', title: '昵称已更新' })
@@ -565,9 +349,7 @@ export function UserManagement() {
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">邀请、编辑和管理后台管理员</p>
           </div>
         </div>
-        <Button onClick={() => setDialogUser('new')}>
-          邀请管理员
-        </Button>
+        <Button onClick={() => setDialogUser('new')}>邀请管理员</Button>
       </div>
 
       <Card>
@@ -603,9 +385,7 @@ export function UserManagement() {
                           <div>
                             <p className="font-medium text-slate-800 dark:text-white">{u.nickname}</p>
                             <p className="text-xs text-slate-400">
-                              {[u.loginUsername ? `账号 ${u.loginUsername}` : null, u.email ?? null]
-                                .filter(Boolean)
-                                .join(' · ') || '—'}
+                              {[u.loginUsername ? `账号 ${u.loginUsername}` : null, u.email ?? null].filter(Boolean).join(' · ') || '-'}
                             </p>
                           </div>
                         </div>
@@ -638,11 +418,9 @@ export function UserManagement() {
                       </td>
                       <td className="py-3 px-2 text-right">
                         {u.role === 'super_admin' ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑昵称" aria-label="编辑昵称">
-                              <Edit2 className="h-4 w-4 text-slate-400" />
-                            </button>
-                          </div>
+                          <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑昵称" aria-label="编辑昵称">
+                            <Edit2 className="h-4 w-4 text-slate-400" />
+                          </button>
                         ) : (
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑" aria-label="编辑">
@@ -678,7 +456,7 @@ export function UserManagement() {
         open={deleteConfirm.open}
         onClose={() => setDeleteConfirm({ open: false, user: null })}
         onConfirm={() => {
-          if (deleteConfirm.user) {handleDelete(deleteConfirm.user)}
+          if (deleteConfirm.user) { handleDelete(deleteConfirm.user) }
           setDeleteConfirm({ open: false, user: null })
         }}
         title="删除管理员"

@@ -6,7 +6,9 @@
 
 import { Router, Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import User, { IUser } from '../models/User'
+import AdminInvitation from '../models/AdminInvitation'
 import { signTokenPair, verifyToken, verifyRefreshToken } from '../utils/jwt'
 import { createSecureLogger } from '../utils/secureLogger'
 import { adminJwtEmailField } from '../utils/adminIdentity'
@@ -18,13 +20,169 @@ const logger = createSecureLogger('auth-route')
 
 const BCRYPT_ROUNDS = 12
 const MIN_PASSWORD_LENGTH = 10
+const BOOTSTRAP_EMAIL_DOMAINS = new Set(['gmail.com', '163.com', '126.com'])
 
 const router = Router()
+
+async function needsBootstrapAdmin(): Promise<boolean> {
+  const existingSuperAdmin = await User.exists({ role: 'super_admin' })
+  return !existingSuperAdmin
+}
+
+function isAllowedBootstrapEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase()
+  return !!domain && BOOTSTRAP_EMAIL_DOMAINS.has(domain)
+}
+
+function hashInviteToken(token: string): string {
+  return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+function validatePassword(password: string): string | null {
+  if (password.length < MIN_PASSWORD_LENGTH) {
+    return 'password_too_short'
+  }
+  const hasUppercase = /[A-Z]/.test(password)
+  const hasLowercase = /[a-z]/.test(password)
+  const hasNumber = /[0-9]/.test(password)
+  if (!hasUppercase || !hasLowercase || !hasNumber) {
+    return 'password_too_weak'
+  }
+  return null
+}
 
 // 应用认证限流到登录相关路由
 router.use('/login', authLimiter)
 router.use('/register', authLimiter)
 router.use('/send-code', codeLimiter)
+
+router.get('/bootstrap-status', async (_req: Request, res: Response) => {
+  try {
+    return res.json({
+      success: true,
+      needsBootstrap: await needsBootstrapAdmin(),
+    })
+  } catch (error) {
+    logger.error({ error }, 'Bootstrap status check failed')
+    return res.status(500).json({ success: false, error: 'server_error' })
+  }
+})
+
+router.get('/invitations/:token', async (req: Request, res: Response) => {
+  try {
+    const token = String(req.params.token || '')
+    if (token.length < 32) {
+      return res.status(400).json({ success: false, error: 'invalid_invitation' })
+    }
+
+    const invitation = await AdminInvitation.findOne({
+      tokenHash: hashInviteToken(token),
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: { $gt: new Date() },
+    }).lean()
+
+    if (!invitation) {
+      return res.status(404).json({ success: false, error: 'invitation_not_found_or_expired' })
+    }
+
+    if (await User.exists({ email: invitation.email })) {
+      return res.status(409).json({ success: false, error: 'email_already_exists' })
+    }
+
+    return res.json({
+      success: true,
+      invitation: {
+        email: invitation.email,
+        nickname: invitation.nickname,
+        expiresAt: invitation.expiresAt,
+      },
+    })
+  } catch (error) {
+    logger.error({ error }, 'Invitation lookup failed')
+    return res.status(500).json({ success: false, error: 'server_error' })
+  }
+})
+
+router.post('/accept-invitation', async (req: Request, res: Response) => {
+  let claimedInvitationId: unknown = null
+  try {
+    const token = String(req.body.token || '')
+    const password = String(req.body.password || '')
+    const nickname = String(req.body.nickname || '').trim()
+
+    if (token.length < 32 || !password) {
+      return res.status(400).json({ success: false, error: 'invitation_token_password_required' })
+    }
+
+    const passwordError = validatePassword(password)
+    if (passwordError) {
+      return res.status(400).json({ success: false, error: passwordError })
+    }
+
+    const acceptedAt = new Date()
+    const invitation = await AdminInvitation.findOneAndUpdate(
+      {
+        tokenHash: hashInviteToken(token),
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: { $gt: acceptedAt },
+      },
+      { $set: { acceptedAt } },
+      { new: true }
+    )
+
+    if (!invitation) {
+      return res.status(404).json({ success: false, error: 'invitation_not_found_or_expired' })
+    }
+    claimedInvitationId = invitation._id
+
+    const existing = await User.findOne({ email: invitation.email })
+    if (existing) {
+      invitation.revokedAt = acceptedAt
+      await invitation.save()
+      return res.status(409).json({ success: false, error: 'email_already_exists' })
+    }
+
+    const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
+    const user = await User.create({
+      email: invitation.email,
+      nickname: nickname || invitation.nickname,
+      avatar: '',
+      role: 'admin',
+      provider: 'email',
+      providerId: `email_${invitation.email}`,
+      passwordHash,
+      permissions: invitation.permissions,
+      isActive: true,
+      lastLoginAt: new Date(),
+    })
+
+    const tokens = signTokenPair({
+      userId: user._id.toString(),
+      email: adminJwtEmailField(user),
+      role: user.role,
+    })
+    setTokenCookie(res, tokens.accessToken)
+    setRefreshTokenCookie(res, tokens.refreshToken)
+
+    logger.info({ userId: user._id, invitationId: invitation._id }, 'Invitation accepted')
+
+    return res.status(201).json({ success: true })
+  } catch (error: any) {
+    if (error.code === 11000) {
+      if (claimedInvitationId) {
+        await AdminInvitation.findByIdAndUpdate(claimedInvitationId, { $set: { revokedAt: new Date() } })
+      }
+      return res.status(409).json({ success: false, error: 'email_already_exists' })
+    }
+    if (claimedInvitationId) {
+      await AdminInvitation.findByIdAndUpdate(claimedInvitationId, { $set: { acceptedAt: null } })
+    }
+    logger.error({ error }, 'Accept invitation failed')
+    return res.status(500).json({ success: false, error: 'server_error' })
+  }
+})
 
 // ═══════════════════════════════════════════════════════════════
 // 邮箱验证码相关 API
@@ -46,9 +204,17 @@ router.post('/send-code', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: 'invalid_type' })
     }
 
+    const normalizedEmail = email.toLowerCase().trim()
+
     // 注册时检查邮箱是否已存在
     if (type === 'register') {
-      const existing = await User.findOne({ email: email.toLowerCase().trim() })
+      if (!(await needsBootstrapAdmin())) {
+        return res.status(403).json({ success: false, error: 'registration_closed' })
+      }
+      if (!isAllowedBootstrapEmail(normalizedEmail)) {
+        return res.status(400).json({ success: false, error: 'unsupported_email_provider' })
+      }
+      const existing = await User.findOne({ email: normalizedEmail })
       if (existing) {
         return res.status(409).json({ success: false, error: 'email_already_exists' })
       }
@@ -56,7 +222,7 @@ router.post('/send-code', async (req: Request, res: Response) => {
 
     // 忘记密码时检查邮箱是否存在
     if (type === 'reset_password') {
-      const existing = await User.findOne({ email: email.toLowerCase().trim(), provider: 'email' })
+      const existing = await User.findOne({ email: normalizedEmail, provider: 'email' })
       if (!existing) {
         // 为了安全，不暴露邮箱是否存在
         return res.json({ success: true, message: '如果邮箱存在，验证码已发送' })
@@ -123,7 +289,7 @@ router.post('/verify-code', async (req: Request, res: Response) => {
  */
 router.post('/register', async (req: Request, res: Response) => {
   try {
-    const { email, password, nickname, skipVerification } = req.body
+    const { email, password, nickname } = req.body
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'email_and_password_required' })
@@ -151,28 +317,23 @@ router.post('/register', async (req: Request, res: Response) => {
       return res.status(409).json({ success: false, error: 'email_already_exists' })
     }
 
-    // 验证邮箱验证码（除非是开发环境跳过验证）
-    const isDev = process.env.NODE_ENV !== 'production' && skipVerification
-    if (!isDev) {
-      const isVerified = await emailVerificationService.isEmailVerified(normalizedEmail, 'register')
-      if (!isVerified) {
-        return res.status(400).json({ success: false, error: 'email_not_verified' })
-      }
+    const isFirstUser = await needsBootstrapAdmin()
+    if (!isFirstUser) {
+      return res.status(403).json({ success: false, error: 'registration_closed' })
+    }
+    if (!isAllowedBootstrapEmail(normalizedEmail)) {
+      return res.status(400).json({ success: false, error: 'unsupported_email_provider' })
+    }
+
+    const isVerified = await emailVerificationService.isEmailVerified(normalizedEmail, 'register')
+    if (!isVerified) {
+      return res.status(400).json({ success: false, error: 'email_not_verified' })
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
 
-    // 使用 MongoDB 事务原子性检查并创建用户
-    const session = await User.startSession()
-
     try {
-      session.startTransaction()
-
-      // 检查是否已存在超级管理员
-      const existingSuperAdmin = await User.findOne({ role: 'super_admin' }).session(session)
-      const isFirstUser = !existingSuperAdmin
-
-      const user = await User.create([{
+      const newUser = await User.create({
         email: normalizedEmail,
         nickname: nickname?.trim() || normalizedEmail.split('@')[0],
         avatar: '',
@@ -183,11 +344,7 @@ router.post('/register', async (req: Request, res: Response) => {
         permissions: [],
         isActive: isFirstUser, // 第一个用户自动激活，其他用户需要审批
         lastLoginAt: new Date(),
-      }], { session })
-
-      await session.commitTransaction()
-
-      const newUser = user[0]
+      })
 
       // 清除验证码记录
       await emailVerificationService.clearVerification(normalizedEmail, 'register')
@@ -221,16 +378,14 @@ router.post('/register', async (req: Request, res: Response) => {
         },
       })
     } catch (error: any) {
-      await session.abortTransaction()
-
-      // 处理并发创建导致的重复键错误
       if (error.code === 11000) {
+        if (error.keyPattern?.role) {
+          return res.status(403).json({ success: false, error: 'registration_closed' })
+        }
         return res.status(409).json({ success: false, error: 'email_already_exists' })
       }
 
       throw error
-    } finally {
-      session.endSession()
     }
   } catch (error) {
     logger.error({ error }, 'Registration failed')

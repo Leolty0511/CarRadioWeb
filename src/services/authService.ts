@@ -26,6 +26,17 @@ function getCsrfHeader(): Record<string, string> {
 
 // --- Email verification code flow ---
 
+export async function getBootstrapStatus(): Promise<{ success: boolean; needsBootstrap: boolean; error?: string }> {
+  try {
+    const response = await fetch('/api/auth/bootstrap-status', {
+      credentials: 'include',
+    })
+    return await response.json()
+  } catch {
+    return { success: false, needsBootstrap: false, error: 'network_error' }
+  }
+}
+
 /** Send verification code to email */
 export async function sendVerificationCode(
   email: string,
@@ -56,6 +67,37 @@ export async function verifyCode(
       headers: { 'Content-Type': 'application/json', ...getCsrfHeader() },
       credentials: 'include',
       body: JSON.stringify({ email: email.trim(), code, type }),
+    })
+    return await response.json()
+  } catch {
+    return { success: false, error: 'network_error' }
+  }
+}
+
+export async function getInvitation(
+  token: string
+): Promise<{ success: boolean; error?: string; invitation?: { email: string; nickname: string; expiresAt: string } }> {
+  try {
+    const response = await fetch(`/api/auth/invitations/${encodeURIComponent(token)}`, {
+      credentials: 'include',
+    })
+    return await response.json()
+  } catch {
+    return { success: false, error: 'network_error' }
+  }
+}
+
+export async function acceptInvitation(
+  token: string,
+  password: string,
+  nickname?: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const response = await fetch('/api/auth/accept-invitation', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getCsrfHeader() },
+      credentials: 'include',
+      body: JSON.stringify({ token, password, nickname }),
     })
     return await response.json()
   } catch {

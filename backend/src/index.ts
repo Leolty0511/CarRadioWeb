@@ -56,7 +56,9 @@ import './models/LegalVersion';
 import './models/LegalPageContent';
 import './models/NewsletterSubscriber';
 import './models/NewsletterCampaign';
+import './models/AdminInvitation';
 import { seedDevAdmin } from './seed/devAdmin';
+import { ensureAdminIndexes } from './services/adminIndexService';
 const _userModelRef = User;
 
 // User management + audit log routes
@@ -192,6 +194,16 @@ app.use(csrfMiddleware);
 mongoose.connect(MONGODB_URI)
   .then(async () => {
     dbLogger.info('MongoDB connected');
+
+    try {
+      await ensureAdminIndexes();
+      systemLogger.info('Admin indexes ensured');
+    } catch (error) {
+      systemLogger.error({ error }, 'Admin index initialization failed');
+      if (process.env.NODE_ENV === 'production') {
+        process.exit(1);
+      }
+    }
 
     // 初始化系统配置
     try {

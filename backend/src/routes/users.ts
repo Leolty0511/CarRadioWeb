@@ -4,20 +4,35 @@
  */
 
 import { Router, Request, Response } from 'express'
-import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 import User from '../models/User'
+import AdminInvitation from '../models/AdminInvitation'
 import { requireSuperAdmin } from '../middleware/auth'
 import { ALL_PERMISSIONS } from '../config/permissions'
 import { createLogger } from '../utils/logger'
-import { normalizeLoginUsername } from '../utils/loginUsername'
+import emailVerificationService from '../services/emailVerificationService'
 
 const logger = createLogger('users-route')
 
-const BCRYPT_ROUNDS = 12
-
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const INVITE_EXPIRES_MS = 48 * 60 * 60 * 1000
 
 const router = Router()
+
+function buildInviteUrl(token: string): string {
+  const base = (process.env.FRONTEND_URL || process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:5173').replace(/\/$/, '')
+  return `${base}/admin?invite=${encodeURIComponent(token)}`
+}
+
+function normalizePermissions(permissions: unknown): string[] {
+  return Array.isArray(permissions)
+    ? permissions.filter((p: unknown): p is string => typeof p === 'string' && ALL_PERMISSIONS.includes(p as any))
+    : []
+}
+
+function hasInvalidPermissions(permissions: unknown): boolean {
+  return Array.isArray(permissions) && permissions.some((p) => typeof p !== 'string' || !ALL_PERMISSIONS.includes(p as any))
+}
 
 /**
  * PUT /api/users/me/nickname — any authenticated admin can update their own nickname
@@ -73,73 +88,61 @@ router.get('/permissions', (_req: Request, res: Response) => {
 /** POST /api/users — create a new admin (invited by super_admin) */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { email, nickname, permissions, password, loginUsername } = req.body
+    const { email, nickname, permissions } = req.body
 
     if (!nickname?.trim()) {
       return res.status(400).json({ success: false, error: 'nickname_required' })
     }
 
-    const userData: Record<string, unknown> = {
+    if (!email?.trim()) {
+      return res.status(400).json({ success: false, error: 'email_required' })
+    }
+    const normalizedEmail = String(email).trim().toLowerCase()
+    if (!EMAIL_SHAPE.test(normalizedEmail)) {
+      return res.status(400).json({ success: false, error: 'invalid_email' })
+    }
+    if (await User.findOne({ email: normalizedEmail })) {
+      return res.status(409).json({ success: false, error: 'email_already_exists' })
+    }
+
+    await AdminInvitation.updateMany(
+      { email: normalizedEmail, acceptedAt: null, revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    )
+
+    if (hasInvalidPermissions(permissions)) {
+      return res.status(400).json({ success: false, error: 'invalid_permissions' })
+    }
+
+    const safePermissions = normalizePermissions(permissions)
+    const token = crypto.randomBytes(32).toString('base64url')
+    const invitation = await AdminInvitation.create({
+      email: normalizedEmail,
       nickname: nickname.trim(),
-      avatar: '',
-      role: 'admin',
-      permissions: Array.isArray(permissions) ? permissions : [],
-      isActive: true,
+      permissions: safePermissions,
+      tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
+      invitedBy: req.user!._id,
+      expiresAt: new Date(Date.now() + INVITE_EXPIRES_MS),
+    })
+
+    const emailResult = await emailVerificationService.sendAdminInvitation(
+      normalizedEmail,
+      buildInviteUrl(token),
+      invitation.nickname
+    )
+    if (!emailResult.success) {
+      invitation.revokedAt = new Date()
+      await invitation.save()
+      return res.status(400).json({ success: false, error: emailResult.error || 'send_failed' })
     }
 
-    const passwordStr = typeof password === 'string' ? password.trim() : ''
-
-    if (passwordStr.length > 0) {
-      if (passwordStr.length < 8) {
-        return res.status(400).json({ success: false, error: 'password_too_short' })
-      }
-
-      const lu = normalizeLoginUsername(typeof loginUsername === 'string' ? loginUsername : '')
-      if (!lu) {
-        return res.status(400).json({ success: false, error: 'login_username_invalid' })
-      }
-
-      if (await User.findOne({ loginUsername: lu })) {
-        return res.status(409).json({ success: false, error: 'login_username_taken' })
-      }
-      if (await User.findOne({ email: lu })) {
-        return res.status(409).json({ success: false, error: 'login_username_taken' })
-      }
-
-      const emailTrim = typeof email === 'string' ? email.trim().toLowerCase() : ''
-      if (emailTrim) {
-        if (!EMAIL_SHAPE.test(emailTrim)) {
-          return res.status(400).json({ success: false, error: 'invalid_contact_email' })
-        }
-        if (await User.findOne({ email: emailTrim })) {
-          return res.status(409).json({ success: false, error: 'email_already_exists' })
-        }
-        userData.email = emailTrim
-      }
-
-      userData.loginUsername = lu
-      userData.provider = 'email'
-      userData.providerId = `local_${lu}`
-      userData.passwordHash = await bcrypt.hash(passwordStr, BCRYPT_ROUNDS)
-    } else {
-      if (!email?.trim()) {
-        return res.status(400).json({ success: false, error: 'email_required' })
-      }
-      const em = email.trim().toLowerCase()
-      if (await User.findOne({ email: em })) {
-        return res.status(409).json({ success: false, error: 'email_already_exists' })
-      }
-
-      userData.email = em
-      userData.provider = 'google'
-      userData.providerId = `pending_${Date.now()}`
+    res.status(201).json({ success: true, data: invitation })
+  } catch (error: any) {
+    if (error.code === 11000 && error.keyPattern?.email) {
+      return res.status(409).json({ success: false, error: 'active_invitation_exists' })
     }
-
-    const user = await User.create(userData)
-    res.status(201).json({ success: true, data: user })
-  } catch (error) {
-    logger.error({ error }, 'Create user failed')
-    res.status(500).json({ success: false, error: 'create_failed' })
+    logger.error({ error }, 'Invite user failed')
+    res.status(500).json({ success: false, error: 'invite_failed' })
   }
 })
 
@@ -159,8 +162,11 @@ router.put('/:id', async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, error: 'cannot_modify_super_admin' })
     }
 
-    if (nickname !== undefined) user.nickname = nickname
-    if (Array.isArray(permissions)) user.permissions = permissions
+    if (nickname !== undefined) user.nickname = String(nickname).trim()
+    if (hasInvalidPermissions(permissions)) {
+      return res.status(400).json({ success: false, error: 'invalid_permissions' })
+    }
+    if (Array.isArray(permissions)) user.permissions = normalizePermissions(permissions)
     if (typeof isActive === 'boolean') user.isActive = isActive
 
     await user.save()
@@ -191,30 +197,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error({ error, userId: req.params.id }, 'Delete user failed')
     res.status(500).json({ success: false, error: 'delete_failed' })
-  }
-})
-
-/** PUT /api/users/:id/nickname — kept for backward compatibility, redirects to /me/nickname logic */
-router.put('/:id/nickname', async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params
-    const { nickname } = req.body
-
-    if (!nickname?.trim()) {
-      return res.status(400).json({ success: false, error: 'nickname_required' })
-    }
-
-    const user = await User.findById(id)
-    if (!user) {
-      return res.status(404).json({ success: false, error: 'user_not_found' })
-    }
-
-    user.nickname = nickname.trim()
-    await user.save()
-    res.json({ success: true, data: user })
-  } catch (error) {
-    logger.error({ error }, 'Update user nickname failed')
-    res.status(500).json({ success: false, error: 'update_failed' })
   }
 })
 

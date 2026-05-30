@@ -106,7 +106,10 @@ UserSchema.methods.isSuperAdmin = function (): boolean {
 UserSchema.index({ provider: 1, providerId: 1 }, { unique: true })
 UserSchema.index({ email: 1 }, { unique: true, sparse: true })
 UserSchema.index({ loginUsername: 1 }, { unique: true, sparse: true })
-UserSchema.index({ role: 1 })
+UserSchema.index(
+  { role: 1 },
+  { unique: true, partialFilterExpression: { role: 'super_admin' } }
+)
 UserSchema.index({ isActive: 1 })
 
 export default mongoose.model<IUser>('User', UserSchema)
