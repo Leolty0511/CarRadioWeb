@@ -434,6 +434,9 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
                 required
               />
             </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {t('adminAuth.bootstrapTokenHelp')}
+            </p>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {t('adminAuth.passwordHint')}
