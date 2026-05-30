@@ -31,12 +31,30 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const [cooldown, setCooldown] = useState(0)
   const [providerInfo, setProviderInfo] = useState<{ name: string; authHelp: string } | null>(null)
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
+  const [bootstrapChecked, setBootstrapChecked] = useState(false)
+  const [bootstrapError, setBootstrapError] = useState(false)
+  const [hasInvitation, setHasInvitation] = useState(false)
   const [invitationToken, setInvitationToken] = useState('')
   const [invitationEmail, setInvitationEmail] = useState('')
+
+  const loadBootstrapStatus = async (invite = '') => {
+    setBootstrapError(false)
+    const result = await getBootstrapStatus()
+    if (result.success) {
+      setNeedsBootstrap(result.needsBootstrap)
+      if (result.needsBootstrap && !invite) {
+        setStep('register-email')
+      }
+    } else {
+      setBootstrapError(true)
+    }
+    setBootstrapChecked(true)
+  }
 
   useEffect(() => {
     let cancelled = false
     const invite = new URLSearchParams(window.location.search).get('invite') || ''
+    setHasInvitation(!!invite)
     if (invite) {
       setLoading(true)
       getInvitation(invite).then(result => {
@@ -54,13 +72,8 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
         if (!cancelled) {setLoading(false)}
       })
     }
-    getBootstrapStatus().then(result => {
-      if (!cancelled && result.success) {
-        setNeedsBootstrap(result.needsBootstrap)
-        if (result.needsBootstrap && !invite) {
-          setStep('register-email')
-        }
-      }
+    loadBootstrapStatus(invite).then(() => {
+      if (cancelled) {return}
     })
     return () => {
       cancelled = true
@@ -256,6 +269,10 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     setVerifyCode('')
     setPassword('')
     setProviderInfo(null)
+    if (needsBootstrap && !hasInvitation) {
+      setStep('register-email')
+      return
+    }
     if (step === 'register-email' || step === 'forgot-email') {
       setStep('login')
     } else if (step === 'register-verify') {
@@ -272,6 +289,36 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const renderStepContent = () => {
     switch (step) {
       case 'login':
+        if (!bootstrapChecked) {
+          return (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-slate-500 dark:text-slate-400">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {t('adminAuth.checkingBootstrap')}
+            </div>
+          )
+        }
+
+        if (bootstrapError) {
+          return (
+            <div className="space-y-3">
+              <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300 text-sm p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                <span>{t('adminAuth.bootstrapCheckFailed')}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBootstrapChecked(false)
+                  loadBootstrapStatus()
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 transition-colors"
+              >
+                {t('adminAuth.retryBootstrapCheck')}
+              </button>
+            </div>
+          )
+        }
+
         return (
           <>
             <form onSubmit={handleLogin} className="space-y-3">
@@ -357,14 +404,16 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
               {cooldown > 0 ? t('adminAuth.resendIn', { seconds: cooldown }) : t('adminAuth.sendCode')}
             </button>
 
-            <button
-              type="button"
-              onClick={goBack}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-slate-600 dark:text-slate-400 text-sm hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              {t('adminAuth.backToLogin')}
-            </button>
+            {!needsBootstrap && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-slate-600 dark:text-slate-400 text-sm hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {t('adminAuth.backToLogin')}
+              </button>
+            )}
           </div>
         )
 

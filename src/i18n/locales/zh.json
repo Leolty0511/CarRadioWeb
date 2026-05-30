@@ -1838,6 +1838,9 @@
     "accountPendingApproval": "注册成功，等待管理员审核",
     "forgotPassword": "忘记密码？",
     "noAccount": "没有账号？去注册",
+    "checkingBootstrap": "正在检测管理员初始化状态...",
+    "bootstrapCheckFailed": "无法检测本站是否需要创建第一个超级管理员。请检查后端连接后重试。",
+    "retryBootstrapCheck": "重新检测",
     "errors": {
       "invalid_credentials": "账号或密码错误",
       "email_already_exists": "该邮箱已注册",
