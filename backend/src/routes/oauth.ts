@@ -20,7 +20,6 @@ const logger = createSecureLogger('auth-route')
 
 const BCRYPT_ROUNDS = 12
 const MIN_PASSWORD_LENGTH = 10
-const DEV_BOOTSTRAP_TOKEN = 'dev-admin-bootstrap'
 
 const router = Router()
 
@@ -31,27 +30,6 @@ async function needsBootstrapAdmin(): Promise<boolean> {
 
 function hashInviteToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
-}
-
-function getBootstrapToken(): string | null {
-  const configured = process.env.ADMIN_BOOTSTRAP_TOKEN?.trim()
-  if (configured) {
-    return configured
-  }
-  if (process.env.NODE_ENV !== 'production') {
-    return DEV_BOOTSTRAP_TOKEN
-  }
-  return null
-}
-
-function isValidBootstrapToken(token: string): boolean {
-  const expected = getBootstrapToken()
-  if (!expected) {
-    return false
-  }
-  const providedBuffer = Buffer.from(token)
-  const expectedBuffer = Buffer.from(expected)
-  return providedBuffer.length === expectedBuffer.length && crypto.timingSafeEqual(providedBuffer, expectedBuffer)
 }
 
 function validatePassword(password: string): string | null {
@@ -227,7 +205,7 @@ router.post('/send-code', async (req: Request, res: Response) => {
       if (!(await needsBootstrapAdmin())) {
         return res.status(403).json({ success: false, error: 'registration_closed' })
       }
-      return res.status(400).json({ success: false, error: 'registration_uses_bootstrap_token' })
+      return res.status(400).json({ success: false, error: 'registration_does_not_send_code' })
     }
 
     // 忘记密码时检查邮箱是否存在
@@ -300,7 +278,6 @@ router.post('/verify-code', async (req: Request, res: Response) => {
 router.post('/register', async (req: Request, res: Response) => {
   try {
     const { email, password, nickname } = req.body
-    const bootstrapToken = String(req.body.bootstrapToken || '').trim()
 
     if (!email || !password) {
       return res.status(400).json({ success: false, error: 'email_and_password_required' })
@@ -331,12 +308,6 @@ router.post('/register', async (req: Request, res: Response) => {
     const isFirstUser = await needsBootstrapAdmin()
     if (!isFirstUser) {
       return res.status(403).json({ success: false, error: 'registration_closed' })
-    }
-    if (!getBootstrapToken()) {
-      return res.status(503).json({ success: false, error: 'bootstrap_token_not_configured' })
-    }
-    if (!bootstrapToken || !isValidBootstrapToken(bootstrapToken)) {
-      return res.status(403).json({ success: false, error: 'invalid_bootstrap_token' })
     }
 
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)

@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Shield, AlertCircle, Mail, Lock, User, Loader2, ArrowLeft, KeyRound } from 'lucide-react'
+import { Shield, AlertCircle, Mail, Lock, User, Loader2, ArrowLeft } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { acceptInvitation, getBootstrapStatus, getInvitation, sendVerificationCode, verifyCode as verifyCodeApi, emailLogin, emailRegister, resetPassword } from '@/services/authService'
 
@@ -28,7 +28,6 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [verifyCode, setVerifyCode] = useState('')
-  const [bootstrapToken, setBootstrapToken] = useState('')
   const [cooldown, setCooldown] = useState(0)
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
   const [bootstrapChecked, setBootstrapChecked] = useState(false)
@@ -147,11 +146,6 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
       return
     }
 
-    if (!bootstrapToken.trim()) {
-      setError(t('adminAuth.bootstrapTokenRequired'))
-      return
-    }
-
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(t('adminAuth.passwordTooShort'))
       return
@@ -169,7 +163,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
     setLoading(true)
     try {
-      const result = await emailRegister(email, password, nickname || undefined, bootstrapToken)
+      const result = await emailRegister(email, password, nickname || undefined)
 
       if (result.success) {
         onAuthenticated()
@@ -421,22 +415,6 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
                 required
               />
             </div>
-
-            <div className="relative">
-              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input
-                type="password"
-                value={bootstrapToken}
-                onChange={(e) => setBootstrapToken(e.target.value)}
-                placeholder={t('adminAuth.bootstrapTokenPlaceholder')}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 transition-shadow"
-                autoComplete="off"
-                required
-              />
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {t('adminAuth.bootstrapTokenHelp')}
-            </p>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {t('adminAuth.passwordHint')}

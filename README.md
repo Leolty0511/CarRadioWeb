@@ -85,17 +85,14 @@ Admin login uses **email verification code + password**. No external OAuth depen
 
 #### First Deployment
 
-1. Set `ADMIN_BOOTSTRAP_TOKEN` in `backend/config.env` to a strong random value. This is the first-setup code shown on `/admin`.
-2. Visit `/admin`
-3. Enter email, password, and the first-setup code
-4. **The first registered user automatically becomes `super_admin`** (cannot be deleted)
-5. Configure SMTP after login to enable password reset and admin invitation emails
-
-Why this exists: on a public deployment, the first visitor to `/admin` must not be able to claim super admin access. In local development, if `ADMIN_BOOTSTRAP_TOKEN` is omitted, the backend accepts `dev-admin-bootstrap`. Do not use that fallback in production.
+1. Visit `/admin`
+2. Enter email and password
+3. **The first registered user automatically becomes `super_admin`** (cannot be deleted)
+4. Configure SMTP after login to enable password reset and admin invitation emails
 
 #### SMTP Configuration
 
-Required for password reset codes and admin invitation emails. First super admin setup uses `ADMIN_BOOTSTRAP_TOKEN` and does not require SMTP. For local development and Docker self-hosted testing, the project can use Mailpit without any personal mailbox credentials; open `http://127.0.0.1:8025` to read emails. For real email delivery, replace the same variables with any SMTP provider.
+Required for password reset codes and admin invitation emails. First super admin setup does not require SMTP. For local development and Docker self-hosted testing, the project can use Mailpit without any personal mailbox credentials; open `http://127.0.0.1:8025` to read emails. For real email delivery, replace the same variables with any SMTP provider.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
@@ -197,7 +194,6 @@ cp backend/config.env.example backend/config.env
 |----------|----------|-------------|
 | `MONGODB_URI` | Yes | MongoDB connection string |
 | `JWT_SECRET` | Yes | JWT signing secret |
-| `ADMIN_BOOTSTRAP_TOKEN` | Yes | First-setup code for creating the first `super_admin`; prevents others from claiming admin access |
 | `SESSION_SECRET` | Yes | Express session secret |
 | `SMTP_HOST` | For email features | SMTP server; use Mailpit locally |
 | `SMTP_PORT` | For email features | SMTP port (`1025` for Mailpit) |
@@ -402,17 +398,14 @@ See the [`LICENSE`](LICENSE) file in the repository root. If a separate license 
 
 #### 首次部署
 
-1. 在 `backend/config.env` 中配置强随机 `ADMIN_BOOTSTRAP_TOKEN`。这就是 `/admin` 页面提示的“首次部署设置码”
-2. 访问 `/admin`
-3. 输入邮箱、密码和首次部署设置码
-4. **第一个注册的用户自动成为超级管理员（`super_admin`）**，不可被删除
-5. 登录后再配置 SMTP，用于忘记密码和管理员邀请邮件
-
-为什么需要它：公开部署时，不能让第一个访问 `/admin` 的人抢先创建超级管理员。本地开发环境如果未配置 `ADMIN_BOOTSTRAP_TOKEN`，后端会接受 `dev-admin-bootstrap`。生产环境不要使用该默认值。
+1. 访问 `/admin`
+2. 输入邮箱和密码
+3. **第一个注册的用户自动成为超级管理员（`super_admin`）**，不可被删除
+4. 登录后再配置 SMTP，用于忘记密码和管理员邀请邮件
 
 #### SMTP 配置
 
-用于发送忘记密码验证码和管理员邀请邮件。首个超级管理员初始化使用 `ADMIN_BOOTSTRAP_TOKEN`，不依赖 SMTP。在 `backend/config.env` 中配置：
+用于发送忘记密码验证码和管理员邀请邮件。首个超级管理员初始化不依赖 SMTP。在 `backend/config.env` 中配置：
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
@@ -480,7 +473,6 @@ cp backend/config.env.example backend/config.env
 |------|------|------|
 | `MONGODB_URI` | 是 | MongoDB 连接字符串 |
 | `JWT_SECRET` | 是 | JWT 签名密钥（使用强随机字符串） |
-| `ADMIN_BOOTSTRAP_TOKEN` | 是 | 创建首个 `super_admin` 的首次部署设置码，防止他人抢占管理员权限 |
 | `SESSION_SECRET` | 是 | Express Session 密钥 |
 | `SMTP_HOST` | 邮件功能需要 | SMTP 服务器；本地可用 Mailpit |
 | `SMTP_PORT` | 邮件功能需要 | SMTP 端口（Mailpit 为 `1025`） |

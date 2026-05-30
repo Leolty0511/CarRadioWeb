@@ -129,15 +129,14 @@ export async function emailLogin(
 export async function emailRegister(
   email: string,
   password: string,
-  nickname?: string,
-  bootstrapToken?: string
+  nickname?: string
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...getCsrfHeader() },
       credentials: 'include',
-      body: JSON.stringify({ email, password, nickname, bootstrapToken }),
+      body: JSON.stringify({ email, password, nickname }),
     })
     return await response.json()
   } catch {
