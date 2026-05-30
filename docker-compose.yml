@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # Web 应用服务
   web:
     build: .
     container_name: automotivehu-web
@@ -12,30 +11,35 @@ services:
       MONGODB_URI: mongodb://mongo:27017/knowledge-base
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
+      ADMIN_BOOTSTRAP_TOKEN: ${ADMIN_BOOTSTRAP_TOKEN:?ADMIN_BOOTSTRAP_TOKEN is required}
       OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID}
       OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET}
       OSS_BUCKET: ${OSS_BUCKET}
       OSS_REGION: ${OSS_REGION}
       OSS_ENDPOINT: ${OSS_ENDPOINT}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SMTP_HOST: ${SMTP_HOST:-mailpit}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@localhost}
     depends_on:
       - mongo
       - redis
+      - mailpit
     restart: unless-stopped
     networks:
       - app-network
     volumes:
       - ./backend/uploads:/app/backend/uploads
 
-  # MongoDB 数据库
   mongo:
     image: mongo:6
     container_name: automotivehu-mongo
     ports:
       - "27017:27017"
     environment:
-      # 安全警告：必须通过 .env 文件或环境变量设置以下值
-      # 不要使用默认凭据！
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:?MONGO_USERNAME is required}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:?MONGO_PASSWORD is required}
       MONGO_INITDB_DATABASE: knowledge-base
@@ -46,7 +50,6 @@ services:
     networks:
       - app-network
 
-  # Redis 缓存
   redis:
     image: redis:7-alpine
     container_name: automotivehu-redis
@@ -59,7 +62,16 @@ services:
     networks:
       - app-network
 
-  # Nginx 反向代理（可选）
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: automotivehu-mailpit
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+    restart: unless-stopped
+    networks:
+      - app-network
+
   nginx:
     image: nginx:alpine
     container_name: automotivehu-nginx
@@ -75,7 +87,6 @@ services:
     networks:
       - app-network
 
-# 数据卷
 volumes:
   mongo-data:
     driver: local
@@ -84,8 +95,6 @@ volumes:
   redis-data:
     driver: local
 
-# 网络
 networks:
   app-network:
     driver: bridge
-

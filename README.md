@@ -85,24 +85,26 @@ Admin login uses **email verification code + password**. No external OAuth depen
 
 #### First Deployment
 
-1. Configure SMTP in `backend/config.env` for sending verification codes
-2. Visit `/admin` and click "Register"
-3. Enter email → receive verification code → set password
+1. Set `ADMIN_BOOTSTRAP_TOKEN` in `backend/config.env` to a strong random value
+2. Visit `/admin`
+3. Enter email, password, and the bootstrap token
 4. **The first registered user automatically becomes `super_admin`** (cannot be deleted)
-5. Subsequent registrations default to `admin` role, requiring super_admin approval
+5. Configure SMTP after login to enable password reset and admin invitation emails
+
+In non-production development, if `ADMIN_BOOTSTRAP_TOKEN` is omitted, the backend accepts `dev-admin-bootstrap`. Do not use that fallback in production.
 
 #### SMTP Configuration
 
-Required for sending verification codes. Configure in `backend/config.env`:
+Required for password reset codes and admin invitation emails. First super admin setup uses `ADMIN_BOOTSTRAP_TOKEN` and does not require SMTP. For local development and Docker self-hosted testing, the project can use Mailpit without any personal mailbox credentials; open `http://127.0.0.1:8025` to read emails. For real email delivery, replace the same variables with any SMTP provider.
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `SMTP_HOST` | SMTP server address | `smtp.163.com` |
-| `SMTP_PORT` | SMTP port | `465` (SSL) or `587` (TLS) |
-| `SMTP_SECURE` | Use SSL | `true` |
-| `SMTP_USER` | SMTP username (usually email) | `your-email@163.com` |
-| `SMTP_PASS` | Password or authorization code | Authorization code (not login password) |
-| `SMTP_FROM` | Sender address | `noreply@example.com` |
+| `SMTP_HOST` | SMTP server address | `127.0.0.1` locally, `mailpit` in Docker |
+| `SMTP_PORT` | SMTP port | `1025` locally, provider port for real delivery |
+| `SMTP_SECURE` | Use SSL | `false` for Mailpit, provider value for real delivery |
+| `SMTP_USER` | SMTP username | Empty for Mailpit; provider username if required |
+| `SMTP_PASS` | SMTP password or authorization code | Empty for Mailpit; provider secret if required |
+| `SMTP_FROM` | Sender address | `noreply@localhost` |
 
 **Common email providers:**
 
@@ -195,13 +197,14 @@ cp backend/config.env.example backend/config.env
 |----------|----------|-------------|
 | `MONGODB_URI` | Yes | MongoDB connection string |
 | `JWT_SECRET` | Yes | JWT signing secret |
+| `ADMIN_BOOTSTRAP_TOKEN` | Yes | One-time token for creating the first `super_admin` |
 | `SESSION_SECRET` | Yes | Express session secret |
-| `SMTP_HOST` | Yes | SMTP server for verification codes |
-| `SMTP_PORT` | Yes | SMTP port (usually 465 for SSL) |
-| `SMTP_SECURE` | Yes | Use SSL (`true`/`false`) |
-| `SMTP_USER` | Yes | SMTP username (usually email) |
-| `SMTP_PASS` | Yes | SMTP password or authorization code |
-| `SMTP_FROM` | No | Sender address (defaults to SMTP_USER) |
+| `SMTP_HOST` | For email features | SMTP server; use Mailpit locally |
+| `SMTP_PORT` | For email features | SMTP port (`1025` for Mailpit) |
+| `SMTP_SECURE` | For email features | Use SSL (`false` for Mailpit) |
+| `SMTP_USER` | No | Required only if the SMTP provider needs authentication |
+| `SMTP_PASS` | No | Required only if the SMTP provider needs authentication |
+| `SMTP_FROM` | No | Sender address (defaults to `noreply@localhost`) |
 | `OSS_ACCESS_KEY_ID` / `OSS_ACCESS_KEY_SECRET` | For file upload | Alibaba Cloud OSS keys |
 | `OSS_BUCKET` / `OSS_REGION` / `OSS_ENDPOINT` | For file upload | OSS bucket config |
 | `OPENAI_API_KEY` | For AI | OpenAI / DeepSeek API key |
@@ -399,24 +402,26 @@ See the [`LICENSE`](LICENSE) file in the repository root. If a separate license 
 
 #### 首次部署
 
-1. 在 `backend/config.env` 中配置 SMTP（用于发送验证码）
-2. 访问 `/admin`，点击「注册」
-3. 输入邮箱 → 接收验证码 → 设置密码
+1. 在 `backend/config.env` 中配置强随机 `ADMIN_BOOTSTRAP_TOKEN`
+2. 访问 `/admin`
+3. 输入邮箱、密码和初始化密钥
 4. **第一个注册的用户自动成为超级管理员（`super_admin`）**，不可被删除
-5. 后续注册默认为 `admin` 角色，需超级管理员审批
+5. 登录后再配置 SMTP，用于忘记密码和管理员邀请邮件
+
+非生产开发环境如果未配置 `ADMIN_BOOTSTRAP_TOKEN`，后端会接受 `dev-admin-bootstrap`。生产环境不要使用该默认值。
 
 #### SMTP 配置
 
-用于发送验证码，在 `backend/config.env` 中配置：
+用于发送忘记密码验证码和管理员邀请邮件。首个超级管理员初始化使用 `ADMIN_BOOTSTRAP_TOKEN`，不依赖 SMTP。在 `backend/config.env` 中配置：
 
 | 变量 | 说明 | 示例 |
 |------|------|------|
-| `SMTP_HOST` | SMTP 服务器地址 | `smtp.163.com` |
-| `SMTP_PORT` | SMTP 端口 | `465`（SSL）或 `587`（TLS） |
-| `SMTP_SECURE` | 是否使用 SSL | `true` |
-| `SMTP_USER` | SMTP 用户名（通常是邮箱） | `your-email@163.com` |
-| `SMTP_PASS` | 密码或授权码 | 授权码（非登录密码） |
-| `SMTP_FROM` | 发件人地址 | `noreply@example.com` |
+| `SMTP_HOST` | SMTP 服务器地址 | 本地 `127.0.0.1`，Docker 中 `mailpit` |
+| `SMTP_PORT` | SMTP 端口 | 本地 `1025`，真实发信按服务商填写 |
+| `SMTP_SECURE` | 是否使用 SSL | Mailpit 为 `false`，真实发信按服务商填写 |
+| `SMTP_USER` | SMTP 用户名 | Mailpit 留空，服务商需要认证时填写 |
+| `SMTP_PASS` | SMTP 密码或授权码 | Mailpit 留空，服务商需要认证时填写 |
+| `SMTP_FROM` | 发件人地址 | `noreply@localhost` |
 
 **常用邮箱服务商：**
 
@@ -475,13 +480,14 @@ cp backend/config.env.example backend/config.env
 |------|------|------|
 | `MONGODB_URI` | 是 | MongoDB 连接字符串 |
 | `JWT_SECRET` | 是 | JWT 签名密钥（使用强随机字符串） |
+| `ADMIN_BOOTSTRAP_TOKEN` | 是 | 创建首个 `super_admin` 的一次性初始化密钥 |
 | `SESSION_SECRET` | 是 | Express Session 密钥 |
-| `SMTP_HOST` | 是 | SMTP 服务器（发送验证码） |
-| `SMTP_PORT` | 是 | SMTP 端口（SSL 通常为 465） |
-| `SMTP_SECURE` | 是 | 是否使用 SSL（`true`/`false`） |
-| `SMTP_USER` | 是 | SMTP 用户名（通常是邮箱） |
-| `SMTP_PASS` | 是 | SMTP 密码或授权码 |
-| `SMTP_FROM` | 否 | 发件人地址（默认使用 SMTP_USER） |
+| `SMTP_HOST` | 邮件功能需要 | SMTP 服务器；本地可用 Mailpit |
+| `SMTP_PORT` | 邮件功能需要 | SMTP 端口（Mailpit 为 `1025`） |
+| `SMTP_SECURE` | 邮件功能需要 | 是否使用 SSL（Mailpit 为 `false`） |
+| `SMTP_USER` | 否 | 仅在 SMTP 服务商要求认证时填写 |
+| `SMTP_PASS` | 否 | 仅在 SMTP 服务商要求认证时填写 |
+| `SMTP_FROM` | 否 | 发件人地址（默认 `noreply@localhost`） |
 | `OSS_ACCESS_KEY_ID` / `OSS_ACCESS_KEY_SECRET` | 文件上传 | 阿里云 OSS 密钥 |
 | `OSS_BUCKET` / `OSS_REGION` / `OSS_ENDPOINT` | 文件上传 | OSS 存储桶配置 |
 | `OPENAI_API_KEY` | AI 功能 | OpenAI / DeepSeek API Key |

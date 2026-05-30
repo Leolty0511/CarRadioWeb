@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Shield, AlertCircle, Mail, Lock, User, Loader2, ArrowLeft } from 'lucide-react'
+import { Shield, AlertCircle, Mail, Lock, User, Loader2, ArrowLeft, KeyRound } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { acceptInvitation, getBootstrapStatus, getInvitation, sendVerificationCode, verifyCode as verifyCodeApi, emailLogin, emailRegister, resetPassword } from '@/services/authService'
 
@@ -15,7 +15,7 @@ interface AdminAuthProps {
 
 const MIN_PASSWORD_LENGTH = 10
 
-type AuthStep = 'login' | 'register-email' | 'register-verify' | 'register-password' | 'forgot-email' | 'forgot-verify' | 'forgot-password' | 'accept-invitation'
+type AuthStep = 'login' | 'register' | 'forgot-email' | 'forgot-verify' | 'forgot-password' | 'accept-invitation'
 
 const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const { t } = useTranslation()
@@ -28,8 +28,8 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
   const [password, setPassword] = useState('')
   const [nickname, setNickname] = useState('')
   const [verifyCode, setVerifyCode] = useState('')
+  const [bootstrapToken, setBootstrapToken] = useState('')
   const [cooldown, setCooldown] = useState(0)
-  const [providerInfo, setProviderInfo] = useState<{ name: string; authHelp: string } | null>(null)
   const [needsBootstrap, setNeedsBootstrap] = useState(false)
   const [bootstrapChecked, setBootstrapChecked] = useState(false)
   const [bootstrapError, setBootstrapError] = useState(false)
@@ -43,7 +43,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     if (result.success) {
       setNeedsBootstrap(result.needsBootstrap)
       if (result.needsBootstrap && !invite) {
-        setStep('register-email')
+        setStep('register')
       }
     } else {
       setBootstrapError(true)
@@ -88,7 +88,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     }
   }, [cooldown])
 
-  const handleSendCode = async (type: 'register' | 'reset_password') => {
+  const handleSendCode = async () => {
     setError(null)
 
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -98,15 +98,12 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
     setLoading(true)
     try {
-      const result = await sendVerificationCode(email, type)
+      const result = await sendVerificationCode(email, 'reset_password')
 
       if (result.success) {
         setCooldown(60) // 60 second cooldown
-        if (result.provider) {
-          setProviderInfo(result.provider)
-        }
         // Move to verify step
-        setStep(type === 'register' ? 'register-verify' : 'forgot-verify')
+        setStep('forgot-verify')
       } else {
         const errorKey = result.error || 'unknown'
         setError(t(`adminAuth.errors.${errorKey}`, t('adminAuth.sendCodeFailed')))
@@ -119,7 +116,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     }
   }
 
-  const handleVerifyCode = async (type: 'register' | 'reset_password') => {
+  const handleVerifyCode = async () => {
     setError(null)
 
     if (!verifyCode.trim() || verifyCode.trim().length !== 6) {
@@ -129,10 +126,10 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
     setLoading(true)
     try {
-      const result = await verifyCodeApi(email, verifyCode, type)
+      const result = await verifyCodeApi(email, verifyCode, 'reset_password')
 
       if (result.success) {
-        setStep(type === 'register' ? 'register-password' : 'forgot-password')
+        setStep('forgot-password')
       } else {
         const errorKey = result.error || 'unknown'
         setError(t(`adminAuth.errors.${errorKey}`, t('adminAuth.verifyFailed')))
@@ -144,6 +141,16 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
   const handleRegister = async () => {
     setError(null)
+
+    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError(t('adminAuth.invalidEmail'))
+      return
+    }
+
+    if (!bootstrapToken.trim()) {
+      setError(t('adminAuth.bootstrapTokenRequired'))
+      return
+    }
 
     if (password.length < MIN_PASSWORD_LENGTH) {
       setError(t('adminAuth.passwordTooShort'))
@@ -162,7 +169,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
     setLoading(true)
     try {
-      const result = await emailRegister(email, password, nickname || undefined)
+      const result = await emailRegister(email, password, nickname || undefined, bootstrapToken)
 
       if (result.success) {
         onAuthenticated()
@@ -268,17 +275,12 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     setError(null)
     setVerifyCode('')
     setPassword('')
-    setProviderInfo(null)
     if (needsBootstrap && !hasInvitation) {
-      setStep('register-email')
+      setStep('register')
       return
     }
-    if (step === 'register-email' || step === 'forgot-email') {
+    if (step === 'register' || step === 'forgot-email') {
       setStep('login')
-    } else if (step === 'register-verify') {
-      setStep('register-email')
-    } else if (step === 'register-password') {
-      setStep('register-verify')
     } else if (step === 'forgot-verify') {
       setStep('forgot-email')
     } else if (step === 'forgot-password') {
@@ -369,7 +371,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
               {needsBootstrap && (
                 <button
                   type="button"
-                  onClick={() => { setStep('register-email'); setError(null); }}
+                  onClick={() => { setStep('register'); setError(null); }}
                   className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
                 >
                   {t('adminAuth.noAccount')}
@@ -379,7 +381,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
           </>
         )
 
-      case 'register-email':
+      case 'register':
         return (
           <div className="space-y-3">
             <div className="relative">
@@ -390,90 +392,11 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder={t('adminAuth.emailPlaceholder')}
                 className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 transition-shadow"
+                autoComplete="email"
                 required
               />
             </div>
 
-            <button
-              type="button"
-              onClick={() => handleSendCode('register')}
-              disabled={loading || cooldown > 0}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {cooldown > 0 ? t('adminAuth.resendIn', { seconds: cooldown }) : t('adminAuth.sendCode')}
-            </button>
-
-            {!needsBootstrap && (
-              <button
-                type="button"
-                onClick={goBack}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-slate-600 dark:text-slate-400 text-sm hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {t('adminAuth.backToLogin')}
-              </button>
-            )}
-          </div>
-        )
-
-      case 'register-verify':
-        return (
-          <div className="space-y-3">
-            {providerInfo && (
-              <div className="text-xs text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 p-2 rounded-lg">
-                {providerInfo.name}: {providerInfo.authHelp}
-              </div>
-            )}
-
-            <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-              {t('adminAuth.codeSentTo', { email })}
-            </p>
-
-            <input
-              type="text"
-              value={verifyCode}
-              onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-              placeholder={t('adminAuth.codePlaceholder')}
-              className="w-full px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 transition-shadow text-center text-2xl tracking-widest"
-              maxLength={6}
-              required
-            />
-
-            <button
-              type="button"
-              onClick={() => handleVerifyCode('register')}
-              disabled={loading || verifyCode.length !== 6}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t('adminAuth.verifyButton')}
-            </button>
-
-            <div className="flex justify-between text-center text-xs">
-              <button
-                type="button"
-                onClick={goBack}
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-              >
-                <ArrowLeft className="h-3 w-3 inline mr-1" />
-                {t('adminAuth.back')}
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSendCode('register')}
-                disabled={cooldown > 0}
-                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
-              >
-                {cooldown > 0 ? t('adminAuth.resendIn', { seconds: cooldown }) : t('adminAuth.resendCode')}
-              </button>
-            </div>
-          </div>
-        )
-
-      case 'register-password':
-        return (
-          <div className="space-y-3">
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input
@@ -499,6 +422,19 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
               />
             </div>
 
+            <div className="relative">
+              <KeyRound className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="password"
+                value={bootstrapToken}
+                onChange={(e) => setBootstrapToken(e.target.value)}
+                placeholder={t('adminAuth.bootstrapTokenPlaceholder')}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-lg text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-400 dark:focus:ring-slate-500 transition-shadow"
+                autoComplete="off"
+                required
+              />
+            </div>
+
             <p className="text-xs text-slate-500 dark:text-slate-400">
               {t('adminAuth.passwordHint')}
             </p>
@@ -513,14 +449,16 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
               {t('adminAuth.registerButton')}
             </button>
 
-            <button
-              type="button"
-              onClick={goBack}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-slate-600 dark:text-slate-400 text-sm hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              {t('adminAuth.back')}
-            </button>
+            {!needsBootstrap && (
+              <button
+                type="button"
+                onClick={goBack}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-slate-600 dark:text-slate-400 text-sm hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {t('adminAuth.back')}
+              </button>
+            )}
           </div>
         )
 
@@ -541,7 +479,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
             <button
               type="button"
-              onClick={() => handleSendCode('reset_password')}
+              onClick={handleSendCode}
               disabled={loading || cooldown > 0}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -579,7 +517,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
 
             <button
               type="button"
-              onClick={() => handleVerifyCode('reset_password')}
+              onClick={handleVerifyCode}
               disabled={loading || verifyCode.length !== 6}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
@@ -598,7 +536,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
               </button>
               <button
                 type="button"
-                onClick={() => handleSendCode('reset_password')}
+                onClick={handleSendCode}
                 disabled={cooldown > 0}
                 className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors disabled:opacity-50"
               >
@@ -703,9 +641,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     switch (step) {
       case 'login':
         return t('adminAuth.login')
-      case 'register-email':
-      case 'register-verify':
-      case 'register-password':
+      case 'register':
         return t('adminAuth.register')
       case 'forgot-email':
       case 'forgot-verify':
@@ -720,11 +656,7 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
     switch (step) {
       case 'login':
         return t('adminAuth.loginHint')
-      case 'register-email':
-        return t('adminAuth.registerEmailHint')
-      case 'register-verify':
-        return t('adminAuth.registerVerifyHint')
-      case 'register-password':
+      case 'register':
         return t('adminAuth.registerPasswordHint')
       case 'forgot-email':
         return t('adminAuth.forgotEmailHint')

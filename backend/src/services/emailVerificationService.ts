@@ -14,6 +14,7 @@
 
 import crypto from 'crypto';
 import nodemailer from 'nodemailer';
+import SMTPTransport from 'nodemailer/lib/smtp-transport';
 import mongoose from 'mongoose';
 import { createLogger } from '../utils/logger';
 
@@ -113,8 +114,8 @@ interface SmtpConfig {
   host: string;
   port: number;
   secure: boolean;
-  user: string;
-  pass: string;
+  user?: string;
+  pass?: string;
   from: string;
 }
 
@@ -128,14 +129,14 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
   const envUser = process.env.SMTP_USER;
   const envPass = process.env.SMTP_PASS;
 
-  if (envHost && envUser && envPass) {
+  if (envHost) {
     return {
       host: envHost,
-      port: parseInt(process.env.SMTP_PORT || '465', 10),
-      secure: process.env.SMTP_SECURE !== 'false',
-      user: envUser,
-      pass: envPass,
-      from: process.env.SMTP_FROM || envUser,
+      port: parseInt(process.env.SMTP_PORT || '1025', 10),
+      secure: process.env.SMTP_SECURE === 'true',
+      user: envUser || undefined,
+      pass: envPass || undefined,
+      from: process.env.SMTP_FROM || envUser || 'noreply@localhost',
     };
   }
 
@@ -286,12 +287,15 @@ ${type === 'register' ? '如非本人操作，请忽略此邮件。' : '如非�
 
     // Send email
     try {
-      const transporter = nodemailer.createTransport({
+      const transportConfig: SMTPTransport.Options = {
         host: smtpConfig.host,
         port: smtpConfig.port,
         secure: smtpConfig.secure,
-        auth: { user: smtpConfig.user, pass: smtpConfig.pass },
-      });
+      };
+      if (smtpConfig.user && smtpConfig.pass) {
+        transportConfig.auth = { user: smtpConfig.user, pass: smtpConfig.pass };
+      }
+      const transporter = nodemailer.createTransport(transportConfig);
 
       await transporter.sendMail({
         from: smtpConfig.from,
@@ -344,12 +348,15 @@ This invitation expires in 48 hours. If you did not expect this invitation, igno
 </div>`;
 
     try {
-      const transporter = nodemailer.createTransport({
+      const transportConfig: SMTPTransport.Options = {
         host: smtpConfig.host,
         port: smtpConfig.port,
         secure: smtpConfig.secure,
-        auth: { user: smtpConfig.user, pass: smtpConfig.pass },
-      });
+      };
+      if (smtpConfig.user && smtpConfig.pass) {
+        transportConfig.auth = { user: smtpConfig.user, pass: smtpConfig.pass };
+      }
+      const transporter = nodemailer.createTransport(transportConfig);
 
       await transporter.sendMail({
         from: smtpConfig.from,
