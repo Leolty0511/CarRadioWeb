@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react'
-import { X, RotateCcw } from 'lucide-react'
+import { Bot, RotateCcw, Sparkles, X } from 'lucide-react'
 import ChatMessage, { ChatMessageData } from './ChatMessage'
 import ChatInput from './ChatInput'
 import { useAITranslation } from '@/hooks/useAITranslation'
@@ -11,6 +11,7 @@ interface AIChatWindowProps {
   onSendMessage: (message: string) => void
   onClearChat: () => void
   isLoading?: boolean
+  status?: 'online' | 'offline'
 }
 
 const AIChatWindow: React.FC<AIChatWindowProps> = ({
@@ -19,7 +20,8 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
   messages,
   onSendMessage,
   onClearChat,
-  isLoading = false
+  isLoading = false,
+  status = 'offline'
 }) => {
   const { t } = useAITranslation()
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -45,37 +47,63 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
 
   if (!isOpen) {return null}
 
+  const quickQuestions = [
+    t('ai.quickQuestions.compatibility'),
+    t('ai.quickQuestions.installation'),
+    t('ai.quickQuestions.troubleshooting'),
+  ]
+  const isOnline = status === 'online'
+
   return (
-    <div className="fixed inset-4 sm:top-20 sm:right-6 sm:inset-auto sm:w-[600px] sm:h-[800px] w-full h-full bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 flex flex-col z-[60] animate-in slide-in-from-bottom-4 duration-300 ai-chat-window">
+    <>
+    <button
+      type="button"
+      aria-label={t('ai.close')}
+      onClick={onClose}
+      className="fixed inset-0 z-[55] bg-slate-950/25 backdrop-blur-[1px] sm:hidden"
+    />
+    <div className="fixed left-3 right-3 top-16 bottom-3 sm:left-auto sm:top-auto sm:right-6 sm:bottom-6 sm:w-[460px] md:w-[500px] sm:h-[min(760px,calc(100vh-7rem))] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-2xl shadow-[0_24px_80px_rgba(15,23,42,0.24)] border border-slate-200/80 dark:border-slate-700/80 flex flex-col overflow-hidden z-[60] animate-in slide-in-from-bottom-4 duration-300 ai-chat-window">
       {/* 头部 */}
-      <div className="flex items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-blue-500/20 bg-gray-100 dark:bg-slate-900 text-gray-800 dark:text-white rounded-t-2xl">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-500/20 rounded-full flex items-center justify-center">
-            <span className="text-xs sm:text-sm font-bold text-blue-500 dark:text-blue-400">{t('ai.label')}</span>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-200/80 dark:border-slate-700/80 bg-white/90 dark:bg-slate-900/90 text-slate-900 dark:text-white">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="h-10 w-10 flex-shrink-0 rounded-xl bg-blue-600 text-white shadow-sm flex items-center justify-center">
+            <Bot className="h-5 w-5" />
           </div>
-          <div>
-            <h3 className="font-semibold text-sm sm:text-base">{t('ai.title')}</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 hidden sm:block">{t('ai.subtitle')}</p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="truncate text-sm sm:text-base font-semibold">{t('ai.title')}</h3>
+              <span className={`hidden sm:inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                isOnline
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                  : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+              }`}>
+                <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                {isOnline ? t('ai.status.online') : t('ai.status.offline')}
+              </span>
+            </div>
+            <p className="truncate text-xs text-slate-500 dark:text-slate-400 hidden sm:block">{t('ai.subtitle')}</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex flex-shrink-0 items-center gap-1">
           {/* 清空聊天 */}
           <button
+            type="button"
             onClick={onClearChat}
-            className="p-2 sm:p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-colors duration-200 touch-manipulation"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors duration-200 touch-manipulation"
             title={t('ai.clearChat')}
           >
-            <RotateCcw className="h-5 w-5 sm:h-4 sm:w-4" />
+            <RotateCcw className="h-4 w-4" />
           </button>
 
           {/* 关闭 */}
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 sm:p-1.5 hover:bg-gray-200 dark:hover:bg-white/10 rounded-lg transition-colors duration-200 touch-manipulation"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-white dark:hover:bg-white/10 transition-colors duration-200 touch-manipulation"
             title={t('ai.close')}
           >
-            <X className="h-5 w-5 sm:h-4 sm:w-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -83,15 +111,30 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
       {/* 消息区域 */}
       <div
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 dark:bg-slate-900"
+        className="flex-1 overflow-y-auto px-3 py-4 sm:px-4 space-y-4 bg-slate-50/90 dark:bg-slate-950/40"
       >
         {messages.length === 0 ? (
-          <div className="text-center text-gray-500 dark:text-gray-400 mt-8">
-            <div className="w-16 h-16 bg-blue-100 dark:bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-blue-500 dark:text-blue-400 text-xl font-bold">{t('ai.label')}</span>
+          <div className="min-h-full flex items-center justify-center px-2 py-6 text-center text-slate-500 dark:text-slate-400">
+            <div className="w-full max-w-sm">
+              <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <Sparkles className="h-6 w-6" />
+              </div>
+              <h4 className="font-semibold text-slate-800 dark:text-slate-100 mb-2">{t('ai.welcome.title')}</h4>
+              <p className="text-sm leading-6 text-slate-500 dark:text-slate-400">{t('ai.welcome.subtitle')}</p>
+              <div className="mt-5 grid gap-2">
+                {quickQuestions.map(question => (
+                  <button
+                    key={question}
+                    type="button"
+                    onClick={() => onSendMessage(question)}
+                    disabled={isLoading}
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-blue-500/40 dark:hover:bg-blue-500/10 dark:hover:text-blue-200"
+                  >
+                    {question}
+                  </button>
+                ))}
+              </div>
             </div>
-            <h4 className="font-semibold text-gray-700 dark:text-gray-200 mb-2">{t('ai.welcome.title')}</h4>
-            <p className="text-sm text-gray-500 dark:text-gray-400">{t('ai.welcome.subtitle')}</p>
           </div>
         ) : (
           <>
@@ -115,6 +158,7 @@ const AIChatWindow: React.FC<AIChatWindowProps> = ({
         placeholder={isLoading ? t('ai.processing') : undefined}
       />
     </div>
+    </>
   )
 }
 

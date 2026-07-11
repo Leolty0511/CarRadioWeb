@@ -1,10 +1,12 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAI } from '@/contexts/AIContext'
 import { sendAIMessage, AIMessage, aiService } from '@/services/aiService'
 import { useContentLanguage } from '@/contexts/ContentLanguageContext'
 import AIFloatingButton from './AIFloatingButton'
 import AIChatWindow from './AIChatWindow'
+
+type AssistantStatus = 'online' | 'offline'
 
 const AIAssistant: React.FC = () => {
   const {
@@ -19,10 +21,30 @@ const AIAssistant: React.FC = () => {
 
   const { t } = useTranslation()
   const { contentLanguage } = useContentLanguage()
+  const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('offline')
 
   // 组件挂载时加载AI配置
   useEffect(() => {
     // TODO: 从后端加载AI配置
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    aiService.getStatus()
+      .then(result => {
+        if (cancelled) {return}
+        setAssistantStatus(result.success && result.status?.online ? 'online' : 'offline')
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAssistantStatus('offline')
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   const handleSendMessage = async (messageContent: string) => {
@@ -177,6 +199,13 @@ const AIAssistant: React.FC = () => {
     if (state.isOpen) {
       closeChat()
     } else {
+      aiService.getStatus()
+        .then(result => {
+          setAssistantStatus(result.success && result.status?.online ? 'online' : 'offline')
+        })
+        .catch(() => {
+          setAssistantStatus('offline')
+        })
       openChat()
     }
   }
@@ -202,6 +231,7 @@ const AIAssistant: React.FC = () => {
         onSendMessage={handleSendMessage}
         onClearChat={handleClearChat}
         isLoading={state.isLoading}
+        status={assistantStatus}
       />
     </>
   )

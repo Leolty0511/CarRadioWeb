@@ -21,7 +21,7 @@ import type { AdminUser } from '@/services/authService'
 import { userHasPermission } from '@/services/authService'
 
 /** 设计常量 */
-const SIDEBAR_WIDTH_EXPANDED = 256
+const SIDEBAR_WIDTH_EXPANDED = 216
 const SIDEBAR_WIDTH_COLLAPSED = 72
 const TRANSITION_DURATION = 'duration-200'
 
@@ -119,7 +119,7 @@ export const AdminNav: React.FC<AdminNavProps> = ({
 
         {!collapsed && (
           <>
-            <span className="flex-1 text-sm font-medium truncate">{item.label}</span>
+            <span className="min-w-0 flex-1 text-left text-sm font-medium truncate">{item.label}</span>
             {showBadge && (
               <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 flex items-center justify-center bg-red-500 text-white text-xs font-semibold rounded-full">
                 {badgeCount > 99 ? '99+' : badgeCount}

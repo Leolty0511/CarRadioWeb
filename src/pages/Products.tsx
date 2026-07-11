@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { ProductCard } from '@/components/ui/ECommerceCard'
 import { HeroBanner } from '@/components/ui/HeroBanner'
 import { Package, Grid, List, SlidersHorizontal } from 'lucide-react'
@@ -34,87 +35,57 @@ export default function Products() {
 
   // 默认 Hero 图片（管理员未配置时使用）- 车载导航屏幕
   const DEFAULT_HERO_IMAGE = 'https://images.unsplash.com/photo-1634804519576-d7047c5b39d6?q=80&w=1920&auto=format&fit=crop'
-  const [heroBannerImage, setHeroBannerImage] = useState<string>(DEFAULT_HERO_IMAGE)
 
-  // 从后端获取 Hero Banner 配置
-  useEffect(() => {
-    const fetchHeroBanner = async () => {
-      try {
-        const response = await fetch(`/api/hero-banners/products?language=${contentLanguage}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data?.imageUrl) {
-            setHeroBannerImage(data.imageUrl)
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fetch hero banner for products page, using default')
+  // 通过 React Query 统一数据获取，享受缓存与请求去重
+  // Hero Banner：失败时降级为默认图片
+  const { data: heroBannerImage = DEFAULT_HERO_IMAGE } = useQuery({
+    queryKey: ['hero-banner', 'products', contentLanguage],
+    queryFn: async () => {
+      const response = await fetch(`/api/hero-banners/products?language=${contentLanguage}`)
+      if (!response.ok) {return DEFAULT_HERO_IMAGE}
+      const data = await response.json()
+      return data?.imageUrl || DEFAULT_HERO_IMAGE
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // 产品分类：失败时降级为仅「全部」分类
+  const { data: categories = [{ id: 'all', name: t('products.categories.all'), icon: '🏷️' }] } = useQuery({
+    queryKey: ['product-categories', contentLanguage],
+    queryFn: async () => {
+      const response = await fetch(`/api/categories?documentType=product&language=${contentLanguage}`)
+      if (!response.ok) {
+        return [{ id: 'all', name: t('products.categories.all'), icon: '🏷️' }]
       }
-    }
+      const data = await response.json()
+      const categoryList = data.data || []
 
-    fetchHeroBanner()
-  }, [contentLanguage])
+      const allCategories: Array<{ id: string; name: string; icon: string }> = [
+        { id: 'all', name: t('products.categories.all'), icon: '🏷️' }
+      ]
+      categoryList.forEach((cat: any) => {
+        allCategories.push({
+          id: cat.name,
+          name: cat.name,
+          icon: cat.icon || '📦'
+        })
+      })
+      return allCategories
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
-  // 从API获取产品数据
-  const [products, setProducts] = useState<Product[]>([])
-  const [loading, setLoading] = useState(true)
-  const [categories, setCategories] = useState<Array<{ id: string; name: string; icon: string }>>([])
-
-  // 获取产品分类
-  useEffect(() => {
-    const fetchCategories = async () => {
-      try {
-        const response = await fetch(`/api/categories?documentType=product&language=${contentLanguage}`)
-        if (response.ok) {
-          const data = await response.json()
-          const categoryList = data.data || []
-
-          // 添加"全部"分类
-          const allCategories = [
-            { id: 'all', name: t('products.categories.all'), icon: '🏷️' }
-          ]
-
-          // 添加从API获取的分类
-          categoryList.forEach((cat: any) => {
-            allCategories.push({
-              id: cat.name,
-              name: cat.name,
-              icon: cat.icon || '📦'
-            })
-          })
-
-          setCategories(allCategories)
-        }
-      } catch (error) {
-        console.warn('Failed to fetch categories')
-        // 使用默认分类作为后备
-        setCategories([
-          { id: 'all', name: t('products.categories.all'), icon: '🏷️' }
-        ])
-      }
-    }
-
-    fetchCategories()
-  }, [contentLanguage, t])
-
-  // 获取产品数据
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch(`/api/products/published?language=${contentLanguage}`)
-        if (response.ok) {
-          const data = await response.json()
-          setProducts(data.products || [])
-        }
-      } catch (error) {
-        console.warn('Failed to fetch products')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchProducts()
-  }, [contentLanguage])
+  // 产品数据：失败时降级为空列表
+  const { data: products = [], isLoading: loading } = useQuery<Product[]>({
+    queryKey: ['products', 'published', contentLanguage],
+    queryFn: async () => {
+      const response = await fetch(`/api/products/published?language=${contentLanguage}`)
+      if (!response.ok) {return []}
+      const data = await response.json()
+      return data.products || []
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
   // 过滤产品
   const filteredProducts = useMemo(() => {

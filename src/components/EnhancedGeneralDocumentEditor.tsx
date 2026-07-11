@@ -128,12 +128,10 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
 
   // 更新段落内容
   const updateSection = (id: string, field: keyof ContentSection, value: string) => {
-    console.log('🔧 updateSection:', { id, field, value: value.substring(0, 100) + '...' });
     setFormData(prev => {
       const newSections = prev.sections.map(section =>
         section.id === id ? { ...section, [field]: value } : section
       );
-      console.log('📝 更新后的sections:', newSections.map(s => ({ id: s.id, content: s.content?.substring(0, 50) + '...' })));
       return {
         ...prev,
         sections: newSections
@@ -336,12 +334,7 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
           <CategorySelector
             selectedCategory={formData.category || ''}
             onCategoryChange={(category) => {
-              console.log('📝 EnhancedEditor - 分类变化:', category);
-              setFormData(prev => {
-                const newData = { ...prev, category };
-                console.log('📝 EnhancedEditor - 更新后的formData.category:', newData.category);
-                return newData;
-              });
+              setFormData(prev => ({ ...prev, category }));
             }}
             documentType="general"
             placeholder={t('category.selectOrCreateCategory')}
@@ -489,11 +482,6 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
                 key={`section-${section.id}-content`}
                 value={section.content}
                 onChange={(value) => {
-                  console.log('🔧 Section内容变化:', {
-                    sectionId: section.id,
-                    newValue: value.substring(0, 50) + '...',
-                    oldValue: section.content?.substring(0, 50) + '...'
-                  });
                   updateSection(section.id, 'content', value);
                 }}
                 placeholder={t('admin.documents.sectionContentPlaceholder')}

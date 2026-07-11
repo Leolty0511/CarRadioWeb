@@ -130,11 +130,11 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSourceClick }) => 
   }
 
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'} mb-4`}>
+    <div className={`flex gap-2.5 ${isUser ? 'flex-row-reverse' : 'flex-row'} mb-4`}>
       {/* 头像 */}
       <div className={`
-        flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
-        ${isUser ? 'bg-blue-500' : 'bg-gradient-to-r from-purple-500 to-blue-500'}
+        flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center shadow-sm
+        ${isUser ? 'bg-slate-700' : 'bg-blue-600'}
       `}>
         {isUser ? (
           <User className="h-4 w-4 text-white" />
@@ -144,13 +144,13 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSourceClick }) => 
       </div>
 
       {/* 消息内容 */}
-      <div className={`flex-1 max-w-[80%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
+      <div className={`flex-1 max-w-[84%] ${isUser ? 'items-end' : 'items-start'} flex flex-col`}>
         {/* 消息气泡 */}
         <div className={`
-          px-4 py-2 rounded-2xl relative
+          px-3.5 py-2.5 rounded-2xl relative text-sm leading-6 shadow-sm
           ${isUser
-            ? 'bg-blue-500 text-white rounded-br-sm'
-            : 'bg-gray-100 border border-gray-300 text-gray-900 rounded-bl-sm dark:bg-gray-800 dark:border-gray-600 dark:text-white'
+            ? 'bg-blue-600 text-white rounded-br-md'
+            : 'bg-white border border-slate-200 text-slate-900 rounded-bl-md dark:bg-slate-900 dark:border-slate-700 dark:text-slate-100'
           }
         `}>
           {/* 打字动画 */}
@@ -161,7 +161,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSourceClick }) => 
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
-                              <span className="text-sm text-gray-500 ml-2">{t('ai.typing')}</span>
+                              <span className="text-sm text-slate-500 dark:text-slate-400 ml-2">{t('ai.typing')}</span>
             </div>
           ) : (
             <div className="whitespace-pre-wrap break-words">{message.content}</div>
@@ -171,12 +171,12 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSourceClick }) => 
         {/* 信息来源 */}
         {message.sources && message.sources.length > 0 && !message.isTyping && !message.requiresSelection && (
           <div className="mt-3 space-y-2 max-w-full">
-            <div className="text-xs text-gray-500 font-medium">{t('ai.sources.title')}</div>
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t('ai.sources.title')}</div>
             <div className="space-y-3">
               {message.sources.slice(0, 3).map((source, index) => (
                 <div
                   key={index}
-                  className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm hover:shadow-md hover:border-blue-300 transition-all duration-200 cursor-pointer group"
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500/50 transition-all duration-200 cursor-pointer group"
                   onClick={() => onSourceClick?.(source)}
                 >
                   {/* 来源头部信息 */}
@@ -186,16 +186,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSourceClick }) => 
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">
+                        <span className="text-xs px-2 py-0.5 bg-blue-50 dark:bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-full font-medium">
                           {getSourceTypeLabel(source.type)}
                         </span>
                         {source.category && (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
                             {source.category}
                           </span>
                         )}
                       </div>
-                      <h4 className="text-sm font-medium text-gray-900 mb-1 overflow-hidden" style={{
+                      <h4 className="text-sm font-medium text-slate-900 dark:text-slate-100 mb-1 overflow-hidden" style={{
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical'
@@ -203,7 +203,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({ message, onSourceClick }) => 
                         {source.title}
                       </h4>
                       {(source.summary || source.description) && (
-                        <p className="text-xs text-gray-600 overflow-hidden" style={{
+                        <p className="text-xs text-slate-600 dark:text-slate-400 overflow-hidden" style={{
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
                           WebkitBoxOrient: 'vertical'

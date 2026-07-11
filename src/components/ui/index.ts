@@ -12,7 +12,6 @@ export { default as LoadingSpinner } from './LoadingSpinner'
 export { default as Modal } from './Modal'
 
 // 现代化组件
-export { ModernButton } from './ModernButton'
 export { ModernCard } from './ModernCard'
 
 // 电商专用组件

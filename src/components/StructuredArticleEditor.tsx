@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
+import logger from '@/utils/logger';
 import { useTranslation } from 'react-i18next';
 import { useToast } from '@/components/ui/Toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -163,17 +164,17 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   // 确保activeSection在有效范围内
   const safeSetActiveSection = useCallback((index: number) => {
     const safeIndex = Math.max(0, Math.min(sections.length - 1, index));
-    console.log(`Setting active section from ${activeSection} to ${safeIndex}`);
+    logger.debug(`Setting active section from ${activeSection} to ${safeIndex}`);
     setActiveSection(safeIndex);
   }, [activeSection, sections.length]);
 
   // 添加状态变更监听和错误恢复
   useEffect(() => {
-    console.log('Active section changed to:', activeSection, sections[activeSection]?.title);
+    logger.debug('Active section changed to:', activeSection, sections[activeSection]?.title);
 
     // 如果当前索引超出范围，自动修正
     if (activeSection >= sections.length || activeSection < 0) {
-      console.warn('Invalid active section detected, resetting to 0');
+      logger.warn('Invalid active section detected, resetting to 0');
       setActiveSection(0);
     }
   }, [activeSection, sections.length]);
@@ -181,9 +182,9 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   const [formData, setFormData] = useState<StructuredArticle>(() => {
     // 如果是编辑已有文章，需要转换数据结构
     if (article) {
-      console.log('Editing article:', article);
-      console.log('Article supportedFeatures:', article.supportedFeatures);
-      console.log('Article unsupportedFeatures:', article.unsupportedFeatures);
+      logger.debug('Editing article:', article);
+      logger.debug('Article supportedFeatures:', article.supportedFeatures);
+      logger.debug('Article unsupportedFeatures:', article.unsupportedFeatures);
 
       return {
         id: article.id || Date.now(),
@@ -298,9 +299,9 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
       saveDraft('structured', formData, article?.id);
       setAutoSaveStatus('saved');
       setLastSaveTime(new Date());
-      console.log('自动保存成功');
+      logger.debug('自动保存成功');
     } catch (error) {
-      console.error('自动保存失败:', error);
+      logger.error('自动保存失败:', error);
       setAutoSaveStatus('unsaved');
     }
   }, [formData, article?.id]);
@@ -360,7 +361,7 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
           )
         }
       } catch (err) {
-        console.error('加载车型失败:', err)
+        logger.error('加载车型失败:', err)
         if (isMounted) {setVehicles([])}
       }
     })
@@ -380,8 +381,8 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   // 当 article 改变时重新初始化 formData
   useEffect(() => {
     if (article) {
-      console.log('Article changed, reinitializing formData:', article);
-      console.log('Article basicInfo importantNotes:', article.basicInfo?.importantNotes);
+      logger.debug('Article changed, reinitializing formData:', article);
+      logger.debug('Article basicInfo importantNotes:', article.basicInfo?.importantNotes);
 
       const newFormData: StructuredArticle = {
         id: formData.id,
@@ -403,7 +404,7 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
         feedback: [], // 添加缺失的feedback字段
       };
 
-      console.log('Setting new formData:', newFormData);
+      logger.debug('Setting new formData:', newFormData);
       setFormData(newFormData);
     }
   }, [article]);
@@ -438,14 +439,14 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
         //   }))
         // }))
 
-        // console.log(`Loaded ${feedback.length} feedback items for document ${article.id}`)
+        // logger.debug(`Loaded ${feedback.length} feedback items for document ${article.id}`)
       }
       loadFeedback()
     }
   }, [article]);
 
   const handleBasicInfoChange = useCallback((field: keyof typeof formData.basicInfo, value: string) => {
-    console.log(`handleBasicInfoChange called: field=${field}, value=`, value);
+    logger.debug(`handleBasicInfoChange called: field=${field}, value=`, value);
     setFormData(prev => {
       const newFormData = {
         ...prev,
@@ -454,15 +455,15 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
           [field]: value
         }
       };
-      console.log('Updated formData:', newFormData);
+      logger.debug('Updated formData:', newFormData);
       return newFormData;
     });
   }, []);
 
   // 保存时转换数据结构以匹配查看器期望的格式
   const handleSave = () => {
-    console.log('StructuredArticleEditor: handleSave called');
-    console.log('StructuredArticleEditor: Current formData:', formData);
+    logger.debug('StructuredArticleEditor: handleSave called');
+    logger.debug('StructuredArticleEditor: Current formData:', formData);
 
          // 数据验证
      const errors = [];
@@ -620,16 +621,16 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
       }))
     };
 
-    console.log('StructuredArticleEditor: Converted data:', convertedData);
-    console.log('StructuredArticleEditor: Calling onSave');
+    logger.debug('StructuredArticleEditor: Converted data:', convertedData);
+    logger.debug('StructuredArticleEditor: Calling onSave');
 
     // 清除自动保存的数据
     try {
       const autoSaveKey = `structured_article_autosave_${article?.id || 'new'}`;
       localStorage.removeItem(autoSaveKey);
-      console.log('已清除自动保存数据:', autoSaveKey);
+      logger.debug('已清除自动保存数据:', autoSaveKey);
     } catch (error) {
-      console.error('清除自动保存数据失败:', error);
+      logger.error('清除自动保存数据失败:', error);
     }
 
     onSave(convertedData);
@@ -674,7 +675,7 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   const addCompatibleModel = () => {
     const existingCount = formData.compatibleModels.length;
     const newId = `compatible_${Date.now()}_${existingCount}_${Math.random().toString(36).substr(2, 9)}`;
-    console.log('Adding compatible model with ID:', newId);
+    logger.debug('Adding compatible model with ID:', newId);
     const newModel: CompatibleModel = {
       id: newId,
       name: '',
@@ -719,18 +720,18 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   };
 
   const updateCompatibleModel = useCallback((id: string, field: string, value: any) => {
-    console.log('updateCompatibleModel called:', { id, field, value });
+    logger.debug('updateCompatibleModel called:', { id, field, value });
 
     setFormData(prev => {
       const updated = {
         ...prev,
         compatibleModels: prev.compatibleModels.map(model => {
           if (model.id === id) {
-            console.log('Updating model:', model.id);
+            logger.debug('Updating model:', model.id);
             // 处理嵌套字段更新
             if (field.includes('.')) {
               const parts = field.split('.');
-              console.log('Nested field update:', { parts, value });
+              logger.debug('Nested field update:', { parts, value });
 
               if (parts[0] === 'originalHost') {
                 return {
@@ -743,7 +744,7 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
               } else if (parts[0] === 'optionalModules') {
                 const moduleName = parts[1];
                 const propName = parts[2];
-                console.log('Updating optionalModules:', { moduleName, propName, value });
+                logger.debug('Updating optionalModules:', { moduleName, propName, value });
 
                 return {
                   ...model,
@@ -762,7 +763,7 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
           return model;
         })
       };
-      console.log('Updated formData:', updated);
+      logger.debug('Updated formData:', updated);
       return updated;
     });
   }, []);
@@ -777,7 +778,7 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   const addIncompatibleModel = () => {
     const existingCount = formData.incompatibleModels.length;
     const newId = `incompatible_${Date.now()}_${existingCount}_${Math.random().toString(36).substr(2, 9)}`;
-    console.log('Adding incompatible model with ID:', newId);
+    logger.debug('Adding incompatible model with ID:', newId);
     const newModel: IncompatibleModel = {
       id: newId,
       name: '',
@@ -791,20 +792,20 @@ const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
   };
 
   const updateIncompatibleModel = useCallback((id: string, field: string, value: string) => {
-    console.log('updateIncompatibleModel called:', { id, field, value });
+    logger.debug('updateIncompatibleModel called:', { id, field, value });
 
     setFormData(prev => {
       const updated = {
         ...prev,
         incompatibleModels: prev.incompatibleModels.map(model => {
           if (model.id === id) {
-            console.log('Updating incompatible model:', model.id, 'field:', field, 'value:', value);
+            logger.debug('Updating incompatible model:', model.id, 'field:', field, 'value:', value);
             return { ...model, [field]: value };
           }
           return model;
         })
       };
-      console.log('Updated incompatible models formData:', updated.incompatibleModels);
+      logger.debug('Updated incompatible models formData:', updated.incompatibleModels);
       return updated;
     });
   }, []);

@@ -294,29 +294,27 @@ const AdminAuth: React.FC<AdminAuthProps> = ({ onAuthenticated }) => {
           )
         }
 
-        if (bootstrapError) {
-          return (
-            <div className="space-y-3">
-              <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300 text-sm p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                <span>{t('adminAuth.bootstrapCheckFailed')}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setBootstrapChecked(false)
-                  loadBootstrapStatus()
-                }}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 transition-colors"
-              >
-                {t('adminAuth.retryBootstrapCheck')}
-              </button>
-            </div>
-          )
-        }
-
         return (
           <>
+            {bootstrapError && (
+              <div className="space-y-3">
+                <div className="flex items-start gap-2 text-amber-700 dark:text-amber-300 text-sm p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+                  <span>{t('adminAuth.bootstrapCheckFailed')}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBootstrapChecked(false)
+                    loadBootstrapStatus()
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-700 dark:bg-slate-600 text-white rounded-lg text-sm font-medium hover:bg-slate-600 dark:hover:bg-slate-500 transition-colors"
+                >
+                  {t('adminAuth.retryBootstrapCheck')}
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleLogin} className="space-y-3">
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />

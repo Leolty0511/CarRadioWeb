@@ -385,7 +385,7 @@ export const InstallationComparison = ({
     <div className={`grid ${getGridCols()} gap-4 lg:gap-6 items-stretch ${className}`}>
       {validComparisons.map((comparison, index) => (
         <motion.div
-          key={index}
+          key={`${comparison.beforeImage}-${index}`}
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -428,7 +428,7 @@ export const GalleryCarousel = ({ images, className = '' }: GalleryCarouselProps
         className="rounded-2xl overflow-hidden"
       >
         {images.map((image, index) => (
-          <div key={index} className="w-full aspect-video">
+          <div key={image.src} className="w-full aspect-video">
             <img
               src={image.src}
               alt={image.alt || `Image ${index + 1}`}

@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/services/apiClient';
 import {
   BarChart,
@@ -34,6 +35,7 @@ interface DashboardStats {
   totalForms: number;
   unreadForms: number;
   recentVehicles: Array<{
+    _id?: string;
     brand: string;
     model: string;
     year: string;
@@ -52,29 +54,22 @@ interface DashboardStats {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
 
   // 图表颜色
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#0EA5E9'];
 
-  // 获取统计数据
-  useEffect(() => {
-    const fetchDashboardStats = async () => {
-      try {
-        const data = await apiClient.get('/system/dashboard-stats');
-        if (data.success && data.stats) {
-          setStats(data.stats as DashboardStats);
-        }
-        setLoading(false);
-      } catch (error) {
-        console.error('Failed to fetch dashboard stats:', error);
-        setLoading(false);
+  // 通过 React Query 获取统计数据，享受缓存与请求去重
+  const { data: stats = null, isLoading: loading } = useQuery<DashboardStats | null>({
+    queryKey: ['admin-dashboard-stats'],
+    queryFn: async () => {
+      const data = await apiClient.get('/system/dashboard-stats');
+      if (data.success && data.stats) {
+        return data.stats as DashboardStats;
       }
-    };
-
-    fetchDashboardStats();
-  }, []);
+      return null;
+    },
+    staleTime: 60 * 1000, // 管理后台数据 1 分钟内视为新鲜
+  });
 
   if (loading) {
     return (
@@ -239,9 +234,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
             <h3 className="text-xl font-semibold text-slate-800 dark:text-white">{t('admin.dashboard.recentVehicles')}</h3>
           </div>
           <div className="space-y-4">
-            {(stats?.recentVehicles || []).map((vehicle, index) => (
+            {(stats?.recentVehicles || []).map((vehicle) => (
               <div
-                key={index}
+                key={vehicle._id || `${vehicle.brand}-${vehicle.model}`}
                 className="flex items-center justify-between p-4 bg-slate-100 dark:bg-gray-700/30 rounded-xl border border-slate-200 dark:border-gray-600/30 hover:border-blue-500/50 transition-all duration-300"
               >
                 <div className="flex items-center gap-3">

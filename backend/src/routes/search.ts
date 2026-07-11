@@ -4,7 +4,7 @@
  */
 
 import { Router, Request, Response } from 'express'
-import fs from 'fs'
+import fsp from 'fs/promises'
 import path from 'path'
 import Product from '../models/Product'
 import Document from '../models/Document'
@@ -39,20 +39,16 @@ interface SearchResponse {
 /**
  * Search user manual PDF files
  */
-function searchUserManuals(searchRegex: RegExp): SearchResult[] {
+async function searchUserManuals(searchRegex: RegExp): Promise<SearchResult[]> {
   const results: SearchResult[] = []
-  
+
   try {
-    if (!fs.existsSync(PDF_DIR)) {
-      return results
-    }
-    
-    const files = fs.readdirSync(PDF_DIR)
-    const pdfFiles = files.filter(file => 
-      path.extname(file).toLowerCase() === '.pdf' && 
+    const files = await fsp.readdir(PDF_DIR)
+    const pdfFiles = files.filter(file =>
+      path.extname(file).toLowerCase() === '.pdf' &&
       searchRegex.test(file)
     )
-    
+
     pdfFiles.slice(0, MAX_RESULTS_PER_TYPE).forEach(file => {
       results.push({
         type: 'manual',
@@ -63,9 +59,10 @@ function searchUserManuals(searchRegex: RegExp): SearchResult[] {
       })
     })
   } catch (error) {
+    // 目录不存在或不可读时静默返回空结果
     logger.warn({ error }, 'Failed to search user manuals')
   }
-  
+
   return results
 }
 
@@ -239,7 +236,7 @@ router.get('/', async (req: Request, res: Response) => {
     })
 
     // Search user manuals (PDF files)
-    const manualResults = searchUserManuals(searchRegex)
+    const manualResults = await searchUserManuals(searchRegex)
     results.push(...manualResults)
 
     // Deduplicate by id

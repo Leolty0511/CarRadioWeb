@@ -41,8 +41,8 @@ const ChatInput: React.FC<ChatInputProps> = ({
   }
 
   return (
-    <div className="border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 sm:p-4">
-      <form onSubmit={handleSubmit} className="flex items-end gap-2 sm:gap-3">
+    <div className="border-t border-slate-200/80 dark:border-slate-700/80 bg-white/95 dark:bg-slate-900/95 p-3">
+      <form onSubmit={handleSubmit} className="flex items-end gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-1.5 shadow-sm focus-within:border-blue-300 focus-within:bg-white focus-within:ring-4 focus-within:ring-blue-500/10 dark:border-slate-700 dark:bg-slate-800 dark:focus-within:border-blue-500/60">
         {/* 输入框 */}
         <div className="flex-1">
           <textarea
@@ -53,7 +53,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             placeholder={placeholder || t('ai.inputPlaceholder')}
             disabled={disabled}
             rows={1}
-            className="w-full px-4 py-2 border border-gray-300 dark:border-slate-600 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50 disabled:text-gray-500 dark:disabled:bg-slate-700 dark:disabled:text-gray-400 max-h-32 bg-white dark:bg-slate-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 scrollbar-none"
+            className="block w-full max-h-32 resize-none border-0 bg-transparent px-3 py-2 text-sm leading-6 text-slate-900 placeholder:text-slate-400 focus:outline-none disabled:text-slate-400 dark:text-slate-100 dark:placeholder:text-slate-500 scrollbar-none"
           />
         </div>
 
@@ -61,10 +61,10 @@ const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="submit"
           disabled={!message.trim() || disabled}
-          className={`flex-shrink-0 p-2.5 sm:p-2 rounded-full transition-all duration-200 touch-manipulation ${
+          className={`flex-shrink-0 h-10 w-10 inline-flex items-center justify-center rounded-xl transition-all duration-200 touch-manipulation ${
             message.trim() && !disabled
-              ? 'bg-blue-500 text-white hover:bg-blue-600 shadow-md hover:shadow-lg'
-              : 'bg-gray-200 dark:bg-slate-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+              : 'bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500 cursor-not-allowed'
           }`}
           title={t('ai.sendMessage')}
         >

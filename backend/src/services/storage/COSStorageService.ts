@@ -162,7 +162,7 @@ export class COSStorageService extends BaseStorageService {
     this.validateFileKey(key);
     const fullKey = this.addPathPrefix(key);
     // 使用 any 类型绕过 COS SDK 类型定义问题
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const data = await promisify<any>(this.client!.getObjectUrl.bind(this.client) as any, {
       Bucket: this.config.bucket,
       Region: this.config.region,

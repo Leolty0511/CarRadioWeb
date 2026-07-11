@@ -3,7 +3,6 @@
  * SDK: esdk-obs-nodejs，回调与 Promise 双模式；成功需判断 result.CommonMsg.Status < 300
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
 const ObsClient = require('esdk-obs-nodejs');
 
 import { Readable } from 'stream';

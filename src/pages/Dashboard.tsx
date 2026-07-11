@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { getApiBaseUrl } from '@/services/apiClient'
 import { HeroBanner, ImageFeatureCard } from '@/components/ui/HeroBanner'
 import { ECommerceButton } from '@/components/ui/ECommerceButton'
@@ -21,109 +22,97 @@ import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 // 默认 Hero 图片（当数据库没有配置时使用）
 const DEFAULT_HERO_IMAGE = '/images/default-hero.png'
 
+// 默认安装对比图（后端未配置时使用）
+const DEFAULT_INSTALL_COMPARISONS = [
+  { beforeImage: '/images/installation-before.jpg', afterImage: '/images/installation-after.jpg' },
+  { beforeImage: '', afterImage: '' },
+  { beforeImage: '', afterImage: '' },
+]
+
 export default function Dashboard() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { contentLanguage } = useContentLanguage()
-  const [heroBannerImage, setHeroBannerImage] = useState(DEFAULT_HERO_IMAGE)
   const [openFeatureIndex, setOpenFeatureIndex] = useState<number | null>(null)
-  // 支持3组安装前后对比图
-  const [installComparisons, setInstallComparisons] = useState<Array<{ beforeImage: string; afterImage: string }>>([
-    { beforeImage: '/images/installation-before.jpg', afterImage: '/images/installation-after.jpg' },
-    { beforeImage: '', afterImage: '' },
-    { beforeImage: '', afterImage: '' },
-  ])
-  const [featuredProducts, setFeaturedProducts] = useState<any[]>([])
 
-  // 从后端获�?Hero Banner 配置
-  useEffect(() => {
-    const fetchHeroBanner = async () => {
-      try {
-        const response = await fetch(`${getApiBaseUrl()}/api/hero-banners/home?language=${contentLanguage}`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data?.imageUrl) {
-            setHeroBannerImage(data.imageUrl)
-          }
-        }
-      } catch (error) {
-        console.warn('Failed to fetch hero banner, using default image')
-      }
-    }
+  // 通过 React Query 统一数据获取，享受 5min staleTime 缓存与请求去重
+  // Hero Banner：失败时降级为默认图片
+  const { data: heroBannerImage = DEFAULT_HERO_IMAGE } = useQuery({
+    queryKey: ['hero-banner', 'home', contentLanguage],
+    queryFn: async () => {
+      const response = await fetch(`${getApiBaseUrl()}/api/hero-banners/home?language=${contentLanguage}`)
+      if (!response.ok) {return DEFAULT_HERO_IMAGE}
+      const data = await response.json()
+      return data?.imageUrl || DEFAULT_HERO_IMAGE
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
-    fetchHeroBanner()
-  }, [contentLanguage])
+  // 安装前后对比图（3组）：失败时降级为默认值
+  const { data: installComparisons = DEFAULT_INSTALL_COMPARISONS } = useQuery<Array<{ beforeImage: string; afterImage: string }>>({
+    queryKey: ['install-comparisons', contentLanguage],
+    queryFn: async () => {
+      const apiBase = getApiBaseUrl()
+      const fetchPromises = [1, 2, 3].flatMap(index => [
+        fetch(`${apiBase}/api/hero-banners/install-before-${index}?language=${contentLanguage}`),
+        fetch(`${apiBase}/api/hero-banners/install-after-${index}?language=${contentLanguage}`)
+      ])
 
-  // 从后端获取安装前后图片配置（支持3组）
-  useEffect(() => {
-    const fetchInstallImages = async () => {
-      try {
-        // 从hero-banners API获取3组安装前后图�?
-        const apiBase = getApiBaseUrl()
-        const fetchPromises = [1, 2, 3].flatMap(index => [
-          fetch(`${apiBase}/api/hero-banners/install-before-${index}?language=${contentLanguage}`),
-          fetch(`${apiBase}/api/hero-banners/install-after-${index}?language=${contentLanguage}`)
-        ])
+      const responses = await Promise.all(fetchPromises)
+      const newComparisons: Array<{ beforeImage: string; afterImage: string }> = []
 
-        const responses = await Promise.all(fetchPromises)
-        const newComparisons: Array<{ beforeImage: string; afterImage: string }> = []
+      for (let i = 0; i < 3; i++) {
+        const beforeResponse = responses[i * 2]
+        const afterResponse = responses[i * 2 + 1]
 
-        for (let i = 0; i < 3; i++) {
-          const beforeResponse = responses[i * 2]
-          const afterResponse = responses[i * 2 + 1]
+        let beforeImage = ''
+        let afterImage = ''
 
-          let beforeImage = ''
-          let afterImage = ''
-
-          if (beforeResponse.ok) {
-            const beforeData = await beforeResponse.json()
-            beforeImage = beforeData?.imageUrl || ''
-          }
-
-          if (afterResponse.ok) {
-            const afterData = await afterResponse.json()
-            afterImage = afterData?.imageUrl || ''
-          }
-
-          newComparisons.push({ beforeImage, afterImage })
+        if (beforeResponse.ok) {
+          const beforeData = await beforeResponse.json()
+          beforeImage = beforeData?.imageUrl || ''
         }
 
-        setInstallComparisons(newComparisons)
-      } catch (error) {
-        console.warn('Failed to fetch installation images, using defaults')
-      }
-    }
-
-    fetchInstallImages()
-  }, [contentLanguage])
-
-  // 从后端获取产品数�?
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch(`${getApiBaseUrl()}/api/products/published?language=${contentLanguage}`)
-        if (response.ok) {
-          const products = await response.json()
-          // 只取�?个产品用于首页展�?
-          setFeaturedProducts(products.slice(0, 4).map((p: any) => ({
-            id: p._id,
-            image: p.images?.[0] || '/images/product-placeholder.jpg',
-            title: p.title,
-            description: p.description,
-            features: p.features?.slice(0, 3) || [],
-          })))
+        if (afterResponse.ok) {
+          const afterData = await afterResponse.json()
+          afterImage = afterData?.imageUrl || ''
         }
-      } catch (error) {
-        console.warn('Failed to fetch products, using empty list')
+
+        newComparisons.push({ beforeImage, afterImage })
       }
-    }
 
-    fetchProducts()
-  }, [contentLanguage])
+      return newComparisons
+    },
+    staleTime: 5 * 60 * 1000,
+  })
 
-  // 核心特�?- 图标 + 图片 + 文案
-  // 默认显示图标，点击后弹窗显示图片和详细内�?
-  // 图片存放�?public/images/why-choose/ 目录
+  // 精选产品（首页取 4 个）：失败时降级为空列表
+  const { data: featuredProducts = [] } = useQuery<Array<{
+    id: string
+    image: string
+    title: string
+    description: string
+    features: string[]
+  }>>({
+    queryKey: ['featured-products', contentLanguage],
+    queryFn: async () => {
+      const response = await fetch(`${getApiBaseUrl()}/api/products/published?language=${contentLanguage}`)
+      if (!response.ok) {return []}
+      const products = await response.json()
+      return products.slice(0, 4).map((p: any) => ({
+        id: p._id,
+        image: p.images?.[0] || '/images/product-placeholder.jpg',
+        title: p.title,
+        description: p.description,
+        features: p.features?.slice(0, 3) || [],
+      }))
+    },
+    staleTime: 5 * 60 * 1000,
+  })
+
+  // 核心特性 - 图标 + 图片 + 文案
+  // 默认显示图标，点击后弹窗显示图片和详细内容
+  // 图片存放于 public/images/why-choose/ 目录
   const keyFeatures = [
     {
       icon: <Smartphone />,
@@ -250,7 +239,7 @@ export default function Dashboard() {
 
           <StaggerContainer className="grid sm:grid-cols-12 gap-5 md:gap-6 lg:gap-8">
             {keyFeatures.map((feature, index) => (
-              <StaggerItem key={index} className={
+              <StaggerItem key={feature.titleKey} className={
                 index === 0 ? 'sm:col-span-7' :
                 index === 1 ? 'sm:col-span-5' :
                 index === 2 ? 'sm:col-span-5' :

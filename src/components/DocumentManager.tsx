@@ -93,7 +93,7 @@ const DocumentManager: React.FC<DocumentManagerProps> = ({
       </Button>
       <Button variant="outline" size="sm" onClick={() => {
         const docId = doc._id || doc.id;
-        if (docId) onDeleteDocument(docId);
+        if (docId) {onDeleteDocument(docId);}
       }}>
         <Trash2 className="h-3 w-3 mr-1" />
         {t('common.delete')}

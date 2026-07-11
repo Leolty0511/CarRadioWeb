@@ -96,8 +96,8 @@ export default function ProductDetail({
               {/* 核心特性列表 */}
               {features.length > 0 && (
                 <div className="space-y-3 mb-8">
-                  {features.map((feature, index) => (
-                    <div key={index} className="flex items-start">
+                  {features.map((feature) => (
+                    <div key={feature} className="flex items-start">
                       <Check className="w-5 h-5 text-[#2979FF] mr-3 flex-shrink-0 mt-0.5" />
                       <span className="text-gray-300 font-body">{feature}</span>
                     </div>
@@ -135,9 +135,9 @@ export default function ProductDetail({
 
           <ECommerceCard hoverable={false} padding="none">
             <div className="divide-y divide-gray-800">
-              {specifications.map((spec, index) => (
+              {specifications.map((spec) => (
                 <div
-                  key={index}
+                  key={spec.labelKey}
                   className="grid md:grid-cols-2 gap-4 p-6 hover:bg-[#212121] transition-colors duration-200"
                 >
                   <div className="flex items-center text-gray-400 font-body">
@@ -169,7 +169,7 @@ export default function ProductDetail({
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {installationImages.map((image, index) => (
                 <div
-                  key={index}
+                  key={image}
                   className="group relative rounded-xl overflow-hidden animate-fade-in-up"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
@@ -206,7 +206,7 @@ export default function ProductDetail({
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {compatibleVehicles.map((vehicle, index) => (
               <ECommerceCard
-                key={index}
+                key={`${vehicle.brand}-${index}`}
                 hoverable
                 className="animate-scale-in"
                 style={{ animationDelay: `${index * 100}ms` }}
@@ -223,9 +223,9 @@ export default function ProductDetail({
                       {vehicle.years}
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {vehicle.models.map((model, modelIndex) => (
+                      {vehicle.models.map((model) => (
                         <span
-                          key={modelIndex}
+                          key={model}
                           className="inline-block px-2 py-1 bg-[#0F1113] text-gray-300 text-xs rounded"
                         >
                           {model}

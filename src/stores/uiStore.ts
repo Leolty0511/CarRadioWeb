@@ -1,8 +1,8 @@
 /**
  * 全局 UI 状态 Store (P1-10)
- * 
+ *
  * 使用 Zustand 替代部分 Context，减少不必要的重渲染
- * 
+ *
  * 使用说明：
  * - 全局搜索状态
  * - 模态框状态
@@ -21,18 +21,18 @@ interface UIState {
   openSearch: () => void
   closeSearch: () => void
   toggleSearch: () => void
-  
+
   // 侧边栏
   sidebarOpen: boolean
   openSidebar: () => void
   closeSidebar: () => void
   toggleSidebar: () => void
-  
+
   // 模态框
   activeModal: string | null
   openModal: (modalId: string) => void
   closeModal: () => void
-  
+
   // 加载状态
   globalLoading: boolean
   setGlobalLoading: (loading: boolean) => void
@@ -46,18 +46,18 @@ export const useUIStore = create<UIState>()(
       openSearch: () => set({ searchOpen: true }),
       closeSearch: () => set({ searchOpen: false }),
       toggleSearch: () => set((state) => ({ searchOpen: !state.searchOpen })),
-      
+
       // 侧边栏
       sidebarOpen: false,
       openSidebar: () => set({ sidebarOpen: true }),
       closeSidebar: () => set({ sidebarOpen: false }),
       toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
-      
+
       // 模态框
       activeModal: null,
       openModal: (modalId) => set({ activeModal: modalId }),
       closeModal: () => set({ activeModal: null }),
-      
+
       // 加载状态
       globalLoading: false,
       setGlobalLoading: (loading) => set({ globalLoading: loading }),

@@ -1,35 +1,36 @@
 # ==================== 第一阶段：构建前端 ====================
-FROM node:18-alpine AS frontend-builder
+FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app
 
 # 复制前端依赖文件
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 # 复制前端源码
 COPY . .
 
 # 构建前端
-RUN npm run build
+RUN npx vite build
 
 # ==================== 第二阶段：构建后端 ====================
-FROM node:18-alpine AS backend-builder
+FROM node:20-alpine AS backend-builder
 
 WORKDIR /app
 
 # 复制后端依赖文件
 COPY backend/package*.json ./backend/
-RUN cd backend && npm ci --only=production
+RUN cd backend && npm ci
 
 # 复制后端源码
 COPY backend ./backend
 
 # 编译 TypeScript
 RUN cd backend && npx tsc
+RUN cd backend && npm prune --omit=dev
 
 # ==================== 第三阶段：生产运行环境 ====================
-FROM node:18-alpine
+FROM node:20-alpine
 
 # 安装 PM2
 RUN npm install -g pm2
@@ -43,7 +44,7 @@ COPY --from=backend-builder /app/backend/node_modules ./backend/node_modules
 COPY --from=backend-builder /app/backend/package.json ./backend/
 
 # 复制 PM2 配置
-COPY ecosystem.config.js ./
+COPY ecosystem.config.cjs ./
 
 # 创建非 root 用户
 RUN addgroup -g 1001 -S nodejs && \
@@ -62,5 +63,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
 # 启动应用
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
-
+CMD ["pm2-runtime", "start", "ecosystem.config.cjs"]

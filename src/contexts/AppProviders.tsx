@@ -1,6 +1,6 @@
 /**
  * 组合 Provider (P1-10)
- * 
+ *
  * 将多个 Context Provider 组合成一个扁平化结构
  * 减少 JSX 嵌套层级，提升渲染性能
  */
@@ -67,7 +67,7 @@ export function AuthenticatedProviders({ children }: AppProvidersProps) {
 /**
  * 全应用 Provider 组合
  * 用于整个应用的根组件
- * 
+ *
  * 注意：这个组合保留了原有的嵌套结构
  * 如果需要进一步优化，可以考虑：
  * 1. 使用 Zustand/Jotai 替代部分 Context

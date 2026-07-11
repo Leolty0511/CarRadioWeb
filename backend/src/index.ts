@@ -135,7 +135,6 @@ validateJwtSecret();
 // 可选：启用 HTTP 代理（国内开发环境访问 Google OAuth 等外部服务）
 const httpsProxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 if (httpsProxy) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { HttpsProxyAgent } = require('https-proxy-agent');
   const https = require('https');
   const http = require('http');
@@ -224,8 +223,9 @@ mongoose.connect(MONGODB_URI)
   });
 
 // 中间件 - 为OSS上传路由设置更大的限制
-app.use('/api/oss-files/upload', express.json({ limit: '500mb' }));
-app.use('/api/oss-files/upload', express.urlencoded({ extended: true, limit: '500mb' }));
+// 注意：文件本体应通过预签名 URL 直传对象存储，后端 body 不应承载文件，故收紧上限
+app.use('/api/oss-files/upload', express.json({ limit: '50mb' }));
+app.use('/api/oss-files/upload', express.urlencoded({ extended: true, limit: '50mb' }));
 
 // 为图片上传路由设置更大的限制
 app.use('/api/upload', express.json({ limit: '50mb' }));

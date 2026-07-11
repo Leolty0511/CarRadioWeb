@@ -4,6 +4,7 @@
 
 import express, { Request, Response } from 'express';
 import fs from 'fs';
+import fsp from 'fs/promises';
 import path from 'path';
 import multer from 'multer';
 import { authenticateUser, requirePermission } from '../middleware/auth';
@@ -53,12 +54,14 @@ const upload = multer({
  */
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const files = fs.readdirSync(PDF_DIR);
-    const manuals = files
-      .filter(file => path.extname(file).toLowerCase() === '.pdf')
-      .map(file => {
+    const files = await fsp.readdir(PDF_DIR);
+    const pdfFiles = files.filter(file => path.extname(file).toLowerCase() === '.pdf');
+
+    // 并行 stat 所有 PDF，避免在请求路径中阻塞事件循环
+    const manuals = await Promise.all(
+      pdfFiles.map(async (file) => {
         const filePath = path.join(PDF_DIR, file);
-        const stats = fs.statSync(filePath);
+        const stats = await fsp.stat(filePath);
         return {
           name: file,
           size: stats.size,
@@ -71,7 +74,8 @@ router.get('/', async (_req: Request, res: Response) => {
           downloadUrl: `/api/user-manual/download/${encodeURIComponent(file)}`
         };
       })
-      .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+    );
+    manuals.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
 
     res.json({
       success: true,
@@ -102,16 +106,17 @@ router.get('/view/:filename', async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: '无效的文件路径' });
     }
 
-    if (!fs.existsSync(filePath)) {
+    let stats: fs.Stats;
+    try {
+      stats = await fsp.stat(filePath);
+    } catch {
       return res.status(404).json({ success: false, message: '文件不存在' });
     }
 
-    const stats = fs.statSync(filePath);
-    
     // Remove headers that may interfere with PDF display
     res.removeHeader('X-Download-Options');
     res.removeHeader('X-Content-Type-Options');
-    
+
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
@@ -142,11 +147,12 @@ router.get('/download/:filename', async (req: Request, res: Response) => {
       return res.status(403).json({ success: false, message: '无效的文件路径' });
     }
 
-    if (!fs.existsSync(filePath)) {
+    let stats: fs.Stats;
+    try {
+      stats = await fsp.stat(filePath);
+    } catch {
       return res.status(404).json({ success: false, message: '文件不存在' });
     }
-
-    const stats = fs.statSync(filePath);
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Length', stats.size);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
@@ -220,7 +226,7 @@ router.delete('/:filename', authenticateUser, requirePermission(PERMISSIONS.reso
       });
     }
 
-    fs.unlinkSync(filePath);
+    await fsp.unlink(filePath);
     logger.info({ filename }, '用户手册删除成功');
 
     res.json({

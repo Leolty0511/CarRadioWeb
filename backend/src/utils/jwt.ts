@@ -9,6 +9,7 @@
  */
 
 import jwt from 'jsonwebtoken';
+import logger from './logger';
 import { signTokenPair as newSignTokenPair, verifyAccessToken, verifyRefreshToken, signAccessToken, signRefreshToken, getDevSecret } from './jwtTokens';
 
 const MIN_SECRET_LENGTH = 32;
@@ -48,7 +49,9 @@ export function signToken(payload: JwtPayload): string {
 export function verifyToken(token: string): JwtPayload | null {
   try {
     return jwt.verify(token, getSecret()) as JwtPayload
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'unknown'
+    logger.warn({ reason }, 'JWT verification failed')
     return null
   }
 }

@@ -7,6 +7,7 @@
  */
 
 import jwt from 'jsonwebtoken';
+import logger from './logger';
 
 const MIN_SECRET_LENGTH = 32;
 
@@ -121,7 +122,10 @@ export function verifyToken(token: string): JwtPayload | null {
   try {
     const decoded = jwt.verify(token, getSecret()) as JwtPayload;
     return decoded;
-  } catch {
+  } catch (error) {
+    // 记录失败原因（不记录 token 本身），便于区分过期/篡改/格式错误
+    const reason = error instanceof Error ? error.message : 'unknown';
+    logger.warn({ reason }, 'JWT verification failed');
     return null;
   }
 }

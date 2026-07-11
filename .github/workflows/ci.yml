@@ -78,7 +78,6 @@ jobs:
 
       - name: Run tests
         run: npm run test:run
-        continue-on-error: true
 
       - name: Upload coverage
         uses: actions/upload-artifact@v4
@@ -121,9 +120,6 @@ jobs:
   backend-lint:
     name: Backend Lint
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -133,17 +129,17 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
         
-       - name: Run npm audit
+      - name: Run npm audit
         continue-on-error: true
         run: npm audit --audit-level=high
-        
+
       - name: Run ESLint
-        run: npx eslint src/ --ext .ts
+        run: npx eslint backend/src --config backend/eslint.config.mjs
 
   backend-type-check:
     name: Backend Type Check

@@ -184,22 +184,8 @@ const SystemConfigManager: React.FC = () => {
     }
 
     try {
-      console.log('========================================');
-      console.log('💾 [前端-保存OSS] 准备保存配置');
-      console.log('💾 [前端-保存OSS] 发送数据:', {
-        accessKeyId: ossConfig.accessKeyId,
-        accessKeySecret: '***' + ossConfig.accessKeySecret.slice(-4),
-        bucket: ossConfig.bucket,
-        region: ossConfig.region,
-        endpoint: ossConfig.endpoint,
-        enabled: ossConfig.enabled
-      });
-
       setOssLoading(true);
-      const result = await systemConfigService.updateOSSConfig(ossConfig);
-
-      console.log('✅ [前端-保存OSS] 保存成功，响应:', result);
-      console.log('========================================');
+      await systemConfigService.updateOSSConfig(ossConfig);
 
       showToast({
         type: 'success',
@@ -210,8 +196,6 @@ const SystemConfigManager: React.FC = () => {
       // 重新加载配置状态
       await loadConfigs();
     } catch (error) {
-      console.error('❌ [前端-保存OSS] 保存失败:', error);
-      console.error('========================================');
       showToast({
         type: 'error',
         title: t('admin.systemConfig.saveFailed'),
@@ -234,21 +218,8 @@ const SystemConfigManager: React.FC = () => {
     }
 
     try {
-      console.log('========================================');
-      console.log('🧪 [前端-测试OSS] 准备测试配置');
-      console.log('🧪 [前端-测试OSS] 发送数据:', {
-        accessKeyId: ossConfig.accessKeyId,
-        accessKeySecret: '***' + ossConfig.accessKeySecret.slice(-4),
-        bucket: ossConfig.bucket,
-        region: ossConfig.region,
-        endpoint: ossConfig.endpoint
-      });
-
       setOssTesting(true);
       const result = await systemConfigService.testOSSConfig(ossConfig);
-
-      console.log('📥 [前端-测试OSS] 收到响应:', result);
-      console.log('========================================');
 
       if (result.success) {
         showToast({
@@ -264,8 +235,6 @@ const SystemConfigManager: React.FC = () => {
         });
       }
     } catch (error) {
-      console.error('❌ [前端-测试OSS] 测试失败:', error);
-      console.error('========================================');
       showToast({
         type: 'error',
         title: t('admin.systemConfig.testFailed'),

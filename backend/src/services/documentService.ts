@@ -307,7 +307,7 @@ export class DocumentService {
       await this.deleteDocumentImages(id, documentType);
 
       // 保存分类信息用于更新统计
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const categoryName = (document as any).category;
 
       // 删除文档

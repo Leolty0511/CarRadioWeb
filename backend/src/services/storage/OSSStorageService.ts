@@ -594,7 +594,7 @@ export class OSSStorageService extends BaseStorageService implements IStorageSer
 
       // ali-oss list 方法需要查询参数对象和一个可选的回调
       // 使用 any 类型绕过类型检查，因为 ali-oss 的类型定义与实际 API 不完全匹配
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const result = await (this.client as any).list(listOptions, {});
 
       const files: IFileInfo[] = (result.objects || []).map((obj: any) => ({
@@ -662,7 +662,7 @@ export class OSSStorageService extends BaseStorageService implements IStorageSer
 
       // 尝试列举存储桶内容来测试连接
       // ali-oss list 方法需要查询参数对象和一个可选的回调
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const result = await (this.client as any).list({ 'max-keys': 1 }, {});
       logger.info({
         objectCount: result.objects?.length || 0,

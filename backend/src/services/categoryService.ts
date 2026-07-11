@@ -160,13 +160,49 @@ export class CategoryService {
 
   /**
    * 批量更新所有分类的文档数量
+   * 使用聚合 pipeline 一次性统计，避免逐分类 N+1 查询
    */
   async updateAllCategoryDocumentCounts(): Promise<void> {
     const categories = await Category.find({ isActive: true });
-    
-    for (const category of categories) {
-      await this.updateCategoryDocumentCount(category.name);
-    }
+    if (categories.length === 0) return;
+
+    const categoryNames = categories.map((c) => c.name);
+    const matchCond = {
+      category: { $in: categoryNames },
+      status: 'published' as const,
+    };
+
+    // 并行聚合两类文档，每个集合仅 1 次查询
+    const [generalCounts, videoCounts] = await Promise.all([
+      GeneralDocument.aggregate<{ _id: string; count: number }>([
+        { $match: matchCond },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+      ]),
+      VideoTutorial.aggregate<{ _id: string; count: number }>([
+        { $match: matchCond },
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const generalMap = new Map(generalCounts.map((r) => [r._id, r.count]));
+    const videoMap = new Map(videoCounts.map((r) => [r._id, r.count]));
+
+    // 批量写入（无 language 维度，与原逐条逻辑等价）
+    await Promise.all(
+      categories.map((category) => {
+        const generalCount = generalMap.get(category.name) ?? 0;
+        const videoCount = videoMap.get(category.name) ?? 0;
+        return Category.updateOne(
+          { name: category.name },
+          {
+            documentCount: generalCount + videoCount,
+            generalCount,
+            videoCount,
+            structuredCount: 0, // 暂时不统计结构化文档
+          }
+        );
+      })
+    );
   }
 
   /**

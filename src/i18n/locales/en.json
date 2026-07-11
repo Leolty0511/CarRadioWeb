@@ -1367,6 +1367,10 @@
     },
     "assistant": "AI Assistant",
     "globalAvailable": "Globally Available",
+    "status": {
+      "online": "Online",
+      "offline": "Offline"
+    },
     "sources": {
       "title": "📚 Related Knowledge Base Content:",
       "types": {

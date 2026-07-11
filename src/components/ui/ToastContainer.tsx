@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import Toast, { ToastType } from './Toast';
 
 interface ToastItem {
@@ -74,13 +74,14 @@ export const ToastProvider: React.FC<ToastProviderProps> = ({ children }) => {
     showToast({ type: 'info', title, description: message, duration });
   }, [showToast]);
 
-  const contextValue: ToastContextType = {
+  // 所有回调已 useCallback 稳定，memo 化 contextValue 避免 Provider 每次渲染新建对象
+  const contextValue = useMemo<ToastContextType>(() => ({
     showToast,
     success,
     error,
     warning,
     info
-  };
+  }), [showToast, success, error, warning, info]);
 
   return (
     <ToastContext.Provider value={contextValue}>

@@ -2180,6 +2180,10 @@
     },
     "assistant": "AI助手",
     "globalAvailable": "全局可用",
+    "status": {
+      "online": "\u5728\u7ebf",
+      "offline": "\u79bb\u7ebf"
+    },
     "systemPrompt": "你是一个专业的车载电子设备技术支持专家，能够基于知识库内容和专业知识为用户提供准确的技术咨询和建议。",
     "configSaved": "配置已保存，但有警告",
     "configUpdateSuccess": "AI配置更新成功",

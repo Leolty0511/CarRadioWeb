@@ -1,4 +1,6 @@
 // 音频生成工具 - 用于创建高质量的音频文件
+import logger from './logger';
+
 export class AudioGenerator {
   private audioContext: AudioContext
 
@@ -448,41 +450,41 @@ export class AudioGenerator {
   // 生成所有音频文件
   async generateAllAudioFiles(): Promise<void> {
     try {
-      console.log('开始生成音频文件...')
+      logger.info('开始生成音频文件...');
 
       // 生成钢琴音乐
-      console.log('生成钢琴音乐...')
+      logger.debug('生成钢琴音乐...');
       const pianoBuffer = await this.generatePianoMusic()
       const pianoBlob = await this.audioBufferToBlob(pianoBuffer)
       this.downloadFile(pianoBlob, 'piano-music.wav', '钢琴音乐')
 
       // 生成流行音乐
-      console.log('生成流行音乐...')
+      logger.debug('生成流行音乐...');
       const popBuffer = await this.generatePopMusic()
       const popBlob = await this.audioBufferToBlob(popBuffer)
       this.downloadFile(popBlob, 'pop-music.wav', '流行音乐')
 
       // 生成爵士音乐
-      console.log('生成爵士音乐...')
+      logger.debug('生成爵士音乐...');
       const jazzBuffer = await this.generateJazzMusic()
       const jazzBlob = await this.audioBufferToBlob(jazzBuffer)
       this.downloadFile(jazzBlob, 'jazz-music.wav', '爵士音乐')
 
       // 生成吉他测试
-      console.log('生成吉他测试音频...')
+      logger.debug('生成吉他测试音频...');
       const guitarBuffer = await this.generateGuitarTest()
       const guitarBlob = await this.audioBufferToBlob(guitarBuffer)
       this.downloadFile(guitarBlob, 'guitar-test.wav', '吉他测试音频')
 
       // 生成频率测试
-      console.log('生成频率测试音频...')
+      logger.debug('生成频率测试音频...');
       const freqBuffer = await this.generateFrequencyTest()
       const freqBlob = await this.audioBufferToBlob(freqBuffer)
       this.downloadFile(freqBlob, 'frequency-test.wav', '频率测试音频')
 
-      console.log('所有音频文件生成完成！')
+      logger.info('所有音频文件生成完成！');
     } catch (error) {
-      console.error('生成音频文件时出错:', error)
+      logger.error('生成音频文件时出错:', error)
     }
   }
 

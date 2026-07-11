@@ -106,6 +106,12 @@ UserSchema.methods.isSuperAdmin = function (): boolean {
 UserSchema.index({ provider: 1, providerId: 1 }, { unique: true })
 UserSchema.index({ email: 1 }, { unique: true, sparse: true })
 UserSchema.index({ loginUsername: 1 }, { unique: true, sparse: true })
+
+// 登录查询 { provider, $or: [{ email }, { loginUsername }] } 的复合索引
+// 让 $or 的每个分支都能命中前缀，避免集合扫描
+UserSchema.index({ provider: 1, email: 1 })
+UserSchema.index({ provider: 1, loginUsername: 1 })
+
 UserSchema.index(
   { role: 1 },
   { unique: true, partialFilterExpression: { role: 'super_admin' } }
