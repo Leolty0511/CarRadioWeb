@@ -122,6 +122,21 @@ router.post('/select', aiChatRateLimit, async (req, res) => {
 /**
  * GET /api/ai/config - 获取AI配置（需要认证）
  */
+router.get('/status', (_req, res) => {
+  try {
+    res.json({
+      success: true,
+      status: aiService.getPublicStatus()
+    });
+  } catch (error) {
+    logger.error({ error }, '获取AI助手状态失败');
+    res.status(500).json({
+      success: false,
+      error: '获取AI助手状态失败'
+    });
+  }
+});
+
 router.get('/config', authenticateUser, requirePermission(PERMISSIONS.ai.configure), (_req, res) => {
   try {
     const config = aiService.getConfig();
@@ -144,6 +159,15 @@ router.get('/config', authenticateUser, requirePermission(PERMISSIONS.ai.configu
 router.put('/config', authenticateUser, requirePermission(PERMISSIONS.ai.configure), async (req, res) => {
   try {
     const { provider, model, temperature, maxTokens, systemPrompt, apiKey, baseURL } = req.body;
+
+    const currentConfig = aiService.getConfig();
+    if (provider && provider !== currentConfig.provider && !apiKey) {
+      res.status(400).json({
+        success: false,
+        error: '切换供应商时必须填写该供应商的 API Key'
+      });
+      return;
+    }
 
     // 验证API密钥（如果提供）
     let validationWarning: string | null = null;
@@ -203,7 +227,7 @@ router.put('/config', authenticateUser, requirePermission(PERMISSIONS.ai.configu
 router.post('/models', authenticateUser, requirePermission(PERMISSIONS.ai.configure), async (req, res) => {
   try {
     const provider = String(req.body?.provider || '') as AIProvider;
-    const apiKey = String(req.body?.apiKey || '');
+    const submittedApiKey = String(req.body?.apiKey || '').trim();
     const baseURL = typeof req.body?.baseURL === 'string' ? req.body.baseURL : undefined;
 
     if (!provider) {
@@ -211,6 +235,8 @@ router.post('/models', authenticateUser, requirePermission(PERMISSIONS.ai.config
       return;
     }
 
+    const currentConfig = aiService.getConfig();
+    const apiKey = submittedApiKey || (provider === currentConfig.provider ? aiService.getApiKey() : '');
     if (!apiKey) {
       res.status(400).json({ success: false, error: 'api_key_required' });
       return;
@@ -346,9 +372,12 @@ router.post('/search', aiChatRateLimit, async (req, res) => {
  */
 router.post('/validate-key', authenticateUser, async (req, res) => {
   try {
-    const { apiKey, provider } = req.body;
+    const provider = String(req.body?.provider || '') as AIProvider;
+    const submittedApiKey = typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    const currentConfig = aiService.getConfig();
+    const apiKey = submittedApiKey || (provider === currentConfig.provider ? aiService.getApiKey() : '');
 
-    if (!apiKey || typeof apiKey !== 'string') {
+    if (!apiKey) {
       res.status(400).json({
         success: false,
         error: 'API密钥无效'
@@ -376,6 +405,21 @@ router.post('/validate-key', authenticateUser, async (req, res) => {
 /**
  * GET /api/ai/knowledge-base-stats - 获取知识库统计（需要认证）
  */
+router.post('/test', authenticateUser, requirePermission(PERMISSIONS.ai.configure), async (_req, res) => {
+  try {
+    const response = await aiService.sendMessage([{ role: 'user', content: 'test' }]);
+    aiService.recordTestResult(response.success === true);
+    res.json(response);
+  } catch (error) {
+    aiService.recordTestResult(false);
+    logger.error({ error }, 'AI测试接口错误');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'AI测试失败'
+    });
+  }
+});
+
 router.get('/knowledge-base-stats', authenticateUser, requirePermission(PERMISSIONS.ai.configure), async (_req, res) => {
   try {
     const totalDocuments = await BaseDocument.countDocuments()

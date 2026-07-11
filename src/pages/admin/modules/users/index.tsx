@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Ban, Check, Edit2, ShieldCheck, Trash2, UserCheck, X } from 'lucide-react'
+import { Ban, Check, Crown, Edit2, ShieldCheck, Trash2, UserCheck, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -10,6 +10,7 @@ import {
   deleteUser,
   getPermissions,
   getUsers,
+  transferSuperAdmin,
   updateOwnNickname,
   updateUser,
   type AdminUserRecord,
@@ -258,6 +259,9 @@ export function UserManagement() {
   const [loading, setLoading] = useState(true)
   const [dialogUser, setDialogUser] = useState<AdminUserRecord | null | 'new'>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; user: AdminUserRecord | null }>({ open: false, user: null })
+  const [transferTarget, setTransferTarget] = useState<AdminUserRecord | null>(null)
+  const [transferPassword, setTransferPassword] = useState('')
+  const [transferring, setTransferring] = useState(false)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -336,6 +340,30 @@ export function UserManagement() {
       fetchData()
     } else {
       showToast({ type: 'error', title: res.error ?? '删除失败' })
+    }
+  }
+
+  const handleTransfer = async () => {
+    if (!transferTarget || !transferPassword) {return}
+    setTransferring(true)
+    try {
+      const res = await transferSuperAdmin(transferTarget._id, transferPassword)
+      if (res.success) {
+        showToast({ type: 'success', title: '超级管理员已转让', description: '当前账号已降级为普通管理员' })
+        window.location.reload()
+        return
+      }
+      const errMap: Record<string, string> = {
+        current_password_incorrect: '当前密码不正确',
+        current_password_required: '请输入当前超级管理员密码',
+        target_user_not_eligible: '目标账号不存在、已停用或不是普通管理员',
+        super_admin_changed: '超级管理员状态已变化，请刷新后重试',
+        transfer_in_progress: '已有超级管理员转让正在进行，请稍后重试',
+        transfer_failed: '转让失败，请稍后重试',
+      }
+      showToast({ type: 'error', title: errMap[res.error ?? ''] ?? res.error ?? '转让失败' })
+    } finally {
+      setTransferring(false)
     }
   }
 
@@ -426,6 +454,11 @@ export function UserManagement() {
                             <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑" aria-label="编辑">
                               <Edit2 className="h-4 w-4 text-slate-400" />
                             </button>
+                            {u.isActive && (
+                              <button onClick={() => { setTransferTarget(u); setTransferPassword('') }} className="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20" title="转让超级管理员" aria-label="转让超级管理员">
+                                <Crown className="h-4 w-4 text-amber-500" />
+                              </button>
+                            )}
                             <button onClick={() => handleToggleActive(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title={u.isActive ? '停用' : '启用'} aria-label={u.isActive ? '停用' : '启用'}>
                               {u.isActive ? <Ban className="h-4 w-4 text-orange-400" /> : <UserCheck className="h-4 w-4 text-green-500" />}
                             </button>
@@ -465,6 +498,29 @@ export function UserManagement() {
         cancelText="取消"
         danger
       />
+      {transferTarget && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl max-w-md w-full p-5 space-y-4">
+            <div className="flex items-center gap-3">
+              <Crown className="h-6 w-6 text-amber-500" />
+              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">转让超级管理员</h3>
+            </div>
+            <p className="text-sm text-slate-600 dark:text-slate-300">
+              将超级管理员转让给“{transferTarget.nickname}”。成功后当前账号会立即降级，此操作只能由新超级管理员再次转让才能撤回。
+            </p>
+            <div>
+              <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">当前超级管理员密码</label>
+              <Input type="password" value={transferPassword} onChange={e => setTransferPassword(e.target.value)} autoComplete="current-password" placeholder="请输入当前密码确认" />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setTransferTarget(null)} disabled={transferring}>取消</Button>
+              <Button onClick={handleTransfer} disabled={transferring || !transferPassword}>
+                {transferring ? '转让中...' : '确认转让'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

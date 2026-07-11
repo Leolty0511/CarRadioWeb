@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { Image as ImageIcon, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
+import { apiClient } from '@/services/apiClient'
 
 interface ImageUploadProps {
   /** 当前值（展示预览），为空表示未选择 */
@@ -45,32 +46,15 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
       if (folder) {formData.append('folder', folder)}
       if (customName) {formData.append('fileName', customName)}
 
-      const res = await fetch('/api/upload/image', {
-        method: 'POST',
-        body: formData
-      })
-
-      let json
-      try {
-        json = await res.json()
-      } catch (parseError) {
-        console.error('解析响应JSON失败:', parseError)
-        throw new Error(`服务器响应格式错误 (状态码: ${res.status})`)
+      const result = await apiClient.upload<{ url: string }>('/upload/image', formData, { retries: 0 })
+      if (!result.success) {
+        throw new Error(result.error || '上传失败：服务器返回失败状态')
       }
-
-      if (!res.ok) {
-        throw new Error(json?.error || `上传失败 (状态码: ${res.status})`)
-      }
-
-      if (!json?.success) {
-        throw new Error(json?.error || '上传失败：服务器返回失败状态')
-      }
-
-      if (!json?.url) {
+      const url = result.url || result.data?.url
+      if (!url) {
         throw new Error('上传失败：服务器未返回图片URL')
       }
-
-      return json.url as string
+      return url
     } catch (error) {
       console.error('图片上传错误:', error)
       throw error

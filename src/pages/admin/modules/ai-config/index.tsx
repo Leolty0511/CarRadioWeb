@@ -450,6 +450,8 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
       if (apiKey.trim() && !apiKey.startsWith('*')) {
         updateData.apiKey = apiKey.trim()
         newApiKey = apiKey.trim()
+      } else {
+        delete updateData.apiKey
       }
       const response = await aiService.updateConfig(updateData)
       if (response.success) {
@@ -458,8 +460,10 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
         } else {
           showToast({ title: t('ai.config.configUpdateSuccess'), type: 'success' })
         }
-        if (newApiKey) {setSavedApiKey(newApiKey)}
-        setApiKey('')
+        if (newApiKey) {
+          setSavedApiKey(newApiKey)
+          setApiKey('*'.repeat(newApiKey.length))
+        }
       } else {
         showToast({ title: response.error || t('ai.config.configUpdateFailed'), type: 'error' })
       }
@@ -471,15 +475,16 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
   }
 
   const handleValidate = async () => {
-    const keyToValidate = (apiKey.trim() && !apiKey.startsWith('*')) ? apiKey.trim() : savedApiKey
-    if (!keyToValidate) {
+    const enteredKey = (apiKey.trim() && !apiKey.startsWith('*')) ? apiKey.trim() : ''
+    const hasSavedKeyForCurrentProvider = apiKey.startsWith('*') && Boolean(savedApiKey)
+    if (!enteredKey && !hasSavedKeyForCurrentProvider) {
       showToast({ title: t('ai.config.pleaseEnterApiKey'), type: 'error' })
       return
     }
     setValidating(true)
     try {
       const response = await apiClient.post('/ai/validate-key', {
-        apiKey: keyToValidate,
+        ...(enteredKey ? { apiKey: enteredKey } : {}),
         provider: config.provider || 'openai',
       })
       if (response.success && response.valid) {
@@ -495,18 +500,22 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
   }
 
   const handleTest = async () => {
-    const keyToUse = (apiKey.trim() && !apiKey.startsWith('*')) ? apiKey.trim() : savedApiKey
-    if (!keyToUse) {
+    const enteredKey = (apiKey.trim() && !apiKey.startsWith('*')) ? apiKey.trim() : ''
+    const hasSavedKeyForCurrentProvider = apiKey.startsWith('*') && Boolean(savedApiKey)
+    if (!enteredKey && !hasSavedKeyForCurrentProvider) {
       showToast({ title: t('ai.config.pleaseEnterApiKey'), type: 'error' })
       return
     }
 
     try {
       // Ensure backend uses latest provider/model/key before testing.
-      const applyConfig = await aiService.updateConfig({
-        ...config,
-        apiKey: keyToUse,
-      })
+      const updateData = { ...config }
+      if (enteredKey) {
+        updateData.apiKey = enteredKey
+      } else {
+        delete updateData.apiKey
+      }
+      const applyConfig = await aiService.updateConfig(updateData)
       if (!applyConfig.success) {
         showToast({
           title: applyConfig.error || t('ai.config.configUpdateFailed'),
@@ -515,7 +524,7 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
         return
       }
 
-      const response = await aiService.sendMessage([{ role: 'user', content: t('ai.config.testMessage') }])
+      const response = await aiService.testConfig()
       showToast({
         title: response.success ? t('ai.config.aiTestSuccess') : (response.error || t('ai.config.aiTestFailed')),
         type: response.success ? 'success' : 'error',
@@ -532,8 +541,9 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
       return
     }
 
-    const keyToUse = (apiKey.trim() && !apiKey.startsWith('*')) ? apiKey.trim() : savedApiKey
-    if (!keyToUse) {
+    const enteredKey = (apiKey.trim() && !apiKey.startsWith('*')) ? apiKey.trim() : ''
+    const hasSavedKeyForCurrentProvider = apiKey.startsWith('*') && Boolean(savedApiKey)
+    if (!enteredKey && !hasSavedKeyForCurrentProvider) {
       showToast({ title: t('ai.config.pleaseEnterApiKey'), type: 'error' })
       return
     }
@@ -542,7 +552,7 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
     try {
       const response = await apiClient.post('/ai/models', {
         provider,
-        apiKey: keyToUse,
+        ...(enteredKey ? { apiKey: enteredKey } : {}),
         baseURL: findProvider(provider)?.baseURL,
       })
 
@@ -627,9 +637,13 @@ function APIPanel({ config, setConfig, showToast }: PanelProps) {
             ]}
             onChange={(p) => {
               const meta = findProvider(p as AIProvider)
+              setApiKey('')
+              setSavedApiKey('')
+              setShowApiKey(false)
               setConfig((prev) => ({
                 ...prev,
                 provider: p as AIProvider,
+                apiKey: undefined,
                 model: meta?.models[0]?.value || '',
                 baseURL: p === 'custom' ? (prev.baseURL || '') : (meta?.baseURL || ''),
               }))

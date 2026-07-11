@@ -4,6 +4,8 @@
  * Cache is invalidated whenever a fetch fails (session likely expired).
  */
 
+import { refreshSession } from './authService'
+
 let cachedAuthenticated: boolean | null = null
 
 export function isAuthenticated(): boolean {
@@ -16,12 +18,20 @@ export function invalidateAuthCache(): void {
 
 export async function checkAdminAuth(): Promise<boolean> {
   try {
-    const response = await fetch('/api/auth/check', { credentials: 'include' })
+    let response = await fetch('/api/auth/check', { credentials: 'include' })
     if (!response.ok) {
       cachedAuthenticated = false
       return false
     }
-    const data = await response.json()
+    let data = await response.json()
+    if (!data.authenticated && await refreshSession()) {
+      response = await fetch('/api/auth/check', { credentials: 'include' })
+      if (!response.ok) {
+        cachedAuthenticated = false
+        return false
+      }
+      data = await response.json()
+    }
     cachedAuthenticated = !!data.authenticated
     return cachedAuthenticated
   } catch {

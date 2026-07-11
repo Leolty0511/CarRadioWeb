@@ -9,11 +9,12 @@ import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import User, { IUser } from '../models/User'
 import AdminInvitation from '../models/AdminInvitation'
-import { signTokenPair, verifyToken, verifyRefreshToken } from '../utils/jwt'
+import { signTokenPair, verifyAccessToken, verifyRefreshToken } from '../utils/jwt'
 import { createSecureLogger } from '../utils/secureLogger'
 import { adminJwtEmailField } from '../utils/adminIdentity'
 import { setTokenCookie, clearTokenCookie, clearRefreshTokenCookie, extractToken, setRefreshTokenCookie } from '../utils/tokenCookie'
 import { authLimiter, codeLimiter } from '../middleware/rateLimit'
+import { isDuplicateKeyError, isDuplicateKeyOnField } from '../utils/mongoErrors'
 import emailVerificationService from '../services/emailVerificationService'
 
 const logger = createSecureLogger('auth-route')
@@ -49,6 +50,9 @@ function validatePassword(password: string): string | null {
 router.use('/login', authLimiter)
 router.use('/register', authLimiter)
 router.use('/send-code', codeLimiter)
+// 密码重置/修改同样涉及 bcrypt 计算，需限流防暴力/DoS
+router.use('/reset-password', authLimiter)
+router.use('/change-password', authLimiter)
 
 router.get('/bootstrap-status', async (_req: Request, res: Response) => {
   try {
@@ -163,8 +167,8 @@ router.post('/accept-invitation', async (req: Request, res: Response) => {
     logger.info({ userId: user._id, invitationId: invitation._id }, 'Invitation accepted')
 
     return res.status(201).json({ success: true })
-  } catch (error: any) {
-    if (error.code === 11000) {
+  } catch (error: unknown) {
+    if (isDuplicateKeyError(error)) {
       if (claimedInvitationId) {
         await AdminInvitation.findByIdAndUpdate(claimedInvitationId, { $set: { revokedAt: new Date() } })
       }
@@ -354,9 +358,9 @@ router.post('/register', async (req: Request, res: Response) => {
           role: newUser.role,
         },
       })
-    } catch (error: any) {
-      if (error.code === 11000) {
-        if (error.keyPattern?.role) {
+    } catch (error: unknown) {
+      if (isDuplicateKeyError(error)) {
+        if (isDuplicateKeyOnField(error, 'role')) {
           return res.status(403).json({ success: false, error: 'registration_closed' })
         }
         return res.status(409).json({ success: false, error: 'email_already_exists' })
@@ -490,7 +494,7 @@ router.post('/change-password', async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'missing_token' })
     }
 
-    const payload = verifyToken(token)
+    const payload = verifyAccessToken(token)
     if (!payload) {
       return res.status(401).json({ success: false, error: 'invalid_token' })
     }
@@ -594,7 +598,7 @@ router.get('/check', (req: Request, res: Response) => {
     return res.json({ authenticated: false })
   }
 
-  const payload = verifyToken(token)
+  const payload = verifyAccessToken(token)
   if (!payload) {
     return res.json({ authenticated: false })
   }
@@ -612,7 +616,7 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(401).json({ success: false, error: 'missing_token' })
     }
 
-    const payload = verifyToken(token)
+    const payload = verifyAccessToken(token)
     if (!payload) {
       return res.status(401).json({ success: false, error: 'invalid_token' })
     }

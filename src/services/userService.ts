@@ -75,3 +75,8 @@ export async function deleteUser(id: string) {
 export async function updateOwnNickname(nickname: string) {
   return apiClient.put<AdminUserRecord>('/users/me/nickname', { nickname })
 }
+
+/** Transfer the single super-admin role to another active administrator. */
+export async function transferSuperAdmin(targetUserId: string, currentPassword: string) {
+  return apiClient.post('/users/transfer-super-admin', { targetUserId, currentPassword })
+}

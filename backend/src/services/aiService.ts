@@ -157,6 +157,8 @@ interface AIConfig {
   temperature: number;
   maxTokens: number;
   systemPrompt: string;
+  lastTestSucceeded?: boolean;
+  lastTestedAt?: string;
   // DeepSeek特定配置
   baseURL?: string;
 }
@@ -302,6 +304,8 @@ class AIService {
           temperature: savedConfig.temperature || 0.7,
           maxTokens: savedConfig.maxTokens || 1000,
           systemPrompt: savedConfig.systemPrompt || '你是一个专业的车载电子设备技术支持专家，能够基于知识库内容和专业知识为用户提供准确的技术咨询和建议。请用中文回答问题。',
+          lastTestSucceeded: savedConfig.lastTestSucceeded === true,
+          lastTestedAt: savedConfig.lastTestedAt,
           baseURL: savedConfig.baseURL
         };
       } else {
@@ -313,7 +317,8 @@ class AIService {
           temperature: 0.7,
           maxTokens: 1000,
           systemPrompt:
-            '你是一个专业的车载电子设备技术支持专家，能够基于知识库内容和专业知识为用户提供准确的技术咨询和建议。请用中文回答问题。'
+            '你是一个专业的车载电子设备技术支持专家，能够基于知识库内容和专业知识为用户提供准确的技术咨询和建议。请用中文回答问题。',
+          lastTestSucceeded: false
         };
         this.saveConfig();
       }
@@ -2212,7 +2217,14 @@ Examples:
    */
   public updateConfig(newConfig: Partial<AIConfig>): boolean {
     try {
-      this.config = { ...this.config, ...newConfig };
+      const shouldResetTestStatus = ['provider', 'apiKey', 'model', 'baseURL'].some(
+        key => Object.prototype.hasOwnProperty.call(newConfig, key)
+      );
+      this.config = {
+        ...this.config,
+        ...newConfig,
+        ...(shouldResetTestStatus ? { lastTestSucceeded: false, lastTestedAt: undefined } : {})
+      };
       this.saveConfig();
       this.initializeClient();
       return true;
@@ -2236,6 +2248,27 @@ Examples:
     };
   }
 
+  public recordTestResult(success: boolean): void {
+    this.config = {
+      ...this.config,
+      lastTestSucceeded: success,
+      lastTestedAt: new Date().toISOString()
+    };
+    this.saveConfig();
+  }
+
+  public getPublicStatus(): { online: boolean; configured: boolean; lastTestSucceeded: boolean; lastTestedAt?: string } {
+    const configured = Boolean(this.config.apiKey);
+    const lastTestSucceeded = this.config.lastTestSucceeded === true;
+
+    return {
+      online: configured && lastTestSucceeded,
+      configured,
+      lastTestSucceeded,
+      lastTestedAt: this.config.lastTestedAt
+    };
+  }
+
   /**
    * 获取完整的 API 密钥（仅内部使用）
    */
@@ -2247,4 +2280,3 @@ Examples:
 // 单例导出
 export const aiService = new AIService();
 export default aiService;
-

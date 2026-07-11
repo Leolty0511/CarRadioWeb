@@ -35,7 +35,7 @@ const HeroBannerSchema: Schema = new Schema(
     },
     imageUrl: {
       type: String,
-      required: true,
+      default: '',
     },
     title: {
       type: String,

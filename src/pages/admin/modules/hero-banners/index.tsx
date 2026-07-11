@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/Toast'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import ImageUpload from '@/components/ImageUpload'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
-import { getApiBaseUrl } from '@/services/apiClient'
+import { apiClient } from '@/services/apiClient'
 
 interface HeroBanner {
   id: string
@@ -35,6 +35,7 @@ export const HeroBannerManagement: React.FC<HeroBannerManagementProps> = ({
   const { showToast } = useToast()
   const [banners, setBanners] = useState<HeroBanner[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [editingBanner, setEditingBanner] = useState<HeroBanner | null>(null)
   const [showUpload, setShowUpload] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; page: HeroBanner['page'] | '' }>({ open: false, page: '' })
@@ -67,34 +68,18 @@ export const HeroBannerManagement: React.FC<HeroBannerManagementProps> = ({
 
   const loadBanners = async () => {
     setIsLoading(true)
+    setLoadError('')
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/hero-banners?language=${dataLanguage}`)
-      if (response.ok) {
-        const data = await response.json()
-        setBanners(data)
-      } else {
-        // 如果后端还没有这个API，初始化默认数据
-        initializeDefaultBanners()
-      }
+      const response = await apiClient.get<HeroBanner[]>(`/hero-banners?language=${dataLanguage}`)
+      if (!response.success) {throw new Error(response.error || '加载失败')}
+      setBanners(response.data ?? [])
     } catch (error) {
       console.error('Failed to load banners:', error)
-      // 初始化默认数据
-      initializeDefaultBanners()
+      setBanners([])
+      setLoadError(error instanceof Error ? error.message : '无法连接服务器')
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const initializeDefaultBanners = () => {
-    const defaultBanners: HeroBanner[] = pages.map((page) => ({
-      id: page.id,
-      page: page.id as HeroBanner['page'],
-      pageName: page.name,
-      imageUrl: '',
-      title: page.defaultTitle,
-      updatedAt: new Date().toISOString(),
-    }))
-    setBanners(defaultBanners)
   }
 
   const handleUpload = (page: HeroBanner['page']) => {
@@ -115,26 +100,17 @@ export const HeroBannerManagement: React.FC<HeroBannerManagementProps> = ({
     if (!editingBanner) {return}
 
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/hero-banners`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          page: editingBanner.page,
-          language: dataLanguage,
-          imageUrl,
-          title: editingBanner.title,
-          subtitle: editingBanner.subtitle,
-        }),
+      const response = await apiClient.post('/hero-banners', {
+        page: editingBanner.page,
+        language: dataLanguage,
+        imageUrl,
+        title: editingBanner.title,
+        subtitle: editingBanner.subtitle,
       })
-
-      if (response.ok) {
-        setShowUpload(false)
-        loadBanners()
-      } else {
-        const errorData = await response.json()
-        console.error('Failed to save banner:', errorData)
-        showToast({ type: 'error', title: `保存失败: ${errorData.error || '请重试'}` })
-      }
+      if (!response.success) {throw new Error(response.error || '保存失败')}
+      setShowUpload(false)
+      await loadBanners()
+      showToast({ type: 'success', title: 'Banner 图片已保存' })
     } catch (error) {
       console.error('Failed to save banner:', error)
       showToast({ type: 'error', title: '保存失败，请重试' })
@@ -143,15 +119,13 @@ export const HeroBannerManagement: React.FC<HeroBannerManagementProps> = ({
 
   const handleDelete = async (page: HeroBanner['page']) => {
     try {
-      const response = await fetch(`${getApiBaseUrl()}/api/hero-banners/${page}?language=${dataLanguage}`, {
-        method: 'DELETE',
-      })
-
-      if (response.ok) {
-        loadBanners()
-      }
+      const response = await apiClient.delete(`/hero-banners/${page}?language=${dataLanguage}`)
+      if (!response.success) {throw new Error(response.error || '删除失败')}
+      await loadBanners()
+      showToast({ type: 'success', title: 'Banner 图片已删除' })
     } catch (error) {
       console.error('Failed to delete banner:', error)
+      showToast({ type: 'error', title: '删除失败', description: error instanceof Error ? error.message : '请重试' })
     }
   }
 
@@ -185,6 +159,12 @@ export const HeroBannerManagement: React.FC<HeroBannerManagementProps> = ({
       {isLoading ? (
         <div className="text-center py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto" />
+        </div>
+      ) : loadError ? (
+        <div className="rounded-lg border border-red-300 bg-red-50 p-6 text-center dark:border-red-800 dark:bg-red-950/30">
+          <p className="font-semibold text-red-700 dark:text-red-300">Banner 数据加载失败</p>
+          <p className="mt-2 text-sm text-red-600 dark:text-red-400">{loadError}</p>
+          <Button className="mt-4" variant="outline" onClick={loadBanners}>重新加载</Button>
         </div>
       ) : (
         <>

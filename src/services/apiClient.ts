@@ -3,6 +3,8 @@
  * 统一处理所有API请求，避免重复的请求逻辑
  */
 
+import { refreshSession } from './authService';
+
 export type ApiResponse<T = unknown> = {
   success: boolean;
   data?: T;
@@ -97,8 +99,10 @@ class ApiClient {
 
     // Build headers — JWT token is in httpOnly cookie, sent automatically via credentials: 'include'
     // CSRF token is in a non-httpOnly cookie, read by JS and sent as a header for state-changing requests
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
+    const headers: Record<string, string> = {}
+    // Let the browser add the multipart boundary for FormData uploads.
+    if (!(fetchConfig.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json'
     }
     const csrfToken = this.getCsrfToken()
     if (csrfToken) {
@@ -115,6 +119,7 @@ class ApiClient {
     };
 
     let lastError: Error | undefined;
+    let authRefreshAttempted = false;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -124,10 +129,25 @@ class ApiClient {
         const onAbort = () => controller.abort();
         externalSignal?.addEventListener('abort', onAbort);
 
-        const response = await fetch(url, {
+        let response = await fetch(url, {
           ...defaultConfig,
           signal: controller.signal,
         });
+
+        if (response.status === 401 && !authRefreshAttempted && !endpoint.startsWith('/auth/')) {
+          authRefreshAttempted = true;
+          if (await refreshSession()) {
+            // Refresh rotates the CSRF cookie, so rebuild that header before replaying once.
+            const replayHeaders = new Headers(defaultConfig.headers);
+            const refreshedCsrfToken = this.getCsrfToken();
+            if (refreshedCsrfToken) {replayHeaders.set('X-CSRF-Token', refreshedCsrfToken);}
+            response = await fetch(url, {
+              ...defaultConfig,
+              headers: replayHeaders,
+              signal: controller.signal,
+            });
+          }
+        }
 
         clearTimeout(timeoutId);
         externalSignal?.removeEventListener('abort', onAbort);

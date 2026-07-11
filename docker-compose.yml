@@ -31,7 +31,7 @@ services:
     networks:
       - app-network
     volumes:
-      - ./backend/uploads:/app/backend/uploads
+      - ./backend/uploads:/app/uploads
 
   mongo:
     image: mongo:6

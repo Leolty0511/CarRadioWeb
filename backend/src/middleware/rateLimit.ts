@@ -22,11 +22,13 @@ const handleRateLimitResponse = (_req: Request, res: Response): void => {
 /**
  * 公开 API 限流 (通用用户)
  * - 大多数公开端点使用此限制
- * - 100 请求 / 15 分钟
+ * - 生产 600 请求 / 15 分钟；开发 5000 请求 / 15 分钟
  */
 export const publicApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 分钟
-  max: 100,
+  // A single page loads many independent resources. 100/15min caused normal
+  // admin navigation (and users behind the same NAT) to be blocked as abuse.
+  max: process.env.NODE_ENV === 'production' ? 600 : 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: handleRateLimitResponse,

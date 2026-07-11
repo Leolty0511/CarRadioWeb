@@ -99,6 +99,13 @@ export interface AIConfig {
   baseURL?: string
 }
 
+export interface AIStatus {
+  online: boolean
+  configured: boolean
+  lastTestSucceeded: boolean
+  lastTestedAt?: string
+}
+
 class AIService {
   private basePath = '/ai'
 
@@ -160,6 +167,17 @@ class AIService {
     }
   }
 
+  async getStatus(): Promise<{ success: boolean; status?: AIStatus; error?: string }> {
+    try {
+      return await apiClient.get(`${this.basePath}/status`)
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to get AI status'
+      }
+    }
+  }
+
   /**
    * Update AI configuration
    */
@@ -183,6 +201,17 @@ class AIService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update AI config'
+      }
+    }
+  }
+
+  async testConfig(): Promise<AIResponse> {
+    try {
+      return await apiClient.post(`${this.basePath}/test`, {})
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to test AI config'
       }
     }
   }

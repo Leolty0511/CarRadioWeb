@@ -24,6 +24,32 @@ function getCsrfHeader(): Record<string, string> {
   return match ? { 'X-CSRF-Token': decodeURIComponent(match[1]) } : {}
 }
 
+let refreshRequest: Promise<boolean> | null = null
+
+/** Refresh the short-lived access cookie, deduplicating concurrent 401 responses. */
+export function refreshSession(): Promise<boolean> {
+  if (refreshRequest) {return refreshRequest}
+
+  refreshRequest = (async () => {
+    try {
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: getCsrfHeader(),
+        credentials: 'include',
+      })
+      if (!response.ok) {return false}
+      const data = await response.json().catch(() => null)
+      return data?.success === true
+    } catch {
+      return false
+    }
+  })().finally(() => {
+    refreshRequest = null
+  })
+
+  return refreshRequest
+}
+
 // --- Email verification code flow ---
 
 export async function getBootstrapStatus(): Promise<{ success: boolean; needsBootstrap: boolean; error?: string }> {
@@ -31,7 +57,20 @@ export async function getBootstrapStatus(): Promise<{ success: boolean; needsBoo
     const response = await fetch('/api/auth/bootstrap-status', {
       credentials: 'include',
     })
-    return await response.json()
+    const data = await response.json().catch(() => null)
+
+    if (!response.ok || !data?.success) {
+      return {
+        success: false,
+        needsBootstrap: false,
+        error: data?.error || `http_${response.status}`,
+      }
+    }
+
+    return {
+      success: true,
+      needsBootstrap: Boolean(data.needsBootstrap),
+    }
   } catch {
     return { success: false, needsBootstrap: false, error: 'network_error' }
   }
@@ -197,9 +236,13 @@ export async function logout(): Promise<void> {
 /** Fetch current user info — backend reads token from httpOnly cookie */
 export async function fetchCurrentUser(): Promise<AdminUser | null> {
   try {
-    const response = await fetch('/api/auth/me', {
+    let response = await fetch('/api/auth/me', {
       credentials: 'include', // Required to send httpOnly cookies
     })
+
+    if (response.status === 401 && await refreshSession()) {
+      response = await fetch('/api/auth/me', { credentials: 'include' })
+    }
 
     if (!response.ok) {
       return null

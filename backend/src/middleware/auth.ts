@@ -4,9 +4,10 @@
  */
 
 import { Request, Response, NextFunction } from 'express'
-import { verifyToken } from '../utils/jwt'
+import { verifyAccessToken } from '../utils/jwt'
 import { extractToken } from '../utils/tokenCookie'
 import User, { IUser } from '../models/User'
+import logger from '../utils/logger'
 
 // Extend Express Request
 declare global {
@@ -27,7 +28,7 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
       return
     }
 
-    const payload = verifyToken(token)
+    const payload = verifyAccessToken(token)
     if (!payload) {
       res.status(401).json({ success: false, error: 'invalid_token' })
       return
@@ -41,7 +42,8 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
 
     req.user = user
     next()
-  } catch {
+  } catch (error) {
+    logger.error({ error }, 'authenticateUser failed')
     res.status(500).json({ success: false, error: 'auth_error' })
   }
 }
@@ -84,7 +86,7 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
   try {
     const token = extractToken(req)
     if (token) {
-      const payload = verifyToken(token)
+      const payload = verifyAccessToken(token)
       if (payload) {
         const user = await User.findById(payload.userId)
         if (user?.isActive) {
@@ -92,8 +94,9 @@ export const optionalAuth = async (req: Request, _res: Response, next: NextFunct
         }
       }
     }
-  } catch {
-    // Silently continue without auth
+  } catch (error) {
+    // optionalAuth 不阻断请求，但仍记录异常以便排查 DB/JWT 故障
+    logger.warn({ error }, 'optionalAuth encountered an error, continuing unauthenticated')
   }
   next()
 }

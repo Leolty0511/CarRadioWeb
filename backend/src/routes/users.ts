@@ -5,11 +5,14 @@
 
 import { Router, Request, Response } from 'express'
 import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
+import mongoose from 'mongoose'
 import User from '../models/User'
 import AdminInvitation from '../models/AdminInvitation'
 import { requireSuperAdmin } from '../middleware/auth'
 import { ALL_PERMISSIONS } from '../config/permissions'
 import { createLogger } from '../utils/logger'
+import { isDuplicateKeyOnField } from '../utils/mongoErrors'
 import emailVerificationService from '../services/emailVerificationService'
 
 const logger = createLogger('users-route')
@@ -32,6 +35,55 @@ function normalizePermissions(permissions: unknown): string[] {
 
 function hasInvalidPermissions(permissions: unknown): boolean {
   return Array.isArray(permissions) && permissions.some((p) => typeof p !== 'string' || !ALL_PERMISSIONS.includes(p as any))
+}
+
+function isTransactionUnsupported(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('Transaction numbers are only allowed') ||
+    message.includes('replica set member or mongos')
+}
+
+/** Standalone MongoDB fallback: serialized conditional swap with rollback on failure. */
+async function transferWithoutTransaction(currentUserId: unknown, targetUserId: string): Promise<void> {
+  const locks = mongoose.connection.collection('admin_operation_locks')
+  const owner = crypto.randomUUID()
+  const now = new Date()
+  try {
+    await locks.findOneAndUpdate(
+      { _id: 'super-admin-transfer' as any, $or: [{ expiresAt: { $lte: now } }, { owner }] },
+      { $set: { owner, expiresAt: new Date(now.getTime() + 30_000) } },
+      { upsert: true }
+    )
+  } catch (error) {
+    if (isDuplicateKeyOnField(error, '_id')) {throw new Error('TRANSFER_IN_PROGRESS')}
+    throw error
+  }
+
+  let demoted = false
+  try {
+    const target = await User.exists({ _id: targetUserId, role: 'admin', isActive: true })
+    if (!target) {throw new Error('TARGET_NOT_ELIGIBLE')}
+
+    const demoteResult = await User.updateOne(
+      { _id: currentUserId, role: 'super_admin', isActive: true },
+      { $set: { role: 'admin' } }
+    )
+    if (demoteResult.modifiedCount !== 1) {throw new Error('SUPER_ADMIN_CHANGED')}
+    demoted = true
+
+    const promoteResult = await User.updateOne(
+      { _id: targetUserId, role: 'admin', isActive: true },
+      { $set: { role: 'super_admin', permissions: [] } }
+    )
+    if (promoteResult.modifiedCount !== 1) {throw new Error('TARGET_NOT_ELIGIBLE')}
+  } catch (error) {
+    if (demoted) {
+      await User.updateOne({ _id: currentUserId, role: 'admin' }, { $set: { role: 'super_admin' } })
+    }
+    throw error
+  } finally {
+    await locks.deleteOne({ _id: 'super-admin-transfer' as any, owner })
+  }
 }
 
 /**
@@ -83,6 +135,72 @@ router.get('/', async (_req: Request, res: Response) => {
 /** GET /api/users/permissions — return all available permissions */
 router.get('/permissions', (_req: Request, res: Response) => {
   res.json({ success: true, data: ALL_PERMISSIONS })
+})
+
+/** POST /api/users/transfer-super-admin — atomically transfer ownership to an active admin */
+router.post('/transfer-super-admin', async (req: Request, res: Response) => {
+  const session = await mongoose.startSession()
+  try {
+    const targetUserId = String(req.body.targetUserId || '')
+    const currentPassword = String(req.body.currentPassword || '')
+
+    if (!mongoose.isValidObjectId(targetUserId)) {
+      return res.status(400).json({ success: false, error: 'invalid_target_user' })
+    }
+    if (String(req.user!._id) === targetUserId) {
+      return res.status(400).json({ success: false, error: 'cannot_transfer_to_self' })
+    }
+
+    const currentUser = await User.findById(req.user!._id).select('+passwordHash')
+    if (!currentUser || currentUser.role !== 'super_admin') {
+      return res.status(403).json({ success: false, error: 'super_admin_required' })
+    }
+    if (!currentUser.passwordHash || !currentPassword) {
+      return res.status(400).json({ success: false, error: 'current_password_required' })
+    }
+    if (!(await bcrypt.compare(currentPassword, currentUser.passwordHash))) {
+      return res.status(401).json({ success: false, error: 'current_password_incorrect' })
+    }
+
+    try {
+      await session.withTransaction(async () => {
+        const targetUser = await User.findOne({ _id: targetUserId, role: 'admin', isActive: true }).session(session)
+        if (!targetUser) {throw new Error('TARGET_NOT_ELIGIBLE')}
+
+        const demoted = await User.updateOne(
+          { _id: currentUser._id, role: 'super_admin', isActive: true },
+          { $set: { role: 'admin' } },
+          { session }
+        )
+        if (demoted.modifiedCount !== 1) {throw new Error('SUPER_ADMIN_CHANGED')}
+
+        targetUser.role = 'super_admin'
+        targetUser.permissions = []
+        await targetUser.save({ session })
+      })
+    } catch (error) {
+      if (!isTransactionUnsupported(error)) {throw error}
+      logger.info('MongoDB transactions unavailable; using locked transfer fallback')
+      await transferWithoutTransaction(currentUser._id, targetUserId)
+    }
+
+    logger.warn({ fromUserId: currentUser._id, toUserId: targetUserId }, 'Super admin ownership transferred')
+    return res.json({ success: true })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'TARGET_NOT_ELIGIBLE') {
+      return res.status(400).json({ success: false, error: 'target_user_not_eligible' })
+    }
+    if (error instanceof Error && error.message === 'SUPER_ADMIN_CHANGED') {
+      return res.status(409).json({ success: false, error: 'super_admin_changed' })
+    }
+    if (error instanceof Error && error.message === 'TRANSFER_IN_PROGRESS') {
+      return res.status(409).json({ success: false, error: 'transfer_in_progress' })
+    }
+    logger.error({ error }, 'Transfer super admin failed')
+    return res.status(500).json({ success: false, error: 'transfer_failed' })
+  } finally {
+    await session.endSession()
+  }
 })
 
 /** POST /api/users — create a new admin (invited by super_admin) */
@@ -137,8 +255,8 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     res.status(201).json({ success: true, data: invitation })
-  } catch (error: any) {
-    if (error.code === 11000 && error.keyPattern?.email) {
+  } catch (error: unknown) {
+    if (isDuplicateKeyOnField(error, 'email')) {
       return res.status(409).json({ success: false, error: 'active_invitation_exists' })
     }
     logger.error({ error }, 'Invite user failed')
