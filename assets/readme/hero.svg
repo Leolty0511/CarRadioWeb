@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg"
+     width="1200" height="340" viewBox="0 0 1200 340"
+     role="img" aria-labelledby="hero-title hero-desc">
+  <title id="hero-title">CarRadioWeb — Automotive Electronics Knowledge Base</title>
+  <desc id="hero-desc">Product showcase, documentation, AI assistant, and admin panel for car infotainment brands.</desc>
+
+  <defs>
+    <linearGradient id="bg-grad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3B82F6"/>
+      <stop offset="100%" stop-color="#0EA5E9"/>
+    </linearGradient>
+    <pattern id="dashboard-grid" width="60" height="60" patternUnits="userSpaceOnUse" opacity="0.04">
+      <path d="M 60 0 L 0 0 0 60" fill="none" stroke="#60A5FA" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="340" fill="url(#bg-grad)"/>
+  <rect width="1200" height="340" fill="url(#dashboard-grid)"/>
+
+  <!-- Subtle accent arc -->
+  <path d="M0 340 Q 300 200 600 160 Q 900 120 1200 280 L1200 340 Z" fill="#3B82F6" opacity="0.03"/>
+
+  <!-- Left: Title content -->
+  <g transform="translate(64, 48)">
+    <!-- Eyebrow badge -->
+    <rect x="0" y="0" width="148" height="28" rx="14" fill="#3B82F6" opacity="0.15"/>
+    <text x="74" y="19" text-anchor="middle" fill="#60A5FA" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="12" font-weight="600" letter-spacing="1.5">AUTOMOTIVE ELECTRONICS</text>
+
+    <!-- Main title -->
+    <text x="0" y="80" fill="#F8FAFC" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="54" font-weight="700" letter-spacing="-1">CarRadioWeb</text>
+
+    <!-- Tagline -->
+    <text x="0" y="120" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="20" font-weight="400" letter-spacing="0.3">Knowledge base &amp; product showcase platform</text>
+    <text x="0" y="148" fill="#64748B" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="16" font-weight="400">for car infotainment aftermarket brands</text>
+
+    <!-- Tech tags -->
+    <g transform="translate(0, 186)">
+      <rect x="0" y="0" width="96" height="28" rx="6" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <text x="48" y="19" text-anchor="middle" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="500">React 19 + TS</text>
+
+      <rect x="106" y="0" width="80" height="28" rx="6" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <text x="146" y="19" text-anchor="middle" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="500">Node.js</text>
+
+      <rect x="196" y="0" width="90" height="28" rx="6" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <text x="241" y="19" text-anchor="middle" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="500">MongoDB</text>
+
+      <rect x="296" y="0" width="74" height="28" rx="6" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <text x="333" y="19" text-anchor="middle" fill="#94A3B8" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="11" font-weight="500">Docker</text>
+    </g>
+
+    <!-- Repo URL -->
+    <g transform="translate(0, 238)">
+      <rect x="0" y="0" width="210" height="34" rx="8" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+      <text x="14" y="22" fill="#64748B" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="12">github.com/Leolty0511/CarRadioWeb</text>
+    </g>
+  </g>
+
+  <!-- Right: Hexagonal dashboard motif -->
+  <g transform="translate(760, 50)" opacity="0.6">
+    <!-- Dashboard-style hexagons -->
+    <polygon points="110,20 145,0 180,20 180,60 145,80 110,60" fill="none" stroke="#3B82F6" stroke-width="1.5" opacity="0.3"/>
+    <polygon points="65,60 100,40 135,60 135,100 100,120 65,100" fill="none" stroke="#3B82F6" stroke-width="1" opacity="0.2"/>
+    <polygon points="155,60 190,40 225,60 225,100 190,120 155,100" fill="none" stroke="#3B82F6" stroke-width="1" opacity="0.2"/>
+    <polygon points="20,100 55,80 90,100 90,140 55,160 20,140" fill="none" stroke="#3B82F6" stroke-width="1" opacity="0.15"/>
+    <polygon points="110,100 145,80 180,100 180,140 145,160 110,140" fill="none" stroke="#60A5FA" stroke-width="1.5" opacity="0.3"/>
+    <polygon points="200,100 235,80 270,100 270,140 235,160 200,140" fill="none" stroke="#3B82F6" stroke-width="1" opacity="0.2"/>
+    <polygon points="65,140 100,120 135,140 135,180 100,200 65,180" fill="none" stroke="#3B82F6" stroke-width="1" opacity="0.15"/>
+    <polygon points="155,140 190,120 225,140 225,180 190,200 155,180" fill="none" stroke="#3B82F6" stroke-width="1" opacity="0.2"/>
+
+    <!-- Signal bars -->
+    <rect x="280" y="130" width="4" height="16" rx="1" fill="#3B82F6" opacity="0.4"/>
+    <rect x="288" y="124" width="4" height="22" rx="1" fill="#3B82F6" opacity="0.5"/>
+    <rect x="296" y="116" width="4" height="30" rx="1" fill="#60A5FA" opacity="0.6"/>
+    <rect x="304" y="106" width="4" height="40" rx="1" fill="#60A5FA" opacity="0.7"/>
+    <rect x="312" y="96" width="4" height="50" rx="1" fill="#3B82F6" opacity="0.8"/>
+  </g>
+
+  <!-- Bottom accent bar -->
+  <rect x="0" y="336" width="1200" height="4" fill="url(#accent)"/>
+</svg>
