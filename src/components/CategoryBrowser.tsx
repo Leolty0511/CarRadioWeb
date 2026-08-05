@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Tag, FileText, Video, ChevronRight, ArrowLeft, Search, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { getActiveCategories, type Category } from '@/services/categoryService';
+import { getCategoriesByDocumentType, type Category } from '@/services/categoryService';
 import { getDocuments, searchDocuments } from '@/services/documentApi';
 
 /**
@@ -19,12 +19,14 @@ const mapUILanguageToDocLanguage = (_uiLang: string): 'en' => {
 
 interface CategoryBrowserProps {
   documentType: 'video' | 'general';
+  tutorialType?: 'installation' | 'device-operation';
   onViewDocument: (doc: any) => void;
   className?: string;
 }
 
 const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   documentType,
+  tutorialType,
   onViewDocument,
   className = ''
 }) => {
@@ -49,12 +51,12 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
       try {
         setLoading(true);
         // 传入语言参数，获取对应语言的分类
-        const allCategories = await getActiveCategories(documentLanguage);
-        // 过滤适用于当前文档类型的分类
-        const filteredCategories = allCategories.filter(category =>
-          category.documentTypes.includes(documentType)
+        const matchingCategories = await getCategoriesByDocumentType(
+          documentType,
+          documentLanguage,
+          documentType === 'video' ? tutorialType : undefined
         );
-        setCategories(filteredCategories);
+        setCategories(matchingCategories);
       } catch (error) {
         console.error('加载分类失败:', error);
       } finally {
@@ -63,7 +65,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
     };
 
     loadCategories();
-  }, [documentType, documentLanguage]);
+  }, [documentType, documentLanguage, tutorialType]);
 
   // 加载分类下的文档
   const loadCategoryDocuments = async (category: Category) => {
@@ -74,6 +76,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
       // 获取该分类下的已发布文档，按用户语言过滤
       const result = await getDocuments({
         documentType,
+        tutorialType: documentType === 'video' ? tutorialType : undefined,
         category: category.name,
         status: 'published',
         language: documentLanguage,  // 根据用户界面语言过滤文档
@@ -108,6 +111,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
       setIsSearching(true);
       const results = await searchDocuments(query, {
         documentType,
+        tutorialType: documentType === 'video' ? tutorialType : undefined,
         limit: 50
       });
       // 过滤语言
@@ -123,7 +127,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery, documentType, documentLanguage]);
+  }, [searchQuery, documentType, documentLanguage, tutorialType]);
 
   // 清除搜索
   const clearSearch = () => {
@@ -148,7 +152,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   }
 
   // 搜索框组件
-  const SearchBox = () => (
+  const renderSearchBox = () => (
     <div className="mb-6">
       <div className="relative max-w-md">
         <input
@@ -188,7 +192,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   if (showSearchResults) {
     return (
       <div className={className}>
-        <SearchBox />
+        {renderSearchBox()}
 
         {/* 返回按钮 */}
         <div className="flex items-center mb-6">
@@ -266,7 +270,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   if (selectedCategory) {
     return (
       <div className={className}>
-        <SearchBox />
+        {renderSearchBox()}
 
         {/* 返回按钮和分类标题 */}
         <div className="flex items-center mb-6">
@@ -360,7 +364,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   // 显示分类列表
   return (
     <div className={className}>
-      <SearchBox />
+      {renderSearchBox()}
 
       {categories.length === 0 ? (
         <Card className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50">
@@ -412,10 +416,12 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
                   )}
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-slate-400 dark:text-gray-500">
-                      {documentType === 'video'
-                        ? ((category as unknown as { videoCount?: number }).videoCount || 0)
-                        : ((category as unknown as { generalCount?: number }).generalCount || 0)
-                      } {t('category.documents')}
+                      {documentType === 'video' && tutorialType
+                        ? t('knowledge.videoTutorial')
+                        : `${documentType === 'video'
+                          ? ((category as unknown as { videoCount?: number }).videoCount || 0)
+                          : ((category as unknown as { generalCount?: number }).generalCount || 0)
+                        } ${t('category.documents')}`}
                     </span>
                     <div className="flex items-center space-x-1">
                       {category.documentTypes.includes('general') && (

@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "npx vite",
     "dev:backend": "cd backend && npm run dev",
-    "dev:all": "concurrently -n backend,frontend -c blue,green \"npm run dev:backend\" \"wait-on http://localhost:3000 -t 60000 && npm run dev\"",
+    "dev:all": "node scripts/dev-all.mjs",
+    "dev:stop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-stop.ps1",
     "dev:debug": "npx vite --debug",
     "dev:host": "npx vite --host",
     "build": "cd backend && tsc && cd .. && npx vite build",
@@ -33,6 +34,7 @@
     "@types/dompurify": "^3.0.5",
     "@types/node": "^24.3.0",
     "@types/topojson-client": "^3.1.5",
+    "@types/topojson-specification": "^1.0.5",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
     "@vitejs/plugin-react": "^5.2.0",

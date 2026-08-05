@@ -355,6 +355,7 @@ export async function startProjectUpdate(): Promise<UpdateJobStatus> {
     targetCommit: info.remoteCommit,
     statusFile: STATUS_FILE,
     pm2Target: process.env.PM2_PROCESS_NAME || process.env.name || 'official-backend',
+    healthUrl: process.env.UPDATE_HEALTH_URL || `http://127.0.0.1:${process.env.PORT || 3000}/health/ready`,
   })).toString('base64url')
 
   const child = require('child_process').spawn(process.execPath, [runnerPath, payload], {

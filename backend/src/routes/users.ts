@@ -14,6 +14,7 @@ import { ALL_PERMISSIONS } from '../config/permissions'
 import { createLogger } from '../utils/logger'
 import { isDuplicateKeyOnField } from '../utils/mongoErrors'
 import emailVerificationService from '../services/emailVerificationService'
+import { classifyTransferState, type TransferRole } from '../services/superAdminTransferState'
 
 const logger = createLogger('users-route')
 
@@ -45,7 +46,11 @@ function isTransactionUnsupported(error: unknown): boolean {
 }
 
 /** Standalone MongoDB fallback: serialized conditional swap with rollback on failure. */
-async function transferWithoutTransaction(currentUserId: unknown, targetUserId: string): Promise<void> {
+async function transferWithoutTransaction(
+  currentUserId: unknown,
+  targetUserId: string,
+  previousPermissions: string[]
+): Promise<void> {
   const locks = mongoose.connection.collection('admin_operation_locks')
   const owner = crypto.randomUUID()
   const now = new Date()
@@ -62,24 +67,62 @@ async function transferWithoutTransaction(currentUserId: unknown, targetUserId: 
 
   let demoted = false
   try {
-    const target = await User.exists({ _id: targetUserId, role: 'admin', isActive: true })
+    const target = await User.exists({
+      _id: targetUserId,
+      role: 'admin',
+      isActive: true,
+      mustChangeCredentials: false,
+      passwordHash: { $exists: true, $ne: '' },
+    })
     if (!target) {throw new Error('TARGET_NOT_ELIGIBLE')}
 
     const demoteResult = await User.updateOne(
       { _id: currentUserId, role: 'super_admin', isActive: true },
-      { $set: { role: 'admin' } }
+      { $set: { role: 'admin', permissions: ALL_PERMISSIONS } }
     )
     if (demoteResult.modifiedCount !== 1) {throw new Error('SUPER_ADMIN_CHANGED')}
     demoted = true
 
     const promoteResult = await User.updateOne(
-      { _id: targetUserId, role: 'admin', isActive: true },
+      {
+        _id: targetUserId,
+        role: 'admin',
+        isActive: true,
+        mustChangeCredentials: false,
+        passwordHash: { $exists: true, $ne: '' },
+      },
       { $set: { role: 'super_admin', permissions: [] } }
     )
     if (promoteResult.modifiedCount !== 1) {throw new Error('TARGET_NOT_ELIGIBLE')}
   } catch (error) {
     if (demoted) {
-      await User.updateOne({ _id: currentUserId, role: 'admin' }, { $set: { role: 'super_admin' } })
+      const readState = async () => {
+        const [current, target] = await Promise.all([
+          User.findById(currentUserId).select('role').lean(),
+          User.findById(targetUserId).select('role').lean(),
+        ])
+        return classifyTransferState(
+          (current?.role ?? null) as TransferRole,
+          (target?.role ?? null) as TransferRole
+        )
+      }
+
+      const state = await readState()
+      if (state === 'transferred') {return}
+      if (state === 'no_owner') {
+        try {
+          const restored = await User.updateOne(
+            { _id: currentUserId, role: 'admin' },
+            { $set: { role: 'super_admin', permissions: previousPermissions } }
+          )
+          if (restored.modifiedCount === 1) {throw error}
+        } catch (restoreError) {
+          if ((await readState()) === 'transferred') {return}
+          throw restoreError
+        }
+      }
+      if (state === 'original') {throw error}
+      throw new Error('TRANSFER_STATE_UNCERTAIN')
     }
     throw error
   } finally {
@@ -226,8 +269,10 @@ router.get('/permissions', (_req: Request, res: Response) => {
 
 /** POST /api/users/transfer-super-admin — atomically transfer ownership to an active admin */
 router.post('/transfer-super-admin', async (req: Request, res: Response) => {
-  const session = await mongoose.startSession()
+  let session: mongoose.ClientSession | undefined
   try {
+    session = await mongoose.startSession()
+    const activeSession = session
     const targetUserId = String(req.body.targetUserId || '')
     const currentPassword = String(req.body.currentPassword || '')
 
@@ -250,25 +295,30 @@ router.post('/transfer-super-admin', async (req: Request, res: Response) => {
     }
 
     try {
-      await session.withTransaction(async () => {
-        const targetUser = await User.findOne({ _id: targetUserId, role: 'admin', isActive: true }).session(session)
-        if (!targetUser) {throw new Error('TARGET_NOT_ELIGIBLE')}
+      await activeSession.withTransaction(async () => {
+        const targetUser = await User.findOne({
+          _id: targetUserId,
+          role: 'admin',
+          isActive: true,
+          mustChangeCredentials: false,
+        }).select('+passwordHash').session(activeSession)
+        if (!targetUser?.passwordHash) {throw new Error('TARGET_NOT_ELIGIBLE')}
 
         const demoted = await User.updateOne(
           { _id: currentUser._id, role: 'super_admin', isActive: true },
-          { $set: { role: 'admin' } },
-          { session }
+          { $set: { role: 'admin', permissions: ALL_PERMISSIONS } },
+          { session: activeSession }
         )
         if (demoted.modifiedCount !== 1) {throw new Error('SUPER_ADMIN_CHANGED')}
 
         targetUser.role = 'super_admin'
         targetUser.permissions = []
-        await targetUser.save({ session })
+        await targetUser.save({ session: activeSession })
       })
     } catch (error) {
       if (!isTransactionUnsupported(error)) {throw error}
       logger.info('MongoDB transactions unavailable; using locked transfer fallback')
-      await transferWithoutTransaction(currentUser._id, targetUserId)
+      await transferWithoutTransaction(currentUser._id, targetUserId, currentUser.permissions)
     }
 
     logger.warn({ fromUserId: currentUser._id, toUserId: targetUserId }, 'Super admin ownership transferred')
@@ -283,10 +333,13 @@ router.post('/transfer-super-admin', async (req: Request, res: Response) => {
     if (error instanceof Error && error.message === 'TRANSFER_IN_PROGRESS') {
       return res.status(409).json({ success: false, error: 'transfer_in_progress' })
     }
+    if (error instanceof Error && error.message === 'TRANSFER_STATE_UNCERTAIN') {
+      return res.status(503).json({ success: false, error: 'transfer_state_uncertain' })
+    }
     logger.error({ error }, 'Transfer super admin failed')
     return res.status(500).json({ success: false, error: 'transfer_failed' })
   } finally {
-    await session.endSession()
+    await session?.endSession()
   }
 })
 

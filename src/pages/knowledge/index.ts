@@ -1,5 +1,6 @@
 export { default as KnowledgeLanding } from './KnowledgeLanding'
 export { default as VehicleData } from './VehicleData'
 export { default as VideoTutorials } from './VideoTutorials'
+export { default as DeviceOperationVideoTutorials } from './DeviceOperationVideoTutorials'
 export { default as Tutorials } from './Tutorials'
 export { default as CANBusSettings } from './CANBusSettings'

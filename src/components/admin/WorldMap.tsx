@@ -301,7 +301,7 @@ export const WorldMap: React.FC<WorldMapProps> = ({
         )
 
         // Filter out Antarctica and draw countries
-        const filteredFeatures = (countries as GeoJSON.FeatureCollection).features
+        const filteredFeatures = (countries as unknown as GeoJSON.FeatureCollection).features
           .filter(f => !HIDDEN_COUNTRIES.has(f.id as string))
 
         // Draw countries

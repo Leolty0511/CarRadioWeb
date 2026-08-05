@@ -10,6 +10,7 @@ interface RunnerPayload {
   targetCommit: string
   statusFile: string
   pm2Target: string
+  healthUrl: string
 }
 
 interface RunnerStatus {
@@ -85,8 +86,30 @@ function run(
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} 执行失败（退出码 ${result.status}）`)
 }
 
+async function waitForHealth(timeoutMs = 90_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs
+  let lastError = 'health check timed out'
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(payload.healthUrl, { signal: AbortSignal.timeout(5_000) })
+      if (response.ok) {
+        appendLog(`Health check passed: ${payload.healthUrl}`)
+        return
+      }
+      lastError = `health endpoint returned HTTP ${response.status}`
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error)
+    }
+    await new Promise(resolve => setTimeout(resolve, 2_000))
+  }
+
+  throw new Error(`Server health check failed: ${lastError}`)
+}
+
 async function rollback(reason: unknown): Promise<void> {
   const detail = reason instanceof Error ? reason.message : String(reason)
+  let rollbackHealthy = false
   appendLog(`更新失败：${detail}`)
   if (!merged) {
     await writeStatus({
@@ -110,14 +133,20 @@ async function rollback(reason: unknown): Promise<void> {
       path.join(payload.repoRoot, 'backend')
     )
     run(npmCommand, ['run', 'build'], 'rollback_build', '正在恢复原版本构建', 20 * 60_000)
+    run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting previous version', 2 * 60_000)
+    await writeStatus({ stage: 'rollback_health_check', message: 'Confirming previous version is healthy' })
+    await waitForHealth()
+    rollbackHealthy = true
   } catch (rollbackError) {
     appendLog(`自动回退未完成：${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`)
   }
 
   await writeStatus({
     state: 'failed',
-    stage: 'rolled_back',
-    message: `更新失败，已尝试回退：${detail}`,
+    stage: rollbackHealthy ? 'rolled_back' : 'rollback_failed',
+    message: rollbackHealthy
+      ? `更新失败，已恢复并重启旧版本：${detail}`
+      : `更新失败，旧版本自动恢复未完成：${detail}`,
     completedAt: new Date().toISOString(),
   })
 }
@@ -151,6 +180,8 @@ async function main(): Promise<void> {
 
     await writeStatus({ state: 'restarting', stage: 'restarting', message: '更新完成，正在重启服务器' })
     run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', '正在重启服务器', 2 * 60_000)
+    await writeStatus({ state: 'restarting', stage: 'health_check', message: '正在确认新版本服务可用' })
+    await waitForHealth()
     await writeStatus({
       state: 'completed',
       stage: 'completed',

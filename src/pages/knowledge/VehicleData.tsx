@@ -10,12 +10,14 @@ import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import { getDocuments } from '@/services/documentApi'
 import { findVehicleByBrandModelYear } from '@/services/vehicleService'
+import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
 
 const mapUILanguageToDocLanguage = (_uiLang: string): 'en' => 'en'
 
 const VehicleData: React.FC = () => {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const sectionEnabled = useKnowledgeSection('vehicleDataEnabled')
   const documentLanguage = mapUILanguageToDocLanguage(i18n.language)
   const langPrefix = '' // 路由无语言前缀
 
@@ -135,6 +137,8 @@ const VehicleData: React.FC = () => {
     setShowPasswordProtection(false)
     setSelectedDocument(null)
   }
+
+  if (sectionEnabled !== true) {return null}
 
   return (
     <div className="page-container">

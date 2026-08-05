@@ -66,6 +66,15 @@ export interface EnabledModule {
   config: ModuleConfig;
 }
 
+export type KnowledgeSectionKey =
+  | 'vehicleDataEnabled'
+  | 'videoTutorialsEnabled'
+  | 'deviceOperationVideosEnabled'
+  | 'tutorialsEnabled'
+  | 'canbusSettingsEnabled'
+
+export type PublicKnowledgeSettings = Record<KnowledgeSectionKey, boolean>
+
 class ModuleSettingsService {
   private client = apiClient;
 
@@ -80,6 +89,14 @@ class ModuleSettingsService {
     }
 
     return response.data!;
+  }
+
+  async getPublicKnowledgeSettings(): Promise<PublicKnowledgeSettings> {
+    const response = await this.client.get<{ knowledgeBase: { settings: PublicKnowledgeSettings } }>('/v1/config/modules/public');
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'failed_to_load_public_module_settings');
+    }
+    return response.data.knowledgeBase.settings;
   }
 
   /**

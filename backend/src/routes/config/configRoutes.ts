@@ -9,8 +9,17 @@ import configService from '../../services/config/ConfigService';
 import { authenticateUser as auth, requirePermission } from '../../middleware/auth';
 import { PERMISSIONS } from '../../config/permissions';
 import { validateConfigData } from '../../middleware/validation';
+import { getPublicKnowledgeSettings } from '../../services/knowledgeSectionService';
 
 const router = Router();
+
+router.get('/modules/public', async (_req: Request, res: Response, next: NextFunction) => {
+  try {
+    res.json({ success: true, data: { knowledgeBase: { settings: await getPublicKnowledgeSettings() } } });
+  } catch (error) {
+    next(error);
+  }
+});
 
 /**
  * GET /api/v1/config/modules

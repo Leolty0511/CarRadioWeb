@@ -272,7 +272,8 @@ function ExternalLinksPanel({ dataLanguage, showToast, refreshSiteSettings }: Pa
 
 const KNOWLEDGE_SECTIONS: { key: keyof KnowledgeSectionSettings; label: string; desc: string }[] = [
   { key: 'vehicleDataEnabled', label: '车型数据', desc: '知识库入口页显示「车型数据」板块' },
-  { key: 'videoTutorialsEnabled', label: '视频教程', desc: '知识库入口页显示「视频教程」板块' },
+  { key: 'videoTutorialsEnabled', label: '安装视频教程', desc: '知识库入口页显示「安装视频教程」板块' },
+  { key: 'deviceOperationVideosEnabled', label: '设备操作视频教程', desc: '知识库入口页显示「设备操作视频教程」板块' },
   { key: 'tutorialsEnabled', label: '图文教程', desc: '知识库入口页显示「图文教程」板块' },
   { key: 'canbusSettingsEnabled', label: 'CAN 总线设置', desc: '知识库入口页显示「CAN 总线设置」板块' },
 ]
@@ -280,6 +281,7 @@ const KNOWLEDGE_SECTIONS: { key: keyof KnowledgeSectionSettings; label: string; 
 interface KnowledgeSectionSettings {
   vehicleDataEnabled: boolean
   videoTutorialsEnabled: boolean
+  deviceOperationVideosEnabled: boolean
   tutorialsEnabled: boolean
   canbusSettingsEnabled: boolean
 }
@@ -287,6 +289,7 @@ interface KnowledgeSectionSettings {
 const defaultKnowledgeSections: KnowledgeSectionSettings = {
   vehicleDataEnabled: true,
   videoTutorialsEnabled: true,
+  deviceOperationVideosEnabled: true,
   tutorialsEnabled: true,
   canbusSettingsEnabled: true,
 }
@@ -301,6 +304,7 @@ function KnowledgePanel({ showToast }: PanelProps) {
       setSections({
         vehicleDataEnabled: s.vehicleDataEnabled ?? true,
         videoTutorialsEnabled: s.videoTutorialsEnabled ?? true,
+        deviceOperationVideosEnabled: s.deviceOperationVideosEnabled ?? true,
         tutorialsEnabled: s.tutorialsEnabled ?? true,
         canbusSettingsEnabled: s.canbusSettingsEnabled ?? true,
       })
@@ -343,7 +347,7 @@ function KnowledgePanel({ showToast }: PanelProps) {
           <BookOpen className="w-5 h-5" />
           <span>知识库设置</span>
           <Badge variant="secondary" size="sm">
-            已启用 {enabledCount}/4 板块
+            已启用 {enabledCount}/{KNOWLEDGE_SECTIONS.length} 板块
           </Badge>
         </CardTitle>
         <Button size="sm" onClick={handleSave} disabled={saving}>
@@ -354,7 +358,7 @@ function KnowledgePanel({ showToast }: PanelProps) {
         <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
           <AlertCircle className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-blue-600 dark:text-blue-300">
-            控制知识库入口页四个板块的显示与隐藏，关闭后该板块不会在知识库首页出现。
+            控制知识库入口页各板块的显示与隐藏，关闭后该板块不会在知识库首页出现。
           </p>
         </div>
         {KNOWLEDGE_SECTIONS.map(({ key, label, desc }) => (

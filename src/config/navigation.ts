@@ -157,19 +157,6 @@ export function getNavigationConfig(
     },
   ]
 
-  // 论坛：链接到站内 /forum 路由，由 Forum 页根据 getForumBaseUrl() 跳转（开发=>localhost:8888，生产=>https://forum.${域名}）
-  if (forumEnabled) {
-    supportChildren.push({
-      name: 'forum',
-      href: '/forum',
-      icon: MessageCircle,
-      translationKey: 'navigation.forums',
-      descriptionKey: 'navigation.forumsDesc',
-      group: 'community',
-      groupTitleKey: 'navigation.megaMenu.community',
-    })
-  }
-
   // 知识库作为独立一级导航，放在技术中心之前
   baseNavItems.push({
     name: 'knowledge',
@@ -188,6 +175,17 @@ export function getNavigationConfig(
     showInMainNav: true,
     children: supportChildren,
   })
+
+  // 论坛启用后作为独立一级导航，紧跟在技术中心之后。
+  if (forumEnabled) {
+    baseNavItems.push({
+      name: 'forum',
+      href: '/forum',
+      icon: MessageCircle,
+      translationKey: 'navigation.forums',
+      showInMainNav: true,
+    })
+  }
 
   // 仅在启用时添加新闻动态页面
   if (newsEnabled) {

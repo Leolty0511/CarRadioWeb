@@ -21,6 +21,7 @@ const STATIC_PAGES: Array<{ path: string; changefreq: string; priority: number }
   { path: 'knowledge', changefreq: 'weekly', priority: 0.8 },
   { path: 'knowledge/vehicle-data', changefreq: 'weekly', priority: 0.7 },
   { path: 'knowledge/video-tutorials', changefreq: 'weekly', priority: 0.7 },
+  { path: 'knowledge/device-operation-videos', changefreq: 'weekly', priority: 0.7 },
   { path: 'knowledge/tutorials', changefreq: 'weekly', priority: 0.7 },
   { path: 'knowledge/canbus-settings', changefreq: 'weekly', priority: 0.7 },
   { path: 'about', changefreq: 'monthly', priority: 0.7 },

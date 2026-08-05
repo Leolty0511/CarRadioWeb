@@ -350,6 +350,13 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
   const [transferPassword, setTransferPassword] = useState('')
   const [transferring, setTransferring] = useState(false)
 
+  const eligibleTransferTargets = users.filter(user =>
+    user.role === 'admin' &&
+    user.isActive &&
+    !user.mustChangeCredentials &&
+    user.provider === 'email'
+  )
+
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
@@ -461,16 +468,19 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
     try {
       const res = await transferSuperAdmin(transferTarget._id, transferPassword)
       if (res.success) {
-        showToast({ type: 'success', title: '超级管理员已转让', description: '当前账号已降级为普通管理员' })
+        showToast({ type: 'success', title: '超级管理员已转让', description: '当前账号已降级为拥有全部普通权限的管理员' })
         window.location.reload()
         return
       }
       const errMap: Record<string, string> = {
         current_password_incorrect: '当前密码不正确',
         current_password_required: '请输入当前超级管理员密码',
-        target_user_not_eligible: '目标账号不存在、已停用或不是普通管理员',
+        target_user_not_eligible: '目标账号必须是已完成设置、可使用密码登录的活跃管理员',
+        invalid_target_user: '请选择有效的目标管理员',
+        cannot_transfer_to_self: '不能转让给当前账号',
         super_admin_changed: '超级管理员状态已变化，请刷新后重试',
         transfer_in_progress: '已有超级管理员转让正在进行，请稍后重试',
+        transfer_state_uncertain: '无法确认转让结果，请重新登录后检查当前超级管理员',
         transfer_failed: '转让失败，请稍后重试',
       }
       showToast({ type: 'error', title: errMap[res.error ?? ''] ?? res.error ?? '转让失败' })
@@ -481,7 +491,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <ShieldCheck className="w-8 h-8 text-blue-500" />
           <div>
@@ -489,7 +499,21 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">邀请、编辑和管理后台管理员</p>
           </div>
         </div>
-        <Button onClick={() => setDialogUser('new')}>邀请管理员</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setTransferTarget(eligibleTransferTargets[0] ?? null)
+              setTransferPassword('')
+            }}
+            disabled={eligibleTransferTargets.length === 0}
+            title={eligibleTransferTargets.length === 0 ? '暂无符合条件的活跃管理员' : undefined}
+          >
+            <Crown className="h-4 w-4 mr-2 text-amber-500" />
+            转让超级管理员
+          </Button>
+          <Button onClick={() => setDialogUser('new')}>邀请管理员</Button>
+        </div>
       </div>
 
       <Card>
@@ -566,7 +590,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                             <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑" aria-label="编辑">
                               <Edit2 className="h-4 w-4 text-slate-400" />
                             </button>
-                            {u.isActive && (
+                            {eligibleTransferTargets.some(target => target._id === u._id) && (
                               <button onClick={() => { setTransferTarget(u); setTransferPassword('') }} className="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20" title="转让超级管理员" aria-label="转让超级管理员">
                                 <Crown className="h-4 w-4 text-amber-500" />
                               </button>
@@ -625,8 +649,25 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
               <h3 className="text-lg font-semibold text-slate-900 dark:text-white">转让超级管理员</h3>
             </div>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              将超级管理员转让给“{transferTarget.nickname}”。成功后当前账号会立即降级，此操作只能由新超级管理员再次转让才能撤回。
+              成功后当前账号会立即降级为拥有全部普通权限的管理员。此操作只能由新超级管理员再次转让才能撤回。
             </p>
+            <div>
+              <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">接收管理员</label>
+              <select
+                value={transferTarget._id}
+                onChange={event => {
+                  const nextTarget = eligibleTransferTargets.find(user => user._id === event.target.value)
+                  if (nextTarget) {setTransferTarget(nextTarget)}
+                }}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500"
+              >
+                {eligibleTransferTargets.map(user => (
+                  <option key={user._id} value={user._id}>
+                    {user.nickname}（{user.loginUsername || user.email}）
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">当前超级管理员密码</label>
               <Input type="password" value={transferPassword} onChange={e => setTransferPassword(e.target.value)} autoComplete="current-password" placeholder="请输入当前密码确认" />

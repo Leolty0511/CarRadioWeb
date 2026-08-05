@@ -73,9 +73,14 @@ class CategoryService extends BaseCrudService<Category, CreateCategoryRequest, U
   /**
    * 根据文档类型获取分类
    */
-  async getCategoriesByDocumentType(documentType: 'general' | 'video' | 'structured', language?: string): Promise<Category[]> {
+  async getCategoriesByDocumentType(
+    documentType: 'general' | 'video' | 'structured',
+    language?: string,
+    tutorialType?: 'installation' | 'device-operation'
+  ): Promise<Category[]> {
     const params: any = { documentType };
     if (language) {params.language = language;}
+    if (tutorialType) {params.tutorialType = tutorialType;}
     const response = await this.client.get<Category[]>(this.baseEndpoint, params);
 
     if (!response.success) {
@@ -206,8 +211,11 @@ export const categoryService = new CategoryService();
 
 // 导出便捷函数
 export const getActiveCategories = (language?: string) => categoryService.getActiveCategories(language);
-export const getCategoriesByDocumentType = (documentType: 'general' | 'video' | 'structured', language?: string) =>
-  categoryService.getCategoriesByDocumentType(documentType, language);
+export const getCategoriesByDocumentType = (
+  documentType: 'general' | 'video' | 'structured',
+  language?: string,
+  tutorialType?: 'installation' | 'device-operation'
+) => categoryService.getCategoriesByDocumentType(documentType, language, tutorialType);
 export const createCategory = (categoryData: CreateCategoryRequest, language?: 'en' | 'ru') => categoryService.createCategory(categoryData, language);
 export const updateCategory = (id: string, updates: UpdateCategoryRequest) => categoryService.updateCategory(id, updates);
 export const deleteCategory = (id: string) => categoryService.deleteCategory(id);

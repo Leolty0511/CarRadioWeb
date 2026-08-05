@@ -33,6 +33,32 @@ export class CategoryService {
     return await Category.find(query).sort({ order: 1, name: 1 });
   }
 
+  async getCategoriesByVideoTutorialType(
+    tutorialType: 'installation' | 'device-operation',
+    language?: string
+  ): Promise<ICategory[]> {
+    const videoQuery: any = { status: 'published' };
+    if (language) {videoQuery.language = language;}
+    if (tutorialType === 'installation') {
+      videoQuery.$or = [
+        { tutorialType: 'installation' },
+        { tutorialType: { $exists: false } },
+        { tutorialType: null }
+      ];
+    } else {
+      videoQuery.tutorialType = 'device-operation';
+    }
+
+    const categoryNames = await VideoTutorial.distinct('category', videoQuery);
+    const categoryQuery: any = {
+      isActive: true,
+      documentTypes: 'video',
+      name: { $in: categoryNames.filter(Boolean) }
+    };
+    if (language) {categoryQuery.language = language;}
+    return Category.find(categoryQuery).sort({ order: 1, name: 1 });
+  }
+
   /**
    * 创建新分类
    */

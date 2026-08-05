@@ -19,14 +19,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
     if (!url) {return null}
 
     // YouTube 链接处理
-    if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
-      const videoId = url.includes('youtube.com/watch')
-        ? url.split('v=')[1]?.split('&')[0]
-        : url.split('youtu.be/')[1]?.split('?')[0]
+    try {
+      const parsedUrl = new URL(url)
+      const host = parsedUrl.hostname.replace(/^www\./, '')
+      let videoId: string | null = null
 
-      if (videoId) {
-        return `https://www.youtube.com/embed/${videoId}`
+      if (host === 'youtu.be') {
+        videoId = parsedUrl.pathname.split('/').filter(Boolean)[0] || null
+      } else if (host === 'youtube.com' || host === 'm.youtube.com') {
+        if (parsedUrl.pathname === '/watch') {
+          videoId = parsedUrl.searchParams.get('v')
+        } else if (parsedUrl.pathname.startsWith('/shorts/') || parsedUrl.pathname.startsWith('/embed/')) {
+          videoId = parsedUrl.pathname.split('/').filter(Boolean)[1] || null
+        }
       }
+
+      if (videoId) {return `https://www.youtube.com/embed/${videoId}`}
+    } catch {
+      // Continue with the other supported URL formats.
     }
 
     // Bilibili 链接处理
@@ -138,15 +148,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h4 className="text-lg font-semibold text-slate-800 dark:text-white">
-                {videos.length > 1
-                  ? `${currentVideo.title || `${t('admin.video.videoItem')} ${currentVideoIndex + 1}`}`
-                  : t('knowledge.video.videoContent')
-                }
+                {currentVideo.title || document.title || `${t('admin.video.videoItem')} ${currentVideoIndex + 1}`}
               </h4>
-              {currentVideo.description && videos.length > 1 && (
-                <span className="text-sm text-slate-500 dark:text-gray-400">{currentVideo.description}</span>
-              )}
             </div>
+            {currentVideo.description && (
+              <p className="text-sm text-slate-600 dark:text-gray-300 mb-4">{currentVideo.description}</p>
+            )}
             {embedUrl ? (
               <div className="relative">
                 {isLocalVideo ? (
@@ -163,7 +170,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
                   <div className="relative w-full rounded-lg shadow-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
                     <iframe
                       src={embedUrl}
-                      title={document.title}
+                      title={currentVideo.title || document.title}
                       className="w-full h-full"
                       frameBorder="0"
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -178,9 +185,9 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
                   <Play className="h-8 w-8 text-slate-400 dark:text-gray-400" />
                 </div>
                 <p className="text-slate-600 dark:text-gray-300 mb-4">{t('knowledge.video.cannotParseLink')}</p>
-                <p className="text-slate-400 dark:text-gray-500 text-sm mb-4">{t('knowledge.video.currentLink')}: {document.videoUrl || document.content || document.filePath}</p>
+                <p className="text-slate-400 dark:text-gray-500 text-sm mb-4">{t('knowledge.video.currentLink')}: {videoUrl}</p>
                 <Button
-                  onClick={() => window.open(document.videoUrl || document.content || document.filePath, '_blank')}
+                  onClick={() => window.open(videoUrl, '_blank')}
                   className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   <ExternalLink className="h-4 w-4 mr-2" />
@@ -191,10 +198,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
           </div>
 
           {/* 外部链接按钮 */}
-          {(document.videoUrl || document.content || document.filePath) ? (
+          {videoUrl ? (
             <div className="flex justify-center">
               <Button
-                onClick={() => window.open(document.videoUrl || document.content || document.filePath, '_blank')}
+                onClick={() => window.open(videoUrl, '_blank')}
                 variant="outline"
                 className="bg-white/50 dark:bg-gray-800/50 border-slate-200 dark:border-gray-600/50 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-gray-700/50"
               >

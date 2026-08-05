@@ -3,6 +3,7 @@ import { canbusSettingsService } from '../services/canbusSettingsService'
 import { authenticateUser, requirePermission } from '../middleware/auth'
 import { PERMISSIONS } from '../config/permissions'
 import logger from '../utils/logger'
+import { isKnowledgeSectionEnabled } from '../services/knowledgeSectionService'
 
 const router = Router()
 
@@ -13,6 +14,9 @@ const router = Router()
  */
 router.get('/canbox-types', async (_req: Request, res: Response) => {
   try {
+    if (!(await isKnowledgeSectionEnabled('canbusSettingsEnabled'))) {
+      return res.status(404).json({ success: false, error: 'module_disabled' })
+    }
     const types = await canbusSettingsService.getAllCANBoxTypes(true)
     res.json({ success: true, data: types })
   } catch (error) {
@@ -26,6 +30,9 @@ router.get('/canbox-types', async (_req: Request, res: Response) => {
  */
 router.get('/setting', async (req: Request, res: Response) => {
   try {
+    if (!(await isKnowledgeSectionEnabled('canbusSettingsEnabled'))) {
+      return res.status(404).json({ success: false, error: 'module_disabled' })
+    }
     const { vehicleId } = req.query;
 
     if (!vehicleId) {

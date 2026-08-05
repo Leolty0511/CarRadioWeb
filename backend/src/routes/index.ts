@@ -47,6 +47,7 @@ import auditLogsRouter from './auditLogs';
 import legalVersionsRouter from './legalVersions';
 import newsletterRouter from './newsletter';
 import tokenRefreshRouter from './tokenRefresh';
+import configRouter from './config/configRoutes';
 import { authenticateUser } from '../middleware/auth';
 
 const router = Router();
@@ -78,6 +79,7 @@ router.use('/resource-links', resourceLinksRouter);
 router.use('/site-settings', siteSettingsRouter);
 router.use('/legal-versions', legalVersionsRouter);
 router.use('/newsletter', newsletterRouter);
+router.use('/config', configRouter);
 
 // CANBus 设置
 router.use('/canbus-settings', canbusSettingsRouter);

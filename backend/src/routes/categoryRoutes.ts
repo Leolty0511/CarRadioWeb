@@ -84,10 +84,19 @@ router.post('/update-counts', authenticateUser, requirePermission(PERMISSIONS.ca
 // 获取所有活跃分类
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { documentType, language } = req.query;
+    const { documentType, language, tutorialType } = req.query;
+
+    if (tutorialType && !['installation', 'device-operation'].includes(String(tutorialType))) {
+      return res.status(400).json({ success: false, error: 'invalid_tutorial_type' });
+    }
     
     let categories;
-    if (documentType && ['general', 'video', 'structured', 'product'].includes(documentType as string)) {
+    if (documentType === 'video' && tutorialType) {
+      categories = await categoryService.getCategoriesByVideoTutorialType(
+        tutorialType as 'installation' | 'device-operation',
+        language as string
+      );
+    } else if (documentType && ['general', 'video', 'structured', 'product'].includes(documentType as string)) {
       categories = await categoryService.getCategoriesByDocumentType(
         documentType as any, 
         language as string

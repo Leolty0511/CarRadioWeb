@@ -70,7 +70,7 @@ export function initSentry(config?: Partial<SentryConfig>) {
     ],
 
     // 过滤敏感数据
-    beforeSend(event) {
+    beforeSend(event: Sentry.Event) {
       // 移除敏感信息
       if (event.request?.headers) {
         delete event.request.headers['Authorization'];
@@ -86,7 +86,7 @@ export function initSentry(config?: Partial<SentryConfig>) {
     },
 
     // 过滤面包屑
-    beforeBreadcrumb(breadcrumb) {
+    beforeBreadcrumb(breadcrumb: Sentry.Breadcrumb) {
       // 过滤掉控制台日志
       if (breadcrumb.category === 'console') {
         return null;
@@ -174,4 +174,3 @@ export default {
   setContext,
   setTag
 };
-

@@ -5,10 +5,12 @@ import { FileText } from 'lucide-react'
 import CategoryBrowser from '@/components/CategoryBrowser'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
+import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
 
 const Tutorials: React.FC = () => {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const sectionEnabled = useKnowledgeSection('tutorialsEnabled')
   const langPrefix = i18n.language === 'en' ? '' : `/${i18n.language}`
 
   const handleViewDocument = (document: any) => {
@@ -17,6 +19,8 @@ const Tutorials: React.FC = () => {
     const identifier = docSlug || docId
     navigate(`${langPrefix}/knowledge/article/${identifier}`)
   }
+
+  if (sectionEnabled !== true) {return null}
 
   return (
     <div className="page-container">

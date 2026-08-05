@@ -467,8 +467,10 @@
     "sections": {
       "vehicleResearch": "车型资料",
       "vehicleResearchDesc": "查看车型详细数据，包括原车中控内饰图、原厂主机配置等信息。",
-      "videoTutorials": "视频教程",
-      "videoTutorialsDesc": "观看主机操作演示、安装教程及功能设置视频。",
+      "videoTutorials": "安装视频教程",
+      "videoTutorialsDesc": "观看车载主机安装步骤、接线及安装注意事项视频。",
+      "deviceOperationVideos": "设备操作视频教程",
+      "deviceOperationVideosDesc": "按分类查看设备功能操作、设置及使用方法视频。",
       "generalDocuments": "图文教程",
       "generalDocumentsDesc": "查阅常见安装步骤及故障疑难解答图文指南。",
       "canbusSettings": "CANBus设置",

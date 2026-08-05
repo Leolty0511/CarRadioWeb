@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'));
 const KnowledgeLanding = lazy(() => import('@/pages/knowledge/KnowledgeLanding'));
 const VehicleData = lazy(() => import('@/pages/knowledge/VehicleData'));
 const VideoTutorials = lazy(() => import('@/pages/knowledge/VideoTutorials'));
+const DeviceOperationVideoTutorials = lazy(() => import('@/pages/knowledge/DeviceOperationVideoTutorials'));
 const Tutorials = lazy(() => import('@/pages/knowledge/Tutorials'));
 const CANBusSettings = lazy(() => import('@/pages/knowledge/CANBusSettings'));
 const DocumentDetail = lazy(() => import('@/pages/DocumentDetail'));
@@ -57,6 +58,7 @@ export const commonRoutes: RouteConfig[] = [
   { path: 'knowledge', component: KnowledgeLanding },
   { path: 'knowledge/vehicle-data', component: VehicleData },
   { path: 'knowledge/video-tutorials', component: VideoTutorials },
+  { path: 'knowledge/device-operation-videos', component: DeviceOperationVideoTutorials },
   { path: 'knowledge/tutorials', component: Tutorials },
   { path: 'knowledge/canbus-settings', component: CANBusSettings },
   { path: 'knowledge/:type/:id', component: DocumentDetail },
@@ -104,4 +106,3 @@ export const routeComponents = {
   Admin,
   NotFound,
 };
-

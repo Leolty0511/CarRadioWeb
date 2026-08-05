@@ -70,6 +70,7 @@ export class DocumentService {
     try {
       const document = new VideoTutorial({
         ...documentData,
+        tutorialType: documentData.tutorialType || 'installation',
         author: documentData.author || author.nickname, // Use nickname as fallback author
         authorId: author._id,
         status: documentData.status || 'published', // 默认为已发布，方便管理员使用
@@ -341,6 +342,7 @@ export class DocumentService {
       brand?: string;
       model?: string;
       language?: string;  // 新增语言过滤
+      tutorialType?: 'installation' | 'device-operation';
     } = {},
     pagination: {
       page: number;
@@ -371,6 +373,21 @@ export class DocumentService {
       if (filters.category) query.category = filters.category;
       if (filters.author) query.author = filters.author;
       if (filters.language) query.language = filters.language;  // 添加语言过滤
+
+      if (documentType === 'video' && filters.tutorialType) {
+        if (filters.tutorialType === 'installation') {
+          // 兼容新增字段前创建的视频，旧视频统一视为安装视频教程。
+          query.$and = [{
+            $or: [
+              { tutorialType: 'installation' },
+              { tutorialType: { $exists: false } },
+              { tutorialType: null }
+            ]
+          }];
+        } else {
+          query.tutorialType = filters.tutorialType;
+        }
+      }
       
       // 对于结构化文章，brand和model存储在basicInfo中
       if (documentType === 'structured') {
@@ -386,7 +403,7 @@ export class DocumentService {
         const escapedSearch = filters.search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const searchRegex = { $regex: escapedSearch, $options: 'i' };
         if (documentType === 'structured') {
-          query.$or = [
+          const searchConditions = [
             { title: searchRegex },
             { content: searchRegex },
             { summary: searchRegex },
@@ -395,12 +412,14 @@ export class DocumentService {
             { 'basicInfo.model': searchRegex },
             { 'basicInfo.yearRange': searchRegex }
           ];
+          query.$and = [...(query.$and || []), { $or: searchConditions }];
         } else {
-          query.$or = [
+          const searchConditions = [
             { title: searchRegex },
             { content: searchRegex },
             { summary: searchRegex }
           ];
+          query.$and = [...(query.$and || []), { $or: searchConditions }];
         }
       }
 

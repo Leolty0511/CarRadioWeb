@@ -87,6 +87,12 @@ const DocumentDetail: React.FC = () => {
   }, [id, type])
 
   const handleBack = () => {
+    if (document?.documentType === 'video' || document?.type === 'video') {
+      navigate(document.tutorialType === 'device-operation'
+        ? '/knowledge/device-operation-videos'
+        : '/knowledge/video-tutorials')
+      return
+    }
     navigate('/knowledge')
   }
 

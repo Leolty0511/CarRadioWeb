@@ -15,6 +15,7 @@ export interface DocumentData {
   // 分类系统已替代标签系统
   author: string;
   documentType: 'general' | 'video' | 'structured';
+  tutorialType?: 'installation' | 'device-operation';
   status?: 'draft' | 'published' | 'archived';
   language?: 'en' | 'ru';  // 文档语言
 
@@ -86,6 +87,7 @@ export interface DocumentListParams {
   limit?: number;
   search?: string;
   language?: string;  // 添加语言过滤
+  tutorialType?: 'installation' | 'device-operation';
 }
 
 export interface DocumentListResponse {
@@ -167,6 +169,15 @@ class DocumentService extends BaseCrudService<DocumentResponse, DocumentData, Pa
     return response.data!;
   }
 
+  async getAdminDocuments(params: DocumentListParams & { documentType: 'general' | 'video' | 'structured' }): Promise<DocumentListResponse> {
+    const { documentType, ...query } = params;
+    const response = await this.client.get<DocumentListResponse>(`${this.baseEndpoint}/admin/${documentType}`, query);
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'failed_to_load_admin_documents');
+    }
+    return response.data;
+  }
+
   /**
    * 获取单个文档
    */
@@ -212,6 +223,7 @@ class DocumentService extends BaseCrudService<DocumentResponse, DocumentData, Pa
    */
   async searchDocuments(query: string, options?: {
     documentType?: 'general' | 'video' | 'structured';
+    tutorialType?: 'installation' | 'device-operation';
     category?: string;
     limit?: number;
   }): Promise<DocumentResponse[]> {
@@ -359,13 +371,14 @@ export default documentService;
 // 兼容旧API的包装函数
 export const createDocument = (documentData: DocumentData) => documentService.createDocument(documentData);
 export const getDocuments = (params?: DocumentListParams) => documentService.getDocuments(params);
+export const getAdminDocuments = (params: DocumentListParams & { documentType: 'general' | 'video' | 'structured' }) => documentService.getAdminDocuments(params);
 export const getDocument = (id: string, documentType?: 'general' | 'video' | 'structured') =>
   documentService.getDocument(id, documentType);
 export const updateDocument = (id: string, documentData: Partial<DocumentData>, documentType?: 'general' | 'video' | 'structured') =>
   documentService.updateDocument(id, documentData, documentType);
 export const deleteDocument = (id: string, documentType?: 'general' | 'video' | 'structured') =>
   documentService.deleteDocument(id, documentType);
-export const searchDocuments = (query: string, options?: { documentType?: 'general' | 'video' | 'structured'; category?: string; limit?: number; }) =>
+export const searchDocuments = (query: string, options?: { documentType?: 'general' | 'video' | 'structured'; tutorialType?: 'installation' | 'device-operation'; category?: string; limit?: number; }) =>
   documentService.searchDocuments(query, options);
 export const publishDocument = (id: string, documentType?: 'general' | 'video' | 'structured') =>
   documentService.publishDocument(id, documentType);

@@ -459,8 +459,10 @@
     "sections": {
       "vehicleResearch": "Vehicle Data",
       "vehicleResearchDesc": "Browse detailed vehicle specifications including OEM center console interior, factory head unit configurations, and more.",
-      "videoTutorials": "Video Tutorials",
-      "videoTutorialsDesc": "Watch head unit operation guides, installation tutorials, and step-by-step setup videos.",
+      "videoTutorials": "Installation Video Tutorials",
+      "videoTutorialsDesc": "Watch head unit installation, wiring, and installation precaution videos.",
+      "deviceOperationVideos": "Device Operation Video Tutorials",
+      "deviceOperationVideosDesc": "Browse device operation, feature setup, and usage videos by category.",
       "generalDocuments": "Image-Text Tutorials",
       "generalDocumentsDesc": "Find illustrated guides for common installation procedures and troubleshooting solutions.",
       "canbusSettings": "CANBus Settings",

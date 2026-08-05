@@ -1,7 +1,7 @@
 /**
  * 文档管理模块主页面
  * 完全恢复原有核心功能
- * 支持三种文档类型：图文教程、视频教程、车型资料（结构化文章）
+ * 支持图文教程、安装视频教程、设备操作视频教程和车型资料
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -21,7 +21,7 @@ import { sanitizeHTMLForReact } from '@/utils/sanitize'
 import { saveDraft, loadDraft, deleteDraft } from '@/services/draftService'
 import {
   createDocument,
-  getDocuments,
+  getAdminDocuments,
   updateDocument,
   deleteDocument
 } from '@/services/documentApi'
@@ -32,7 +32,7 @@ interface DocumentManagementProps {
   dataLanguage: DataLanguage
 }
 
-type DocumentTypeFilter = 'all' | 'structured' | 'video' | 'general'
+type DocumentTypeFilter = 'all' | 'structured' | 'installation-video' | 'device-operation-video' | 'general'
 
 export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLanguage }) => {
   const { showToast } = useToast()
@@ -77,9 +77,9 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
     setLoading(true)
     try {
       const [structuredResult, videoResult, generalResult] = await Promise.all([
-        getDocuments({ documentType: 'structured', limit: 1000, language: dataLanguage }),
-        getDocuments({ documentType: 'video', limit: 1000, language: dataLanguage }),
-        getDocuments({ documentType: 'general', limit: 1000, language: dataLanguage })
+        getAdminDocuments({ documentType: 'structured', limit: 1000, language: dataLanguage }),
+        getAdminDocuments({ documentType: 'video', limit: 1000, language: dataLanguage }),
+        getAdminDocuments({ documentType: 'general', limit: 1000, language: dataLanguage })
       ])
 
       const allDocuments = [
@@ -267,12 +267,39 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
 
   const structuredDocs = documents.filter(d => (d.documentType || d.type) === 'structured')
   const videoDocs = documents.filter(d => (d.documentType || d.type) === 'video')
+  const installationVideoDocs = videoDocs.filter(d => !d.tutorialType || d.tutorialType === 'installation')
+  const deviceOperationVideoDocs = videoDocs.filter(d => d.tutorialType === 'device-operation')
   const generalDocs = documents.filter(d => (d.documentType || d.type) === 'general')
+
+  const videoGroups = [
+    {
+      filter: 'installation-video' as const,
+      title: '安装视频教程',
+      documents: installationVideoDocs,
+      accentClass: 'text-purple-400',
+    },
+    {
+      filter: 'device-operation-video' as const,
+      title: '设备操作视频教程',
+      documents: deviceOperationVideoDocs,
+      accentClass: 'text-cyan-400',
+    },
+  ]
+
+  const filteredDocumentCount = typeFilter === 'all'
+    ? documents.length
+    : typeFilter === 'structured'
+      ? structuredDocs.length
+      : typeFilter === 'installation-video'
+        ? installationVideoDocs.length
+        : typeFilter === 'device-operation-video'
+          ? deviceOperationVideoDocs.length
+          : generalDocs.length
 
   return (
     <div className="space-y-6">
       {/* 统计面板 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -300,11 +327,23 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">视频教程</p>
-              <p className="text-3xl font-bold text-slate-800 dark:text-white">{videoDocs.length}</p>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">安装视频教程</p>
+              <p className="text-3xl font-bold text-slate-800 dark:text-white">{installationVideoDocs.length}</p>
             </div>
             <div className="p-3 bg-purple-600/20 rounded-xl border border-purple-500/30">
               <Video className="w-8 h-8 text-purple-400" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">设备操作视频教程</p>
+              <p className="text-3xl font-bold text-slate-800 dark:text-white">{deviceOperationVideoDocs.length}</p>
+            </div>
+            <div className="p-3 bg-cyan-600/20 rounded-xl border border-cyan-500/30">
+              <Video className="w-8 h-8 text-cyan-400" />
             </div>
           </div>
         </div>
@@ -323,10 +362,10 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
       </div>
 
       {/* 类型筛选器 */}
-      <div className="flex items-center justify-between gap-4 bg-white/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 bg-white/80 dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-4">
+        <div className="flex items-center gap-3 min-w-0">
           <span className="text-sm font-medium text-slate-700 dark:text-gray-300">显示:</span>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setTypeFilter('all')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -349,15 +388,26 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
               车型资料 <span className="ml-1 opacity-75">({structuredDocs.length})</span>
             </button>
             <button
-              onClick={() => setTypeFilter('video')}
+              onClick={() => setTypeFilter('installation-video')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
-                typeFilter === 'video'
+                typeFilter === 'installation-video'
                   ? 'bg-purple-600 text-white shadow-lg shadow-purple-500/30'
                   : 'bg-slate-100 dark:bg-gray-700/50 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-gray-700'
               }`}
             >
               <Video className="h-4 w-4" />
-              视频教程 <span className="ml-1 opacity-75">({videoDocs.length})</span>
+              安装视频教程 <span className="ml-1 opacity-75">({installationVideoDocs.length})</span>
+            </button>
+            <button
+              onClick={() => setTypeFilter('device-operation-video')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
+                typeFilter === 'device-operation-video'
+                  ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-500/30'
+                  : 'bg-slate-100 dark:bg-gray-700/50 text-slate-600 dark:text-gray-400 hover:bg-slate-200 dark:hover:bg-gray-700'
+              }`}
+            >
+              <Video className="h-4 w-4" />
+              设备操作视频教程 <span className="ml-1 opacity-75">({deviceOperationVideoDocs.length})</span>
             </button>
             <button
               onClick={() => setTypeFilter('general')}
@@ -374,7 +424,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
         </div>
 
         {/* 创建按钮 */}
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => {
               setShowStructuredArticleEditor(true)
@@ -390,13 +440,29 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                 title: '',
                 summary: '',
                 category: '',
+                tutorialType: 'installation',
                 videos: [{ url: '', title: '', description: '', platform: 'custom', duration: '', order: 0 }],
               })
               setShowVideoEditModal(true)
             }}
             className="bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600"
           >
-            创建视频教程
+            创建安装视频教程
+          </Button>
+          <Button
+            onClick={() => {
+              setEditingDocument({
+                title: '',
+                summary: '',
+                category: '',
+                tutorialType: 'device-operation',
+                videos: [{ url: '', title: '', description: '', platform: 'youtube', duration: '', order: 0 }],
+              })
+              setShowVideoEditModal(true)
+            }}
+            className="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600"
+          >
+            创建设备操作视频教程
           </Button>
           <Button
             onClick={() => {
@@ -553,18 +619,17 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
           </Card>
         )}
 
-        {/* 视频教程 */}
-        {videoDocs.length > 0 && (typeFilter === 'all' || typeFilter === 'video') && (
-          <Card className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
+        {videoGroups.map((group) => group.documents.length > 0 && (typeFilter === 'all' || typeFilter === group.filter) && (
+          <Card key={group.filter} className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
             <CardHeader>
               <CardTitle className="text-slate-800 dark:text-white flex items-center">
-                <Video className="h-5 w-5 mr-2 text-purple-400" />
-                视频教程
+                <Video className={`h-5 w-5 mr-2 ${group.accentClass}`} />
+                {group.title}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {videoDocs.map((doc) => (
+                {group.documents.map((doc) => (
                   <div key={doc._id || doc.id} className="bg-slate-100 dark:bg-gray-700/30 rounded-lg p-4 border border-slate-200 dark:border-gray-600/50">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
@@ -593,7 +658,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
               </div>
             </CardContent>
           </Card>
-        )}
+        ))}
 
         {/* 图文教程 */}
         {generalDocs.length > 0 && (typeFilter === 'all' || typeFilter === 'general') && (
@@ -637,7 +702,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
           </Card>
         )}
 
-        {documents.length === 0 && !loading && (
+        {filteredDocumentCount === 0 && !loading && (
           <Card className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
             <CardContent className="p-12 text-center text-slate-500 dark:text-gray-400">
               暂无文档，点击上方按钮创建
@@ -697,12 +762,25 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
           setShowVideoEditModal(false)
           setEditingDocument(null)
         }}
-        title={editingDocument?._id ? '编辑视频教程' : '创建视频教程'}
+        title={`${editingDocument?._id ? '编辑' : '创建'}${editingDocument?.tutorialType === 'device-operation' ? '设备操作视频教程' : '安装视频教程'}`}
         size="xl"
       >
         <div className="relative flex flex-col min-h-0">
           {/* 可滚动内容区域 */}
           <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">教程类型</label>
+              <select
+                value={editingDocument?.tutorialType || 'installation'}
+                onChange={(e) => setEditingDocument({ ...editingDocument, tutorialType: e.target.value })}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-700/50 border border-slate-300 dark:border-slate-600/50 rounded-md text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                aria-label="选择视频教程类型"
+              >
+                <option value="installation">安装视频教程</option>
+                <option value="device-operation">设备操作视频教程</option>
+              </select>
+            </div>
+
             {/* 标题 */}
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">视频标题</label>
@@ -792,6 +870,19 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                       </div>
 
                       <div className="space-y-3">
+                        <div>
+                          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">视频标题</label>
+                          <Input
+                            placeholder="输入这条视频的标题"
+                            value={video.title || ''}
+                            onChange={(e) => {
+                              const newVideos = [...editingDocument.videos]
+                              newVideos[index] = { ...newVideos[index], title: e.target.value }
+                              setEditingDocument({ ...editingDocument, videos: newVideos })
+                            }}
+                          />
+                        </div>
+
                         <div>
                           <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">视频URL</label>
                           <Input
@@ -897,6 +988,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                     content: editingDocument.summary || editingDocument.title,
                     summary: editingDocument.summary || editingDocument.title,
                     category: editingDocument.category || '',
+                    tutorialType: editingDocument.tutorialType || 'installation',
                     author: 'admin',
                     documentType: 'video' as const,
                     language: dataLanguage

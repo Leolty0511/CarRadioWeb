@@ -595,6 +595,9 @@ export const validateDocument = (documentType: string) => {
         if (data.platform) {
           validator.validateEnum(data.platform, 'platform', ['youtube', 'bilibili', 'custom']);
         }
+        if (data.tutorialType) {
+          validator.validateEnum(data.tutorialType, 'tutorialType', ['installation', 'device-operation']);
+        }
         if (data.thumbnail) {
           validator.validateUrl(data.thumbnail, 'thumbnail');
         }

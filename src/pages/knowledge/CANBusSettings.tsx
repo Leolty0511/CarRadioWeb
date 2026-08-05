@@ -4,9 +4,13 @@ import { Settings } from 'lucide-react'
 import CANBusSettingsPanel from '@/components/CANBusSettingsPanel'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
+import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
 
 const CANBusSettings: React.FC = () => {
   const { t } = useTranslation()
+  const sectionEnabled = useKnowledgeSection('canbusSettingsEnabled')
+
+  if (sectionEnabled !== true) {return null}
 
   return (
     <div className="page-container">

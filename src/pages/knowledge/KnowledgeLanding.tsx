@@ -5,18 +5,19 @@ import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import moduleSettingsService from '@/services/moduleSettingsService'
 
-type ContentSection = 'vehicle-data' | 'video-tutorials' | 'tutorials' | 'canbus-settings'
+type ContentSection = 'vehicle-data' | 'video-tutorials' | 'device-operation-videos' | 'tutorials' | 'canbus-settings'
 
 interface NavItem {
   key: ContentSection
   path: string
   i18nKey: string
-  settingKey: 'vehicleDataEnabled' | 'videoTutorialsEnabled' | 'tutorialsEnabled' | 'canbusSettingsEnabled'
+  settingKey: 'vehicleDataEnabled' | 'videoTutorialsEnabled' | 'deviceOperationVideosEnabled' | 'tutorialsEnabled' | 'canbusSettingsEnabled'
 }
 
 const NAV_ITEMS: NavItem[] = [
   { key: 'vehicle-data', path: '/knowledge/vehicle-data', i18nKey: 'vehicleResearch', settingKey: 'vehicleDataEnabled' },
   { key: 'video-tutorials', path: '/knowledge/video-tutorials', i18nKey: 'videoTutorials', settingKey: 'videoTutorialsEnabled' },
+  { key: 'device-operation-videos', path: '/knowledge/device-operation-videos', i18nKey: 'deviceOperationVideos', settingKey: 'deviceOperationVideosEnabled' },
   { key: 'tutorials', path: '/knowledge/tutorials', i18nKey: 'generalDocuments', settingKey: 'tutorialsEnabled' },
   { key: 'canbus-settings', path: '/knowledge/canbus-settings', i18nKey: 'canbusSettings', settingKey: 'canbusSettingsEnabled' },
 ]
@@ -27,6 +28,7 @@ const NAV_ITEMS: NavItem[] = [
 interface KnowledgeSectionFlags {
   vehicleDataEnabled: boolean
   videoTutorialsEnabled: boolean
+  deviceOperationVideosEnabled: boolean
   tutorialsEnabled: boolean
   canbusSettingsEnabled: boolean
 }
@@ -34,6 +36,7 @@ interface KnowledgeSectionFlags {
 const defaultSectionFlags: KnowledgeSectionFlags = {
   vehicleDataEnabled: true,
   videoTutorialsEnabled: true,
+  deviceOperationVideosEnabled: true,
   tutorialsEnabled: true,
   canbusSettingsEnabled: true,
 }
@@ -46,11 +49,11 @@ const KnowledgeLanding: React.FC = () => {
   useEffect(() => {
     const loadModuleSettings = async () => {
       try {
-        const settings = await moduleSettingsService.getModuleSettings()
-        const s = settings.knowledgeBase?.settings ?? {}
+        const s = await moduleSettingsService.getPublicKnowledgeSettings()
         setSectionFlags({
           vehicleDataEnabled: s.vehicleDataEnabled ?? true,
           videoTutorialsEnabled: s.videoTutorialsEnabled ?? true,
+          deviceOperationVideosEnabled: s.deviceOperationVideosEnabled ?? true,
           tutorialsEnabled: s.tutorialsEnabled ?? true,
           canbusSettingsEnabled: s.canbusSettingsEnabled ?? true,
         })

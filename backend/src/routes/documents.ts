@@ -5,10 +5,60 @@ import { validateDocument } from '../middleware/validation';
 import { authenticateUser, requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
 import { createLogger } from '../utils/logger';
+import {
+  getPublicKnowledgeSettings,
+  isKnowledgeSectionEnabled,
+} from '../services/knowledgeSectionService';
+import {
+  documentKnowledgeSection,
+  isPublishedDocument,
+  videoKnowledgeSection,
+  type PublicDocumentType,
+} from '../services/publicDocumentPolicy';
 
 const logger = createLogger('documents-route');
 
 const router = Router();
+
+const documentTypes = ['general', 'video', 'structured'] as const;
+type DocumentType = typeof documentTypes[number];
+
+router.get('/admin/:type',
+  authenticateUser,
+  requirePermission(PERMISSIONS.documents.read),
+  async (req, res) => {
+    try {
+      const type = req.params.type as DocumentType;
+      if (!documentTypes.includes(type)) {
+        return res.status(400).json({ success: false, error: 'invalid_document_type' });
+      }
+
+      const { page = 1, limit = 10, category, author, search, language, status, tutorialType, brand, model } = req.query;
+      if (tutorialType && !['installation', 'device-operation'].includes(String(tutorialType))) {
+        return res.status(400).json({ success: false, error: 'invalid_tutorial_type' });
+      }
+
+      const result = await documentService.getDocuments(type, {
+        status: status as string,
+        category: category as string,
+        author: author as string,
+        search: search as string,
+        language: language as string,
+        tutorialType: tutorialType as 'installation' | 'device-operation' | undefined,
+        brand: brand as string,
+        model: model as string,
+      }, {
+        page: Math.min(Math.max(parseInt(page as string), 1), 1000),
+        limit: Math.min(Math.max(parseInt(limit as string), 1), 1000),
+      });
+
+      return res.json({ success: true, data: result });
+    } catch (error) {
+      logger.error({ error }, 'Fetch admin documents failed');
+      return res.status(500).json({ success: false, error: 'fetch_admin_documents_failed' });
+    }
+  }
+);
 
 /**
  * 通用文档路由
@@ -40,6 +90,9 @@ router.post('/general',
 // 获取通用文档列表
 router.get('/general', async (req, res) => {
   try {
+    if (!(await isKnowledgeSectionEnabled('tutorialsEnabled'))) {
+      return res.status(404).json({ success: false, error: 'module_disabled' });
+    }
     const { page = 1, limit = 10, category, author, search, language } = req.query;
     
     const result = await documentService.getDocuments('general', {
@@ -71,7 +124,7 @@ router.get('/general/:id', async (req, res) => {
   try {
     const document = await documentService.getDocument(req.params.id, 'general', false);
     
-    if (!document) {
+    if (!document || !isPublishedDocument(document) || !(await isKnowledgeSectionEnabled('tutorialsEnabled'))) {
       res.status(404).json({
         success: false,
         error: '文档不存在'
@@ -192,13 +245,25 @@ router.post('/video',
 // 获取视频教程列表
 router.get('/video', async (req, res) => {
   try {
-    const { page = 1, limit = 10, category, author, search } = req.query;
+    const { page = 1, limit = 10, category, author, search, language, tutorialType } = req.query;
+
+    if (tutorialType && !['installation', 'device-operation'].includes(tutorialType as string)) {
+      res.status(400).json({ success: false, error: '无效的视频教程类型' });
+      return;
+    }
+
+    const resolvedTutorialType = tutorialType === 'device-operation' ? 'device-operation' : 'installation';
+    if (!(await isKnowledgeSectionEnabled(videoKnowledgeSection(resolvedTutorialType)))) {
+      return res.status(404).json({ success: false, error: 'module_disabled' });
+    }
     
     const result = await documentService.getDocuments('video', {
       status: 'published', // 安全：公开 API 强制只返回已发布教程
       category: category as string,
       author: author as string,
-      search: search as string
+      search: search as string,
+      language: language as string,
+      tutorialType: resolvedTutorialType
     }, {
       page: Math.min(Math.max(parseInt(page as string), 1), 1000),
       limit: Math.min(Math.max(parseInt(limit as string), 1), 100)
@@ -222,7 +287,7 @@ router.get('/video/:id', async (req, res) => {
   try {
     const document = await documentService.getDocument(req.params.id, 'video');
     
-    if (!document) {
+    if (!document || !isPublishedDocument(document) || !(await isKnowledgeSectionEnabled(videoKnowledgeSection((document as any).tutorialType)))) {
       res.status(404).json({
         success: false,
         error: '视频教程不存在'
@@ -343,6 +408,9 @@ router.post('/structured',
 // 获取结构化文章列表
 router.get('/structured', async (req, res) => {
   try {
+    if (!(await isKnowledgeSectionEnabled('vehicleDataEnabled'))) {
+      return res.status(404).json({ success: false, error: 'module_disabled' });
+    }
     const { page = 1, limit = 10, brand, model, search } = req.query;
     
     const result = await documentService.getDocuments('structured', {
@@ -373,7 +441,7 @@ router.get('/structured/:id', async (req, res) => {
   try {
     const document = await documentService.getDocument(req.params.id, 'structured');
     
-    if (!document) {
+    if (!document || !isPublishedDocument(document) || !(await isKnowledgeSectionEnabled('vehicleDataEnabled'))) {
       res.status(404).json({
         success: false,
         error: '结构化文章不存在'
@@ -571,7 +639,7 @@ router.patch('/:type/:id/archive',
 // 搜索文档
 router.get('/search', async (req, res) => {
   try {
-    const { q, type, category, status } = req.query;
+    const { q, type, category, tutorialType } = req.query;
     
     if (!q) {
       res.status(400).json({
@@ -581,23 +649,37 @@ router.get('/search', async (req, res) => {
       return;
     }
     
+    if (type && !documentTypes.includes(type as DocumentType)) {
+      return res.status(400).json({ success: false, error: 'invalid_document_type' });
+    }
+    if (tutorialType && !['installation', 'device-operation'].includes(String(tutorialType))) {
+      return res.status(400).json({ success: false, error: 'invalid_tutorial_type' });
+    }
+
+    const enabled = await getPublicKnowledgeSettings();
     const searchPromises = [];
     
-    if (!type || type === 'general') {
+    if ((!type || type === 'general') && enabled.tutorialsEnabled) {
       searchPromises.push(
-        documentService.getDocuments('general', { search: q as string, category: category as string, status: status as string })
+        documentService.getDocuments('general', { search: q as string, category: category as string, status: 'published' })
       );
     }
     
-    if (!type || type === 'video') {
+    const resolvedTutorialType = tutorialType === 'device-operation' ? 'device-operation' : 'installation';
+    if ((!type || type === 'video') && enabled[videoKnowledgeSection(resolvedTutorialType)]) {
       searchPromises.push(
-        documentService.getDocuments('video', { search: q as string, category: category as string, status: status as string })
+        documentService.getDocuments('video', {
+          search: q as string,
+          category: category as string,
+          status: 'published',
+          tutorialType: resolvedTutorialType,
+        })
       );
     }
     
-    if (!type || type === 'structured') {
+    if ((!type || type === 'structured') && enabled.vehicleDataEnabled) {
       searchPromises.push(
-        documentService.getDocuments('structured', { search: q as string, category: category as string, status: status as string })
+        documentService.getDocuments('structured', { search: q as string, category: category as string, status: 'published' })
       );
     }
     
@@ -648,7 +730,7 @@ router.post('/:type/:id/view', async (req, res) => {
 
     const document = await documentService.getDocument(id, type);
     
-    if (!document) {
+    if (!document || !isPublishedDocument(document) || !(await isKnowledgeSectionEnabled(documentKnowledgeSection(type as PublicDocumentType, document)))) {
       res.status(404).json({
         success: false,
         error: '文档不存在'
