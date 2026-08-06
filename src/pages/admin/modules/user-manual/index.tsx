@@ -256,7 +256,7 @@ const UserManualManager: React.FC = () => {
       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
         <h3 className="font-medium text-blue-800 dark:text-blue-300 mb-2">说明</h3>
         <ul className="text-sm text-blue-700 dark:text-blue-400 space-y-1">
-          <li>• 用户手册存放在 <code className="bg-blue-100 dark:bg-blue-800/50 px-1 rounded">public/PDF/</code> 目录</li>
+                        <li>• 用户手册保存在受保护存储中，仅登录用户可访问</li>
           <li>• 支持 PDF 格式，最大 50MB</li>
           <li>• 前台用户可在「用户手册」页面查看和下载</li>
         </ul>

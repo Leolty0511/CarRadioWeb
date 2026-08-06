@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useAI } from '@/contexts/AIContext'
 import { sendAIMessage, AIMessage, aiService } from '@/services/aiService'
 import { useContentLanguage } from '@/contexts/ContentLanguageContext'
+import { useAuth } from '@/contexts/AuthContext'
 import AIFloatingButton from './AIFloatingButton'
 import AIChatWindow from './AIChatWindow'
 
@@ -21,6 +22,7 @@ const AIAssistant: React.FC = () => {
 
   const { t } = useTranslation()
   const { contentLanguage } = useContentLanguage()
+  const { isAuthenticated } = useAuth()
   const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('offline')
 
   // 组件挂载时加载AI配置
@@ -213,6 +215,8 @@ const AIAssistant: React.FC = () => {
   const handleClearChat = () => {
     clearMessages()
   }
+
+  if (!isAuthenticated) {return null}
 
   return (
     <>

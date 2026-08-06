@@ -4,6 +4,7 @@
  */
 
 import { refreshSession } from './authService';
+import { refreshMemberSession } from './memberAuthService';
 
 export type ApiResponse<T = unknown> = {
   success: boolean;
@@ -136,7 +137,8 @@ class ApiClient {
 
         if (response.status === 401 && !authRefreshAttempted && !endpoint.startsWith('/auth/')) {
           authRefreshAttempted = true;
-          if (await refreshSession()) {
+          const refreshed = await refreshMemberSession() || await refreshSession()
+          if (refreshed) {
             // Refresh rotates the CSRF cookie, so rebuild that header before replaying once.
             const replayHeaders = new Headers(defaultConfig.headers);
             const refreshedCsrfToken = this.getCsrfToken();

@@ -1,37 +1,48 @@
-/**
- * Public auth context — stub for frontend navigation filtering
- * Admin auth is handled separately via useAdminAuth hook + JWT
- */
-
-import React, { createContext, useContext, useMemo, ReactNode } from 'react'
-
-interface PublicUser {
-  roles: string[]
-}
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from 'react'
+import { getContentSession, logoutContentSession, type ContentPrincipal } from '@/services/memberAuthService'
 
 interface AuthContextType {
-  user: PublicUser | null
+  user: ContentPrincipal | null
   isAuthenticated: boolean
+  loading: boolean
+  refresh: () => Promise<void>
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   isAuthenticated: false,
+  loading: true,
+  refresh: async () => undefined,
+  logout: async () => undefined,
 })
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  // Public users have no roles — all nav items without role restrictions are visible
-  // value 内容恒定，memo 化以避免每次渲染新建对象导致全树重渲染
+  const [user, setUser] = useState<ContentPrincipal | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(async () => {
+    setLoading(true)
+    try { setUser(await getContentSession()) } finally { setLoading(false) }
+  }, [])
+
+  useEffect(() => { refresh() }, [refresh])
+
+  const logout = useCallback(async () => {
+    await logoutContentSession()
+    setUser(null)
+  }, [])
+
   const value = useMemo<AuthContextType>(() => ({
-    user: null,
-    isAuthenticated: false,
-  }), [])
+    user,
+    isAuthenticated: !!user,
+    loading,
+    refresh,
+    logout,
+  }), [loading, logout, refresh, user])
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useAuth = (): AuthContextType => {
-  return useContext(AuthContext)
-}
-
+export const useAuth = () => useContext(AuthContext)
 export default AuthContext

@@ -1,6 +1,6 @@
 /**
  * Notification channel management module
- * Supports: DingTalk, WeCom, ServerChan, SMTP, Webhook
+ * Supports: DingTalk, WeCom, Feishu, ServerChan, SMTP, Webhook
  * Admin can enable multiple channels simultaneously
  */
 
@@ -27,7 +27,7 @@ import { apiClient } from '@/services/apiClient'
 
 // ==================== Types ====================
 
-type ChannelType = 'dingtalk' | 'wecom' | 'serverchan' | 'smtp' | 'webhook'
+type ChannelType = 'dingtalk' | 'wecom' | 'feishu' | 'serverchan' | 'smtp' | 'webhook'
 
 interface ChannelMeta {
   key: ChannelType
@@ -39,6 +39,7 @@ interface ChannelMeta {
 interface ChannelStatus {
   dingtalk: boolean
   wecom: boolean
+  feishu: boolean
   serverchan: boolean
   smtp: boolean
   webhook: boolean
@@ -55,6 +56,7 @@ interface TestResult {
 const CHANNEL_LIST: ChannelMeta[] = [
   { key: 'dingtalk', label: '钉钉机器人', icon: MessageSquare, description: '通过钉钉群机器人推送通知' },
   { key: 'wecom', label: '企业微信', icon: MessageSquare, description: '通过企业微信群机器人推送通知' },
+  { key: 'feishu', label: '飞书机器人', icon: Send, description: '通过飞书群自定义机器人推送通知' },
   { key: 'serverchan', label: 'Server酱', icon: Bell, description: '通过 Server酱 推送到微信' },
   { key: 'smtp', label: '邮件通知', icon: Mail, description: '通过 SMTP 发送邮件通知' },
   { key: 'webhook', label: '自定义 Webhook', icon: Webhook, description: '发送到自定义 HTTP 端点' },
@@ -65,6 +67,7 @@ const CHANNEL_LIST: ChannelMeta[] = [
 const DEFAULT_CONFIGS: Record<ChannelType, Record<string, unknown>> = {
   dingtalk: { webhook: '', secret: '', enabled: false },
   wecom: { webhook: '', enabled: false },
+  feishu: { webhook: '', secret: '', enabled: false },
   serverchan: { uid: '', sendKey: '', enabled: false },
   smtp: { host: '', port: 465, secure: true, user: '', pass: '', to: '', enabled: false },
   webhook: { url: '', method: 'POST', headers: '', bodyTemplate: '{"title":"{{title}}","content":"{{content}}"}', enabled: false },
@@ -177,6 +180,31 @@ function WecomFields({ config, setConfig }: { config: Record<string, unknown>; s
       />
       <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">企业微信群机器人的 Webhook 地址</p>
     </div>
+  )
+}
+
+function FeishuFields({ config, setConfig }: { config: Record<string, unknown>; setConfig: (c: Record<string, unknown>) => void }) {
+  return (
+    <>
+      <div>
+        <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+          Webhook URL <span className="text-red-400 ml-1">*</span>
+        </label>
+        <Input
+          value={(config.webhook as string) || ''}
+          onChange={(e) => setConfig({ ...config, webhook: e.target.value })}
+          placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+        />
+        <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">飞书群自定义机器人的 Webhook 地址</p>
+      </div>
+      <PasswordField
+        label="签名密钥 (Secret)"
+        value={(config.secret as string) || ''}
+        onChange={(v) => setConfig({ ...config, secret: v })}
+        placeholder="机器人安全设置中的签名密钥"
+        hint="可选；仅当飞书机器人启用了签名校验时填写"
+      />
+    </>
   )
 }
 
@@ -346,6 +374,9 @@ const REQUIRED_FIELDS: Record<ChannelType, { key: string; label: string }[]> = {
   wecom: [
     { key: 'webhook', label: 'Webhook URL' },
   ],
+  feishu: [
+    { key: 'webhook', label: 'Webhook URL' },
+  ],
   serverchan: [
     { key: 'sendKey', label: 'SendKey' },
   ],
@@ -372,6 +403,7 @@ function validateChannel(ch: ChannelType, config: Record<string, unknown>): stri
 const CHANNEL_FIELDS: Record<ChannelType, React.FC<{ config: Record<string, unknown>; setConfig: (c: Record<string, unknown>) => void }>> = {
   dingtalk: DingtalkFields,
   wecom: WecomFields,
+  feishu: FeishuFields,
   serverchan: ServerChanFields,
   smtp: SmtpFields,
   webhook: WebhookFields,
@@ -384,7 +416,7 @@ export function NotificationManagement() {
 
   const [loading, setLoading] = useState(true)
   const [channelStatus, setChannelStatus] = useState<ChannelStatus>({
-    dingtalk: false, wecom: false, serverchan: false, smtp: false, webhook: false,
+    dingtalk: false, wecom: false, feishu: false, serverchan: false, smtp: false, webhook: false,
   })
   // Which channel is currently active (single select tab)
   const [activeChannel, setActiveChannel] = useState<ChannelType>('dingtalk')
@@ -392,6 +424,7 @@ export function NotificationManagement() {
   const [configs, setConfigs] = useState<Record<ChannelType, Record<string, unknown>>>({
     dingtalk: { ...DEFAULT_CONFIGS.dingtalk },
     wecom: { ...DEFAULT_CONFIGS.wecom },
+    feishu: { ...DEFAULT_CONFIGS.feishu },
     serverchan: { ...DEFAULT_CONFIGS.serverchan },
     smtp: { ...DEFAULT_CONFIGS.smtp },
     webhook: { ...DEFAULT_CONFIGS.webhook },
@@ -416,7 +449,7 @@ export function NotificationManagement() {
       }
 
       // Load configs for all channels in parallel
-      const channelKeys: ChannelType[] = ['dingtalk', 'wecom', 'serverchan', 'smtp', 'webhook']
+      const channelKeys: ChannelType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook']
       const configResults = await Promise.all(
         channelKeys.map((ch) => apiClient.get(`/system-config/notification/${ch}?edit=true`))
       )

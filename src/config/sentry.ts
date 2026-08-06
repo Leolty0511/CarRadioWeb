@@ -70,7 +70,7 @@ export function initSentry(config?: Partial<SentryConfig>) {
     ],
 
     // 过滤敏感数据
-    beforeSend(event: Sentry.Event) {
+    beforeSend(event) {
       // 移除敏感信息
       if (event.request?.headers) {
         delete event.request.headers['Authorization'];

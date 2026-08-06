@@ -15,6 +15,7 @@ import { notificationService } from '../services/notificationService'
 import { getClientIP, getGeoWithTimezone, getDualTime, formatDualTime } from '../services/geoLocationService'
 import { DocumentService } from '../services/documentService'
 import { authenticateUser, requirePermission } from '../middleware/auth'
+import { authenticateContentAccess } from '../middleware/contentAccess'
 import { PERMISSIONS } from '../config/permissions'
 import { createRateLimit } from '../middleware/errorHandler'
 import { createLogger } from '../utils/logger'
@@ -143,7 +144,7 @@ router.get('/stats/unreplied', authenticateUser, requirePermission(PERMISSIONS.f
 /**
  * 获取文档的所有反馈
  */
-router.get('/:documentId', async (req, res) => {
+router.get('/:documentId', authenticateContentAccess, async (req, res) => {
   try {
     const { documentId } = req.params
     const feedback = await getDocumentFeedback(documentId)
@@ -164,9 +165,10 @@ router.get('/:documentId', async (req, res) => {
 /**
  * 创建用户反馈（需要指定资料体系）
  */
-router.post('/', docFeedbackRateLimit, async (req, res) => {
+router.post('/', authenticateContentAccess, docFeedbackRateLimit, async (req, res) => {
   try {
-    const { documentId, author, content, language } = req.body
+    const { documentId, content, language } = req.body
+    const author = req.contentPrincipal!.nickname
     
     if (!documentId || !author || !content) {
       res.status(400).json({
@@ -183,7 +185,9 @@ router.post('/', docFeedbackRateLimit, async (req, res) => {
       documentId,
       author,
       content,
-      language: feedbackLanguage
+      language: feedbackLanguage,
+      accountId: req.contentPrincipal!.id,
+      accountType: req.contentPrincipal!.type
     })
 
     // 获取文档信息以改善钉钉通知内容
@@ -291,10 +295,11 @@ router.post('/', docFeedbackRateLimit, async (req, res) => {
 /**
  * 添加用户回复（公开，无需认证，带频率限制）
  */
-router.post('/:feedbackId/user-reply', docFeedbackRateLimit, async (req, res) => {
+router.post('/:feedbackId/user-reply', authenticateContentAccess, docFeedbackRateLimit, async (req, res) => {
   try {
     const { feedbackId } = req.params
-    const { author, content } = req.body
+    const { content } = req.body
+    const author = req.contentPrincipal!.nickname
     
     if (!author || !content) {
       res.status(400).json({
@@ -308,8 +313,10 @@ router.post('/:feedbackId/user-reply', docFeedbackRateLimit, async (req, res) =>
       feedbackId,
       author: author.trim(),
       content: content.trim(),
-      isAdmin: false,
-      avatar: ''
+      isAdmin: req.contentPrincipal!.type === 'admin',
+      avatar: req.contentPrincipal!.avatar,
+      accountId: req.contentPrincipal!.id,
+      accountType: req.contentPrincipal!.type
     })
     
     res.json({

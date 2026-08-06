@@ -44,6 +44,7 @@ import { CANBusSettingsManagement } from './modules/canbus-settings'
 import { NewsManagement } from './modules/news'
 import { ResourceManagement } from './modules/resources'
 import { UserManagement } from './modules/users'
+import { MemberManagement } from './modules/members'
 import { AuditLogManagement } from './modules/audit-log'
 import { ComplianceHubManagement } from './modules/compliance-hub'
 import { ChangePasswordDialog } from './components/ChangePasswordDialog'
@@ -78,6 +79,7 @@ const PAGE_TITLES: Record<string, string> = {
   'system-monitor': '系统监控',
   settings: '系统设置',
   users: '管理员管理',
+  members: '会员管理',
   'audit-log': '操作日志',
   'compliance-hub': '合规与线索',
 }
@@ -322,6 +324,8 @@ export const AdminLayout: React.FC = () => {
             onAccountUpdated={refreshAuth}
           />
         )
+      case 'members':
+        return <MemberManagement />
       case 'audit-log':
         return <AuditLogManagement />
       case 'compliance-hub':

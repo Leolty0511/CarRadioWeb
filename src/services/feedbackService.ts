@@ -96,14 +96,13 @@ export const saveDocumentFeedback = async (): Promise<void> => {
 /**
  * 添加用户留言
  */
-export const addUserFeedback = async (documentId: string | number, author: string, content: string): Promise<UserFeedback> => {
+export const addUserFeedback = async (documentId: string | number, content: string): Promise<UserFeedback> => {
   if (!documentId) {
     throw new Error('文档ID不能为空')
   }
 
   const result = await apiClient.post('/document-feedback', {
     documentId: String(documentId),
-    author: author ? author.trim() : '',
     content: content ? content.trim() : ''
   })
 
@@ -121,16 +120,14 @@ export const addUserFeedback = async (documentId: string | number, author: strin
 }
 
 /**
- * 添加用户回复（公开，无需认证）
+ * 添加已登录用户回复
  */
 export const addUserReply = async (
   feedbackId: string,
-  author: string,
   content: string
 ): Promise<boolean> => {
   try {
     const result = await apiClient.post(`/document-feedback/${feedbackId}/user-reply`, {
-      author: author.trim(),
       content: content.trim()
     })
     return result.success

@@ -28,6 +28,7 @@ const Privacy = lazy(() => import('@/pages/Privacy'));
 const Terms = lazy(() => import('@/pages/Terms'));
 const Disclaimer = lazy(() => import('@/pages/Disclaimer'));
 const NewsletterUnsubscribe = lazy(() => import('@/pages/NewsletterUnsubscribe'));
+const MemberAccess = lazy(() => import('@/pages/MemberAccess'));
 
 // 企业官网页面
 const Products = lazy(() => import('@/pages/Products'));
@@ -47,6 +48,7 @@ export interface RouteConfig {
   path: string;
   component: ComponentType;
   index?: boolean;
+  protected?: boolean;
 }
 
 /**
@@ -55,13 +57,13 @@ export interface RouteConfig {
  */
 export const commonRoutes: RouteConfig[] = [
   { path: '', component: Dashboard, index: true },
-  { path: 'knowledge', component: KnowledgeLanding },
-  { path: 'knowledge/vehicle-data', component: VehicleData },
-  { path: 'knowledge/video-tutorials', component: VideoTutorials },
-  { path: 'knowledge/device-operation-videos', component: DeviceOperationVideoTutorials },
-  { path: 'knowledge/tutorials', component: Tutorials },
-  { path: 'knowledge/canbus-settings', component: CANBusSettings },
-  { path: 'knowledge/:type/:id', component: DocumentDetail },
+  { path: 'knowledge', component: KnowledgeLanding, protected: true },
+  { path: 'knowledge/vehicle-data', component: VehicleData, protected: true },
+  { path: 'knowledge/video-tutorials', component: VideoTutorials, protected: true },
+  { path: 'knowledge/device-operation-videos', component: DeviceOperationVideoTutorials, protected: true },
+  { path: 'knowledge/tutorials', component: Tutorials, protected: true },
+  { path: 'knowledge/canbus-settings', component: CANBusSettings, protected: true },
+  { path: 'knowledge/:type/:id', component: DocumentDetail, protected: true },
   { path: 'faq', component: FAQ },
   { path: 'feedback', component: Feedback },
   { path: 'forum', component: Forum },
@@ -70,8 +72,8 @@ export const commonRoutes: RouteConfig[] = [
   { path: 'audio-equalizer', component: AudioEqualizerPage },
   { path: 'audio-generator', component: AudioGeneratorPage },
   { path: 'contact', component: Contact },
-  { path: 'software-downloads', component: SoftwareDownloads },
-  { path: 'user-manual', component: UserManual },
+  { path: 'software-downloads', component: SoftwareDownloads, protected: true },
+  { path: 'user-manual', component: UserManual, protected: true },
   { path: 'products', component: Products },
   { path: 'news', component: News },
   { path: 'resources', component: Resources },
@@ -82,6 +84,7 @@ export const commonRoutes: RouteConfig[] = [
   { path: 'terms', component: Terms },
   { path: 'disclaimer', component: Disclaimer },
   { path: 'newsletter/unsubscribe', component: NewsletterUnsubscribe },
+  { path: 'login', component: MemberAccess },
 ];
 
 /**

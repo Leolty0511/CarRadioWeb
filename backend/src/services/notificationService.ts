@@ -1,6 +1,6 @@
 /**
  * Unified notification service
- * Supports 5 channels: DingTalk, WeCom, ServerChan, SMTP, Webhook
+ * Supports 6 channels: DingTalk, WeCom, Feishu, ServerChan, SMTP, Webhook
  * Each channel can be independently enabled/disabled
  */
 
@@ -10,6 +10,7 @@ import { getDualTime, formatDualTime } from './geoLocationService';
 import SystemConfig, {
   type DingtalkConfig,
   type WecomConfig,
+  type FeishuConfig,
   type ServerChanConfig,
   type SmtpConfig,
   type WebhookConfig,
@@ -94,6 +95,75 @@ async function sendWecom(config: WecomConfig, payload: NotificationPayload): Pro
     return { channel, success: false, message: result.errmsg ?? 'Unknown error' };
   } catch (err) {
     logger.error({ err }, 'WeCom send failed');
+    return { channel, success: false, message: err instanceof Error ? err.message : 'Unknown error' };
+  }
+}
+
+/**
+ * Create a Feishu custom robot signature. Feishu uses the complete
+ * "timestamp\nsecret" string as the HMAC key and an empty message body.
+ */
+export function createFeishuSignature(timestamp: number, secret: string): string {
+  return crypto
+    .createHmac('sha256', `${timestamp}\n${secret}`)
+    .update('')
+    .digest('base64');
+}
+
+/**
+ * Send Feishu group robot message as an interactive card.
+ */
+async function sendFeishu(config: FeishuConfig, payload: NotificationPayload): Promise<SendResult> {
+  const channel: NotificationChannelType = 'feishu';
+  try {
+    const timestamp = Math.floor(Date.now() / 1000);
+    const body: Record<string, unknown> = {
+      msg_type: 'interactive',
+      card: {
+        header: {
+          template: 'blue',
+          title: { tag: 'plain_text', content: payload.title },
+        },
+        elements: [
+          {
+            tag: 'div',
+            text: {
+              tag: 'lark_md',
+              content: payload.markdown ?? payload.content,
+            },
+          },
+        ],
+      },
+    };
+
+    if (config.secret?.trim()) {
+      body.timestamp = String(timestamp);
+      body.sign = createFeishuSignature(timestamp, config.secret.trim());
+    }
+
+    const res = await fetch(config.webhook, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const result = (await res.json()) as {
+      code?: number;
+      msg?: string;
+      StatusCode?: number;
+      StatusMessage?: string;
+    };
+    const code = result.code ?? result.StatusCode;
+
+    if (res.ok && code === 0) {
+      return { channel, success: true, message: '飞书消息已发送' };
+    }
+    return {
+      channel,
+      success: false,
+      message: result.msg ?? result.StatusMessage ?? `飞书接口返回 ${res.status}`,
+    };
+  } catch (err) {
+    logger.error({ err }, 'Feishu send failed');
     return { channel, success: false, message: err instanceof Error ? err.message : 'Unknown error' };
   }
 }
@@ -223,12 +293,13 @@ const CHANNEL_SENDERS: Record<
 > = {
   dingtalk: (c, p) => sendDingtalk(c as DingtalkConfig, p),
   wecom: (c, p) => sendWecom(c as WecomConfig, p),
+  feishu: (c, p) => sendFeishu(c as FeishuConfig, p),
   serverchan: (c, p) => sendServerChan(c as ServerChanConfig, p),
   smtp: (c, p) => sendSmtp(c as SmtpConfig, p),
   webhook: (c, p) => sendWebhook(c as WebhookConfig, p),
 };
 
-const ALL_CHANNELS: NotificationChannelType[] = ['dingtalk', 'wecom', 'serverchan', 'smtp', 'webhook'];
+const ALL_CHANNELS: NotificationChannelType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook'];
 
 // ==================== Public API ====================
 
@@ -378,6 +449,10 @@ class NotificationService {
       case 'dingtalk': {
         const c = config as DingtalkConfig;
         return { ...c, secret: mask(c.secret) };
+      }
+      case 'feishu': {
+        const c = config as FeishuConfig;
+        return { ...c, secret: mask(c.secret ?? '') };
       }
       case 'serverchan': {
         const c = config as ServerChanConfig;

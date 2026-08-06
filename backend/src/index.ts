@@ -385,7 +385,7 @@ app.use(sitemapRouter);
 app.get('/', (req, res) => {
   res.json({
     message: 'Knowledge Base Backend API',
-    version: '1.0.0',
+    version: '1.1.0',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     endpoints: {
       health: '/health',
@@ -398,16 +398,20 @@ app.get('/', (req, res) => {
 
 // ==================== 认证中间件导入 ====================
 import { authenticateUser } from './middleware/auth';
+import { authenticateContentAccess } from './middleware/contentAccess';
+import memberAuthRouter from './routes/memberAuth';
+import membersRouter from './routes/members';
 
 // ==================== 公开路由（无需认证） ====================
 // Authentication routes (email verification + password login)
 app.use('/api/auth', authRouter);
+app.use('/api/member-auth', memberAuthRouter);
 // 前端展示数据（只读）
-app.use('/api/documents', documentsRouter);
+app.use('/api/documents', authenticateContentAccess, documentsRouter);
 app.use('/api/images', imagesRouter);
-app.use('/api/software', softwareRouter);
-app.use('/api/vehicles', vehiclesRouter);
-app.use('/api/categories', categoryRouter);
+app.use('/api/software', authenticateContentAccess, softwareRouter);
+app.use('/api/vehicles', authenticateContentAccess, vehiclesRouter);
+app.use('/api/categories', authenticateContentAccess, categoryRouter);
 app.use('/api/announcement', announcementRouter);
 app.use('/api/language', languageRouter);
 app.use('/api/products', productsRouter);
@@ -415,14 +419,14 @@ app.use('/api/hero-banners', heroBannersRouter);
 app.use('/api/seo', seoSettingsRouter);
 app.use('/api/faq', faqRouter);
 app.use('/api/search', searchRouter);
-app.use('/api/user-manual', userManualRouter);
+app.use('/api/user-manual', authenticateContentAccess, userManualRouter);
 app.use('/api/page-content', pageContentRouter);
 app.use('/api/resource-links', resourceLinksRouter);
 app.use('/api/site-settings', siteSettingsRouter);
 app.use('/api/legal-versions', legalVersionsRouter);
 app.use('/api/newsletter', newsletterRouter);
 // CANBus 设置（路由内部自行控制认证，公开 GET + 管理端点需认证）
-app.use('/api/canbus-settings', canbusSettingsRouter);
+app.use('/api/canbus-settings', authenticateContentAccess, canbusSettingsRouter);
 // 网站图片配置（GET 公开，PUT/POST 路由内部自行认证）
 app.use('/api', siteImagesRouter);
 // 前端公开提交（反馈表单、文档反馈、联系表单）
@@ -441,6 +445,7 @@ app.use('/api/ai', aiRouter);
 
 // ==================== 受保护路由（需要认证） ====================
 app.use('/api/users', authenticateUser, usersRouter);
+app.use('/api/members', authenticateUser, membersRouter);
 app.use('/api/audit-logs', authenticateUser, auditLogsRouter);
 app.use('/api/upload', authenticateUser, uploadRouter);
 app.use('/api/admin', authenticateUser, adminRouter);

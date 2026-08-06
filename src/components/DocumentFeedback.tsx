@@ -3,30 +3,9 @@ import { useTranslation } from 'react-i18next'
 import { MessageCircle, Send, ChevronDown, ChevronUp, Reply } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
 import { getDocumentFeedback, addUserFeedback, addUserReply, UserFeedback as FeedbackType } from '@/services/feedbackService'
-
-/** localStorage key for caching user nickname */
-const FEEDBACK_NICKNAME_KEY = 'feedback_user_nickname'
-
-const getCachedNickname = (): string => {
-  try {
-    return localStorage.getItem(FEEDBACK_NICKNAME_KEY) ?? ''
-  } catch {
-    return ''
-  }
-}
-
-const setCachedNickname = (name: string): void => {
-  try {
-    if (name.trim()) {
-      localStorage.setItem(FEEDBACK_NICKNAME_KEY, name.trim())
-    }
-  } catch {
-    // Silent fail for private browsing
-  }
-}
+import { useAuth } from '@/contexts/AuthContext'
 
 interface DocumentFeedbackProps {
   documentId: string
@@ -40,8 +19,8 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
 }) => {
   const { t } = useTranslation()
   const { showToast } = useToast()
+  const { user } = useAuth()
   const [newFeedback, setNewFeedback] = useState('')
-  const [userName, setUserName] = useState(() => getCachedNickname())
   const [showFeedbackForm, setShowFeedbackForm] = useState(false)
   const [feedbackList, setFeedbackList] = useState<FeedbackType[]>([])
 
@@ -60,15 +39,14 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
   }, [documentId])
 
   const addFeedback = async () => {
-    if (!newFeedback.trim() || !userName.trim()) {return}
+    if (!newFeedback.trim()) {return}
 
     try {
       if (!documentId) {
         throw new Error('文档ID不存在')
       }
 
-      const newFeedbackItem = await addUserFeedback(documentId, userName, newFeedback)
-      setCachedNickname(userName)
+      const newFeedbackItem = await addUserFeedback(documentId, newFeedback)
       setFeedbackList(prev => [...prev, newFeedbackItem])
       setNewFeedback('')
       setShowFeedbackForm(false)
@@ -112,9 +90,8 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
 
         {showFeedbackForm && (
           <FeedbackForm
-            userName={userName}
+            nickname={user?.nickname || ''}
             newFeedback={newFeedback}
-            onUserNameChange={setUserName}
             onFeedbackChange={setNewFeedback}
             onSubmit={addFeedback}
             onCancel={() => {
@@ -139,33 +116,22 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
 
 /** 留言输入表单 */
 interface FeedbackFormProps {
-  userName: string
+  nickname: string
   newFeedback: string
-  onUserNameChange: (val: string) => void
   onFeedbackChange: (val: string) => void
   onSubmit: () => void
   onCancel: () => void
 }
 
 const FeedbackForm: React.FC<FeedbackFormProps> = ({
-  userName, newFeedback, onUserNameChange, onFeedbackChange, onSubmit, onCancel
+  nickname, newFeedback, onFeedbackChange, onSubmit, onCancel
 }) => {
   const { t } = useTranslation()
 
   return (
     <div className="mb-6 p-4 bg-slate-50 dark:bg-gray-700/30 rounded-lg border border-slate-200 dark:border-gray-600/30">
       <div className="space-y-3">
-        <div>
-          <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-1">
-            {t('knowledge.feedbackName')}
-          </label>
-          <Input
-            value={userName}
-            onChange={(e) => onUserNameChange(e.target.value)}
-            placeholder={t('knowledge.feedbackNamePlaceholder')}
-            className="bg-white dark:bg-gray-800 border-slate-300 dark:border-gray-600 text-slate-800 dark:text-white"
-          />
-        </div>
+        <p className="text-xs text-slate-500 dark:text-gray-400">以 {nickname} 的身份留言</p>
         <div>
           <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-1">
             {t('knowledge.feedbackContent')}
@@ -181,7 +147,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({
         <div className="flex space-x-2">
           <Button
             onClick={onSubmit}
-            disabled={!newFeedback.trim() || !userName.trim()}
+            disabled={!newFeedback.trim()}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
             <Send className="h-4 w-4 mr-2" />
@@ -250,18 +216,17 @@ const FeedbackList: React.FC<{ feedbackList: FeedbackType[]; onReplyAdded: () =>
 /** 单条留言 */
 const FeedbackItem: React.FC<{ feedback: FeedbackType; onReplyAdded: () => void }> = ({ feedback, onReplyAdded }) => {
   const { t } = useTranslation()
+  const { user } = useAuth()
   const [showReplyForm, setShowReplyForm] = useState(false)
-  const [replyAuthor, setReplyAuthor] = useState(() => getCachedNickname())
   const [replyContent, setReplyContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
   const handleReply = async () => {
-    if (!replyAuthor.trim() || !replyContent.trim()) {return}
+    if (!replyContent.trim()) {return}
     setSubmitting(true)
     try {
-      const success = await addUserReply(feedback.id, replyAuthor, replyContent)
+      const success = await addUserReply(feedback.id, replyContent)
       if (success) {
-        setCachedNickname(replyAuthor)
         setReplyContent('')
         setShowReplyForm(false)
         onReplyAdded()
@@ -279,7 +244,7 @@ const FeedbackItem: React.FC<{ feedback: FeedbackType; onReplyAdded: () => void 
           <div className="flex items-center justify-between mb-1">
             <span className="text-slate-800 dark:text-white font-medium">{feedback.author}</span>
             <span className="text-slate-400 dark:text-gray-400 text-sm">
-              {new Date(feedback.timestamp).toLocaleDateString()}
+              {new Date(feedback.timestamp).toLocaleString()}
             </span>
           </div>
           <p className="text-slate-600 dark:text-gray-300 text-sm">{feedback.content}</p>
@@ -301,12 +266,7 @@ const FeedbackItem: React.FC<{ feedback: FeedbackType; onReplyAdded: () => void 
         </button>
       ) : (
         <div className="mt-3 p-3 bg-white dark:bg-gray-800/50 rounded-lg border border-slate-200 dark:border-gray-600/30 space-y-2">
-          <Input
-            value={replyAuthor}
-            onChange={(e) => setReplyAuthor(e.target.value)}
-            placeholder={t('knowledge.feedbackNamePlaceholder')}
-            className="bg-white dark:bg-gray-800 border-slate-300 dark:border-gray-600 text-slate-800 dark:text-white text-sm h-8"
-          />
+          <p className="text-xs text-slate-500 dark:text-gray-400">以 {user?.nickname} 的身份回复</p>
           <textarea
             value={replyContent}
             onChange={(e) => setReplyContent(e.target.value)}
@@ -318,7 +278,7 @@ const FeedbackItem: React.FC<{ feedback: FeedbackType; onReplyAdded: () => void 
             <Button
               size="sm"
               onClick={handleReply}
-              disabled={submitting || !replyAuthor.trim() || !replyContent.trim()}
+              disabled={submitting || !replyContent.trim()}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-7"
             >
               <Send className="h-3 w-3 mr-1" />
@@ -421,7 +381,7 @@ const ReplyItem: React.FC<{ reply: Reply }> = ({ reply }) => {
               )}
             </span>
             <span className="text-slate-400 dark:text-gray-500 text-xs">
-              {new Date(reply.timestamp).toLocaleDateString()}
+              {new Date(reply.timestamp).toLocaleString()}
             </span>
           </div>
           <p className="text-slate-600 dark:text-gray-300 text-xs">{reply.content}</p>

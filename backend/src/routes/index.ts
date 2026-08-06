@@ -49,6 +49,7 @@ import newsletterRouter from './newsletter';
 import tokenRefreshRouter from './tokenRefresh';
 import configRouter from './config/configRoutes';
 import { authenticateUser } from '../middleware/auth';
+import { authenticateContentAccess } from '../middleware/contentAccess';
 
 const router = Router();
 
@@ -61,11 +62,11 @@ router.use('/auth', oauthRouter);
 router.use('/auth', tokenRefreshRouter);
 
 // 数据展示路由
-router.use('/documents', documentsRouter);
+router.use('/documents', authenticateContentAccess, documentsRouter);
 router.use('/images', imagesRouter);
-router.use('/software', softwareRouter);
-router.use('/vehicles', vehiclesRouter);
-router.use('/categories', categoryRouter);
+router.use('/software', authenticateContentAccess, softwareRouter);
+router.use('/vehicles', authenticateContentAccess, vehiclesRouter);
+router.use('/categories', authenticateContentAccess, categoryRouter);
 router.use('/announcement', announcementRouter);
 router.use('/language', languageRouter);
 router.use('/products', productsRouter);
@@ -73,7 +74,7 @@ router.use('/hero-banners', heroBannersRouter);
 router.use('/seo', seoSettingsRouter);
 router.use('/faq', faqRouter);
 router.use('/search', searchRouter);
-router.use('/user-manual', userManualRouter);
+router.use('/user-manual', authenticateContentAccess, userManualRouter);
 router.use('/page-content', pageContentRouter);
 router.use('/resource-links', resourceLinksRouter);
 router.use('/site-settings', siteSettingsRouter);
@@ -82,7 +83,7 @@ router.use('/newsletter', newsletterRouter);
 router.use('/config', configRouter);
 
 // CANBus 设置
-router.use('/canbus-settings', canbusSettingsRouter);
+router.use('/canbus-settings', authenticateContentAccess, canbusSettingsRouter);
 
 // 网站图片配置
 router.use('/site-images', siteImagesRouter);

@@ -7,6 +7,8 @@ export interface IUserReply {
   timestamp: number
   isAdmin: boolean
   avatar?: string
+  accountId?: string
+  accountType?: 'member' | 'admin'
 }
 
 export interface IDocumentFeedback extends Document {
@@ -16,6 +18,8 @@ export interface IDocumentFeedback extends Document {
   timestamp: number
   replies: IUserReply[]
   language: 'en' | 'ru'  // 资料体系（留言所属的资料体系）
+  accountId?: string
+  accountType?: 'member' | 'admin'
 }
 
 const userReplySchema = new Schema<IUserReply>({
@@ -44,7 +48,9 @@ const userReplySchema = new Schema<IUserReply>({
   avatar: {
     type: String,
     default: ''
-  }
+  },
+  accountId: { type: String, default: '' },
+  accountType: { type: String, enum: ['member', 'admin'], default: undefined }
 }, { _id: false })
 
 const documentFeedbackSchema = new Schema<IDocumentFeedback>({
@@ -75,7 +81,9 @@ const documentFeedbackSchema = new Schema<IDocumentFeedback>({
     enum: ['en', 'ru'],
     required: true,
     default: 'en'
-  }
+  },
+  accountId: { type: String, default: '' },
+  accountType: { type: String, enum: ['member', 'admin'], default: undefined }
 }, {
   timestamps: true
 })

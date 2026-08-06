@@ -7,6 +7,7 @@ import { createRateLimit } from '../middleware/errorHandler';
 import { authenticateUser, requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
 import { createLogger } from '../utils/logger';
+import { authenticateContentAccess } from '../middleware/contentAccess';
 
 const logger = createLogger('ai-route');
 const router = express.Router();
@@ -17,7 +18,7 @@ const aiChatRateLimit = createRateLimit(15 * 60 * 1000, 20, 'AI 请求过于频�
 /**
  * POST /api/ai/chat - 发送消息到AI助手（公开访问）
  */
-router.post('/chat', aiChatRateLimit, async (req, res) => {
+router.post('/chat', authenticateContentAccess, aiChatRateLimit, async (req, res) => {
   try {
     const { messages, language } = req.body;
 
@@ -77,7 +78,7 @@ router.post('/chat', aiChatRateLimit, async (req, res) => {
 /**
  * POST /api/ai/select - 处理用户资源选择（公开访问）
  */
-router.post('/select', aiChatRateLimit, async (req, res) => {
+router.post('/select', authenticateContentAccess, aiChatRateLimit, async (req, res) => {
   try {
     const { selectionNumber, sources, userLanguage, originalQuery } = req.body;
 
@@ -340,7 +341,7 @@ router.get('/usage', authenticateUser, requirePermission(PERMISSIONS.ai.configur
 /**
  * POST /api/ai/search - 搜索知识库内容
  */
-router.post('/search', aiChatRateLimit, async (req, res) => {
+router.post('/search', authenticateContentAccess, aiChatRateLimit, async (req, res) => {
   try {
     const { query } = req.body;
 

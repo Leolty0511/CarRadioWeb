@@ -13,14 +13,27 @@ import logger from '../utils/logger';
 
 const router = express.Router();
 
-// PDF 存储目录（相对于项目根目录）
-const PDF_DIR = path.join(__dirname, '../../../public/PDF');
+// Private PDF storage: manuals must never be copied into the public Vite tree.
+const PDF_DIR = process.env.MANUAL_STORAGE_DIR
+  ? path.resolve(process.env.MANUAL_STORAGE_DIR)
+  : path.join(process.cwd(), 'private', 'user-manuals');
+const LEGACY_PDF_DIR = path.join(__dirname, '../../../public/PDF');
 const ALLOWED_EXTENSIONS = ['.pdf'];
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 
 // 确保目录存在
 if (!fs.existsSync(PDF_DIR)) {
   fs.mkdirSync(PDF_DIR, { recursive: true });
+}
+
+// Move legacy public manuals out of the static tree on first startup.
+if (fs.existsSync(LEGACY_PDF_DIR) && path.resolve(LEGACY_PDF_DIR) !== path.resolve(PDF_DIR)) {
+  for (const file of fs.readdirSync(LEGACY_PDF_DIR)) {
+    if (path.extname(file).toLowerCase() !== '.pdf') continue;
+    const source = path.join(LEGACY_PDF_DIR, file);
+    const target = path.join(PDF_DIR, file);
+    if (!fs.existsSync(target)) fs.renameSync(source, target);
+  }
 }
 
 // Multer 配置
@@ -188,7 +201,8 @@ router.post('/upload', authenticateUser, requirePermission(PERMISSIONS.resources
         name: file.filename,
         size: file.size,
         sizeFormatted: formatFileSize(file.size),
-        url: `/PDF/${encodeURIComponent(file.filename)}`
+        url: `/api/user-manual/view/${encodeURIComponent(file.filename)}`,
+        downloadUrl: `/api/user-manual/download/${encodeURIComponent(file.filename)}`
       }
     });
   } catch (error) {

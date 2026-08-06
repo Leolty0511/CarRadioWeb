@@ -6,7 +6,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // Notification channel type union
-export type NotificationChannelType = 'dingtalk' | 'wecom' | 'serverchan' | 'smtp' | 'webhook';
+export type NotificationChannelType = 'dingtalk' | 'wecom' | 'feishu' | 'serverchan' | 'smtp' | 'webhook';
 
 // All config types stored in system_configs collection
 export type SystemConfigType = NotificationChannelType | 'oss';
@@ -21,6 +21,14 @@ export interface DingtalkConfig {
 // WeCom (企业微信) robot config
 export interface WecomConfig {
   webhook: string;
+  enabled: boolean;
+}
+
+// Feishu group robot config
+export interface FeishuConfig {
+  webhook: string;
+  /** Optional signing secret configured in the robot security settings */
+  secret?: string;
   enabled: boolean;
 }
 
@@ -64,7 +72,7 @@ export interface OSSConfig {
 }
 
 // Union of all notification channel configs
-export type NotificationConfig = DingtalkConfig | WecomConfig | ServerChanConfig | SmtpConfig | WebhookConfig;
+export type NotificationConfig = DingtalkConfig | WecomConfig | FeishuConfig | ServerChanConfig | SmtpConfig | WebhookConfig;
 
 // System config document interface
 export interface ISystemConfig extends Document {
@@ -86,7 +94,7 @@ export interface ISystemConfigModel extends Model<ISystemConfig> {
   ): Promise<ISystemConfig>;
 }
 
-const VALID_CONFIG_TYPES: SystemConfigType[] = ['dingtalk', 'wecom', 'serverchan', 'smtp', 'webhook', 'oss'];
+const VALID_CONFIG_TYPES: SystemConfigType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook', 'oss'];
 
 const SystemConfigSchema = new Schema<ISystemConfig>({
   configType: {

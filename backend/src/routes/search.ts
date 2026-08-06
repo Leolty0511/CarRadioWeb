@@ -10,6 +10,7 @@ import Product from '../models/Product'
 import Document from '../models/Document'
 import Software from '../models/Software'
 import logger from '../utils/logger'
+import { optionalContentAccess } from '../middleware/contentAccess'
 
 const router = Router()
 
@@ -17,7 +18,9 @@ const MAX_RESULTS_PER_TYPE = 5
 const MIN_QUERY_LENGTH = 2
 
 // PDF directory for user manuals
-const PDF_DIR = path.join(__dirname, '../../../public/PDF')
+const PDF_DIR = process.env.MANUAL_STORAGE_DIR
+  ? path.resolve(process.env.MANUAL_STORAGE_DIR)
+  : path.join(process.cwd(), 'private', 'user-manuals')
 
 type SearchResultType = 'product' | 'document' | 'faq' | 'software' | 'manual'
 
@@ -70,7 +73,7 @@ async function searchUserManuals(searchRegex: RegExp): Promise<SearchResult[]> {
  * GET /api/search
  * Global search endpoint
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', optionalContentAccess, async (req: Request, res: Response) => {
   try {
     const { q, lang: langParam = 'en' } = req.query
     const lang = String(langParam)
@@ -115,6 +118,8 @@ router.get('/', async (req: Request, res: Response) => {
       })
     })
 
+    // Documents, FAQs, software and manuals are visible only to a member/admin.
+    if (req.contentPrincipal) {
     // Search documents (general and video tutorials)
     const documents = await Document.find({
       $or: [
@@ -238,6 +243,7 @@ router.get('/', async (req: Request, res: Response) => {
     // Search user manuals (PDF files)
     const manualResults = await searchUserManuals(searchRegex)
     results.push(...manualResults)
+    }
 
     // Deduplicate by id
     const uniqueResults = results.filter((result, index, self) =>

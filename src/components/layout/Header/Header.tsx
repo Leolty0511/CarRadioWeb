@@ -6,7 +6,8 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, ArrowUp } from 'lucide-react'
+import { Menu, Search, ArrowUp, UserRound } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import SearchBar from '@/components/SearchBar'
 import { DesktopNav } from './DesktopNav'
 import { MobileNav } from './MobileNav'
@@ -32,6 +33,7 @@ export const Header: React.FC<HeaderProps> = ({ navigationItems, shouldTranspare
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getLocalizedPath } = useLanguage()
+  const { isAuthenticated, user } = useAuth()
 
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
@@ -155,6 +157,16 @@ export const Header: React.FC<HeaderProps> = ({ navigationItems, shouldTranspare
               <div className="hidden sm:block">
                 <LanguageSwitcher />
               </div>
+
+              <button
+                type="button"
+                onClick={() => navigate(getLocalizedPath('/login'))}
+                className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+                title={isAuthenticated ? user?.nickname : '登录 / 注册'}
+                aria-label={isAuthenticated ? user?.nickname : '登录 / 注册'}
+              >
+                <UserRound className="h-5 w-5" />
+              </button>
 
               {/* 移动端菜单按钮 */}
               <button

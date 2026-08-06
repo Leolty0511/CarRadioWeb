@@ -158,7 +158,7 @@ router.get('/oss/storage-details', requirePermission(PERMISSIONS.settings.read),
 
 // ==================== Notification channel routes ====================
 
-const VALID_CHANNELS: NotificationChannelType[] = ['dingtalk', 'wecom', 'serverchan', 'smtp', 'webhook'];
+const VALID_CHANNELS: NotificationChannelType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook'];
 
 // Get all channel status (enabled/disabled)
 router.get('/notification/status', requirePermission(PERMISSIONS.notifications.read), async (req: Request, res: Response) => {

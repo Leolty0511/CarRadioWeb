@@ -20,6 +20,8 @@ export interface CreateFeedbackData {
   author: string
   content: string
   language: 'en' | 'ru'
+  accountId?: string
+  accountType?: 'member' | 'admin'
 }
 
 export interface CreateReplyData {
@@ -28,6 +30,8 @@ export interface CreateReplyData {
   content: string
   isAdmin?: boolean
   avatar?: string
+  accountId?: string
+  accountType?: 'member' | 'admin'
 }
 
 /**
@@ -77,7 +81,9 @@ export const createFeedback = async (data: CreateFeedbackData): Promise<Document
       content: data.content.trim(),
       timestamp: Date.now(),
       replies: [],
-      language: data.language
+      language: data.language,
+      accountId: data.accountId || '',
+      accountType: data.accountType
     })
 
     const savedFeedback = await feedback.save()
@@ -104,7 +110,9 @@ export const addReply = async (data: CreateReplyData): Promise<DocumentFeedbackD
       content: data.content.trim(),
       timestamp: Date.now(),
       isAdmin: data.isAdmin || false,
-      avatar: data.avatar || ''
+      avatar: data.avatar || '',
+      accountId: data.accountId || '',
+      accountType: data.accountType
     }
 
     feedback.replies.push(reply)

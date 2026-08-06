@@ -24,6 +24,7 @@ import {
   adminRoutes,
   routeComponents
 } from '@/config/routes'
+import { ContentAccessGuard } from '@/components/ContentAccessGuard'
 
 // 懒加载布局组件
 const Layout = lazy(() => import('@/components/layout/Layout'))
@@ -50,7 +51,11 @@ const AppRoutes = () => {
           route.index ? (
             <Route key="index" index element={<route.component />} />
           ) : (
-            <Route key={route.path} path={route.path} element={<route.component />} />
+            <Route
+              key={route.path}
+              path={route.path}
+              element={route.protected ? <ContentAccessGuard><route.component /></ContentAccessGuard> : <route.component />}
+            />
           )
         )}
       </Route>

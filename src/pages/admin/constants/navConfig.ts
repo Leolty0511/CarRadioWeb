@@ -151,6 +151,7 @@ export const NAV_CONFIG: NavGroup[] = [
     defaultExpanded: true,
     items: [
       { id: 'users', label: '管理员', icon: Users, superAdminOnly: true },
+      { id: 'members', label: '会员管理', icon: Users, superAdminOnly: true },
       { id: 'audit-log', label: '操作日志', icon: ScrollText, superAdminOnly: true }
     ]
   },
@@ -199,4 +200,3 @@ export function getFirstAccessibleNavTab(
   }
   return null
 }
-
