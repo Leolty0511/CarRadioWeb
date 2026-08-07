@@ -458,6 +458,8 @@ app.use('/api/system-config', authenticateUser, systemConfigRouter);
 // ==================== V1 API 路由（内部自行控制认证） ====================
 // P1-07: 添加 /api/v1 版本控制路由
 import apiRoutes from './routes/index';
+import forumRouter from './routes/forum';
+app.use('/api/forum', forumRouter);
 app.use('/api/v1', apiRoutes);
 
 // 保留 /api/* 向后兼容（标记为 deprecated，建议使用 /api/v1/*）
