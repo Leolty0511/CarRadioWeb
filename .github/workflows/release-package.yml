@@ -46,9 +46,12 @@ jobs:
           set -euo pipefail
           rm -rf release-package caradioweb-deploy.tar.gz
           mkdir -p release-package/backend
+          mkdir -p release-package/scripts
           cp -R dist release-package/dist
           cp -R backend/dist release-package/backend/dist
           cp -R backend/node_modules release-package/backend/node_modules
+          cp docker-compose.flarum.yml release-package/docker-compose.flarum.yml
+          cp scripts/deploy-flarum.sh scripts/deploy-flarum.ps1 scripts/cancel-deploy.sh scripts/cancel-deploy.ps1 scripts/ensure-docker.sh release-package/scripts/
           cp package.json package-lock.json release-package/
           cp backend/package.json backend/package-lock.json release-package/backend/
           node -e "const fs=require('fs'); const p=require('./package.json'); fs.writeFileSync('release-package/release.json', JSON.stringify({version:p.version,commit:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,generatedAt:new Date().toISOString()},null,2))"
