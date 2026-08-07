@@ -141,7 +141,7 @@ async function applyArtifact(): Promise<void> {
   }
 
   run(pm2Command, ['stop', payload.pm2Target], 'stopping', 'Stopping the backend service', 2 * 60_000)
-  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'package.json', 'package-lock.json']) {
+  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'package.json', 'package-lock.json', 'release.json']) {
     await moveIntoBackup(relative)
     const staged = path.join(stagingDir, relative)
     const current = path.join(payload.repoRoot, relative)
@@ -160,7 +160,7 @@ async function rollbackArtifact(reason: string): Promise<boolean> {
   if (!artifactBackupDir || !artifactApplied) return false
   try {
     run(pm2Command, ['stop', payload.pm2Target], 'rollback', 'Restoring the previous deployment package', 2 * 60_000)
-    for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'package.json', 'package-lock.json']) {
+    for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'package.json', 'package-lock.json', 'release.json']) {
       const backup = path.join(artifactBackupDir, relative)
       const current = path.join(payload.repoRoot, relative)
       try {
