@@ -84,11 +84,12 @@ function Toggle({ id, checked, onChange }: { id: string; checked: boolean; onCha
 function BasicInfoTab({ settings, setSettings, onSave, saving }: {
   settings: SiteSettings
   setSettings: (s: SiteSettings) => void
-  onSave: () => void
+  onSave: () => Promise<void>
   saving: boolean
 }) {
   const [syncMapAddress, setSyncMapAddress] = useState(true)
   const [mapGeocodeLang, setMapGeocodeLang] = useState<MapGeocodeLanguage>(() => readStoredMapGeocodeLang())
+  const [mapEditable, setMapEditable] = useState(false)
 
   useEffect(() => {
     try {
@@ -101,6 +102,11 @@ function BasicInfoTab({ settings, setSettings, onSave, saving }: {
   const mapLatStr = String(settings.mapLat ?? 40.7128)
   const mapLngStr = String(settings.mapLng ?? -74.0060)
   const mapZoomStr = String(settings.mapZoom ?? 12)
+
+  const handleSave = async () => {
+    await onSave()
+    setMapEditable(false)
+  }
 
   const updateNumberField = (key: 'mapLat' | 'mapLng' | 'mapZoom', raw: string) => {
     const n = Number(raw)
@@ -117,7 +123,7 @@ function BasicInfoTab({ settings, setSettings, onSave, saving }: {
           <Globe className="w-5 h-5" />
           <span>基本信息</span>
         </CardTitle>
-        <Button size="sm" onClick={onSave} disabled={saving}>
+        <Button size="sm" onClick={handleSave} disabled={saving}>
           {saving ? '保存中...' : '保存'}
         </Button>
       </CardHeader>
@@ -226,9 +232,14 @@ function BasicInfoTab({ settings, setSettings, onSave, saving }: {
             lat={Number(settings.mapLat ?? 40.7128)}
             lng={Number(settings.mapLng ?? -74.006)}
             zoom={Number(settings.mapZoom ?? 12)}
-            syncAddressOnPick={syncMapAddress}
+            syncAddressOnPick={syncMapAddress && mapEditable}
             geocodeLanguage={mapGeocodeLang}
-            onChange={(patch) => setSettings({ ...settings, ...patch } as SiteSettings)}
+            editable={mapEditable}
+            onEditRequest={() => setMapEditable(true)}
+            onChange={(patch) => {
+              setMapEditable(true)
+              setSettings({ ...settings, ...patch } as SiteSettings)
+            }}
           />
 
           <p className="text-xs text-slate-500 dark:text-slate-500">以下为精确数值，可直接微调；与地图联动。</p>

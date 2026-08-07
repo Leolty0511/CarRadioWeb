@@ -1,5 +1,12 @@
 # 更新日志
 
+## [1.1.8] - 2026-08-07
+
+### Added
+
+- Add address search to the default map setting using OpenStreetMap search results.
+- Lock the saved default map position until an administrator explicitly enables editing.
+
 ## [1.1.7] - 2026-08-07
 
 ### Fixes
