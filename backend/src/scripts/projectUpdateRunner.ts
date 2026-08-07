@@ -41,6 +41,17 @@ let merged = false
 let artifactBackupDir: string | null = null
 let artifactApplied = false
 
+function getCommandEnvironment(command: string): NodeJS.ProcessEnv {
+  const token = payload.githubToken?.trim()
+  if (command !== 'git' || !token) return process.env
+  return {
+    ...process.env,
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'http.extraheader',
+    GIT_CONFIG_VALUE_0: `AUTHORIZATION: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+  }
+}
+
 function appendLog(message: string): void {
   const clean = message.trim().replace(/\u001b\[[0-9;]*m/g, '')
   if (clean) logs = [...logs, clean.slice(-2000)].slice(-40)
@@ -74,7 +85,7 @@ async function run(command: string, args: string[], stage: string, message: stri
     windowsHide: true,
     timeout,
     maxBuffer: 10 * 1024 * 1024,
-    env: process.env,
+    env: getCommandEnvironment(command),
   })
   appendLog(result.stdout || '')
   appendLog(result.stderr || '')
