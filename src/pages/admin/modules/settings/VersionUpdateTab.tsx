@@ -27,6 +27,7 @@ const BLOCKER_TEXT: Record<string, string> = {
   self_update_disabled: '本地开发环境不执行自我更新；部署到生产服务器后可用。',
   pm2_required: '自动重启需要使用 PM2 托管后端进程。',
   local_branch_diverged: '服务器分支包含未推送提交，不能自动快进更新。',
+  remote_unavailable: '暂时无法连接 GitHub 获取更新信息，请检查服务器网络或仓库授权。',
   already_up_to_date: '当前已经是最新版本。',
 }
 

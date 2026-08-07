@@ -8,6 +8,7 @@ import { createLogger } from '../utils/logger'
 
 const REPOSITORY = 'Leolty0511/CarRadioWeb'
 const REPOSITORY_URL = `https://github.com/${REPOSITORY}`
+const GITHUB_API_URL = `https://api.github.com/repos/${REPOSITORY}`
 const DEFAULT_ARTIFACT_URL = `${REPOSITORY_URL}/releases/download/latest/caradioweb-deploy.tar.gz`
 const DEFAULT_BRANCH = 'main'
 const COMMAND_TIMEOUT_MS = 60_000
@@ -73,6 +74,118 @@ export interface ProjectUpdateInfo {
 interface CommandResult {
   stdout: string
   stderr: string
+}
+
+interface ReleaseMetadata {
+  version?: string
+  commit?: string
+  generatedAt?: string
+}
+
+interface GithubCommit {
+  sha?: string
+  commit?: {
+    message?: string
+    author?: { name?: string; date?: string }
+  }
+}
+
+interface GithubCompareResponse {
+  ahead_by?: number
+  behind_by?: number
+  commits?: GithubCommit[]
+}
+
+interface GithubContentResponse {
+  content?: string
+  encoding?: string
+}
+
+function getArtifactUrl(): string {
+  return process.env.UPDATE_ARTIFACT_URL?.trim() || DEFAULT_ARTIFACT_URL
+}
+
+function getGithubHeaders(): Record<string, string> {
+  const token = process.env.UPDATE_GITHUB_TOKEN?.trim()
+  return {
+    accept: 'application/vnd.github+json',
+    'user-agent': 'CarRadioWeb-updater',
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+  }
+}
+
+async function fetchGithubJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, {
+    headers: getGithubHeaders(),
+    signal: AbortSignal.timeout(30_000),
+  })
+  if (!response.ok) throw new Error(`GitHub API returned HTTP ${response.status}`)
+  return await response.json() as T
+}
+
+async function readReleaseMetadata(): Promise<ReleaseMetadata | null> {
+  try {
+    const raw = await fsPromises.readFile(path.join(REPO_ROOT, 'release.json'), 'utf8')
+    const parsed = JSON.parse(raw) as ReleaseMetadata
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function toUpdateLog(commits: GithubCommit[]): ProjectUpdateLogEntry[] {
+  return commits
+    .map(entry => {
+      const commit = entry.sha || ''
+      const message = (entry.commit?.message || '').split('\n')[0].trim()
+      return {
+        commit,
+        shortCommit: commit.slice(0, 7),
+        message,
+        author: entry.commit?.author?.name || 'GitHub',
+        committedAt: entry.commit?.author?.date || '',
+      }
+    })
+    .filter(entry => Boolean(entry.commit && entry.message))
+}
+
+async function getArtifactRemoteInfo(branch: string, currentCommit: string | null): Promise<{
+  remoteVersion: string | null
+  remoteCommit: string | null
+  remoteCommitMessage: string | null
+  commitsAhead: number
+  commitsBehind: number
+  updateLog: ProjectUpdateLogEntry[]
+}> {
+  const [branchCommit, packageFile] = await Promise.all([
+    fetchGithubJson<GithubCommit>(`${GITHUB_API_URL}/commits/${encodeURIComponent(branch)}`),
+    fetchGithubJson<GithubContentResponse>(`${GITHUB_API_URL}/contents/package.json?ref=${encodeURIComponent(branch)}`),
+  ])
+  const remoteCommit = branchCommit.sha || null
+  const remoteCommitMessage = branchCommit.commit?.message?.split('\n')[0] || null
+  let remoteVersion: string | null = null
+  if (packageFile.content && packageFile.encoding === 'base64') {
+    remoteVersion = parsePackageVersion(Buffer.from(packageFile.content, 'base64').toString('utf8'))
+  }
+
+  let commitsAhead = 0
+  let commitsBehind = 0
+  let updateLog: ProjectUpdateLogEntry[] = []
+  if (currentCommit && remoteCommit && currentCommit !== remoteCommit) {
+    try {
+      const comparison = await fetchGithubJson<GithubCompareResponse>(`${GITHUB_API_URL}/compare/${currentCommit}...${remoteCommit}`)
+      // The current deployment is the compare base and the remote branch is
+      // the head, so GitHub's ahead/behind values are relative to that order.
+      commitsAhead = Number(comparison.behind_by) || 0
+      commitsBehind = Number(comparison.ahead_by) || 0
+      updateLog = toUpdateLog(comparison.commits || [])
+    } catch {
+      commitsBehind = 1
+      updateLog = []
+    }
+  }
+  lastRemoteCheckedAt = new Date().toISOString()
+  return { remoteVersion, remoteCommit, remoteCommitMessage, commitsAhead, commitsBehind, updateLog }
 }
 
 function getGitEnvironment(): NodeJS.ProcessEnv {
@@ -180,6 +293,7 @@ function getBlocker(info: Omit<ProjectUpdateInfo, 'canUpdate' | 'blocker'>): str
   if (!info.workingTreeClean) return 'working_tree_dirty'
   if (!info.selfUpdateEnabled) return 'self_update_disabled'
   if (info.restartMode !== 'pm2') return 'pm2_required'
+  if (!info.checkedAt) return 'remote_unavailable'
   if (info.commitsAhead > 0) return 'local_branch_diverged'
   if (!info.updateAvailable) return 'already_up_to_date'
   return null
@@ -187,6 +301,7 @@ function getBlocker(info: Omit<ProjectUpdateInfo, 'canUpdate' | 'blocker'>): str
 
 export async function getProjectUpdateInfo(refreshRemote = false): Promise<ProjectUpdateInfo> {
   const currentVersion = await readPackageVersion()
+  const releaseMetadata = await readReleaseMetadata()
   const configuredBranch = process.env.UPDATE_BRANCH?.trim() || DEFAULT_BRANCH
   const restartMode = getRestartMode()
   const selfUpdateEnabled = getSelfUpdateEnabled()
@@ -247,6 +362,30 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
     }
   } catch {
     gitRepository = false
+  }
+
+  // Production deployments use a prebuilt archive and intentionally do not
+  // contain .git. Treat the release metadata as the local revision and use
+  // GitHub's API for update checks in that mode.
+  if (!gitRepository && releaseMetadata?.commit) {
+    gitRepository = true
+    repositoryValid = true
+    workingTreeClean = true
+    currentCommit = releaseMetadata.commit
+    currentCommitMessage = currentCommitMessage || null
+    try {
+      const remote = await getArtifactRemoteInfo(branch, currentCommit)
+      remoteVersion = remote.remoteVersion
+      remoteCommit = remote.remoteCommit
+      remoteCommitMessage = remote.remoteCommitMessage
+      commitsAhead = remote.commitsAhead
+      commitsBehind = remote.commitsBehind
+      updateLog = remote.updateLog
+      checkedAt = lastRemoteCheckedAt
+    } catch (error) {
+      logger.warn({ error }, 'Prebuilt deployment update check failed')
+      checkedAt = null
+    }
   }
 
   const baseInfo: Omit<ProjectUpdateInfo, 'canUpdate' | 'blocker'> = {
