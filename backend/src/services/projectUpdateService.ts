@@ -96,13 +96,34 @@ interface GithubCompareResponse {
   commits?: GithubCommit[]
 }
 
+interface GithubReleaseAsset {
+  name?: string
+  url?: string
+  browser_download_url?: string
+}
+
+interface GithubRelease {
+  assets?: GithubReleaseAsset[]
+}
+
 interface GithubContentResponse {
   content?: string
   encoding?: string
 }
 
-function getArtifactUrl(): string {
-  return process.env.UPDATE_ARTIFACT_URL?.trim() || DEFAULT_ARTIFACT_URL
+async function resolveArtifactUrl(): Promise<string> {
+  const configured = process.env.UPDATE_ARTIFACT_URL?.trim()
+  if (configured) return configured
+
+  try {
+    const release = await fetchGithubJson<GithubRelease>(`${GITHUB_API_URL}/releases/tags/latest`)
+    const asset = release.assets?.find(entry => entry.name === 'caradioweb-deploy.tar.gz')
+    if (asset?.url) return asset.url
+  } catch (error) {
+    logger.warn({ error }, 'Unable to resolve the latest deployment asset through GitHub API')
+  }
+
+  return DEFAULT_ARTIFACT_URL
 }
 
 function getGithubHeaders(): Record<string, string> {
@@ -500,6 +521,7 @@ export async function startProjectUpdate(): Promise<UpdateJobStatus> {
   }
   await writeStatus(status)
 
+  const artifactUrl = await resolveArtifactUrl()
   const payload = Buffer.from(JSON.stringify({
     jobId: status.jobId,
     repoRoot: REPO_ROOT,
@@ -509,7 +531,7 @@ export async function startProjectUpdate(): Promise<UpdateJobStatus> {
     statusFile: STATUS_FILE,
     pm2Target: process.env.PM2_PROCESS_NAME || process.env.name || 'official-backend',
     healthUrl: process.env.UPDATE_HEALTH_URL || `http://127.0.0.1:${process.env.PORT || 3000}/health/ready`,
-    artifactUrl: process.env.UPDATE_ARTIFACT_URL?.trim() || DEFAULT_ARTIFACT_URL,
+    artifactUrl,
     githubToken: process.env.UPDATE_GITHUB_TOKEN?.trim() || undefined,
   })).toString('base64url')
 
