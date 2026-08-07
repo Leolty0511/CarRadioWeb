@@ -48,6 +48,7 @@ import legalVersionsRouter from './legalVersions';
 import newsletterRouter from './newsletter';
 import tokenRefreshRouter from './tokenRefresh';
 import configRouter from './config/configRoutes';
+import forumRouter from './forum';
 import { authenticateUser } from '../middleware/auth';
 import { authenticateContentAccess } from '../middleware/contentAccess';
 
@@ -81,6 +82,7 @@ router.use('/site-settings', siteSettingsRouter);
 router.use('/legal-versions', legalVersionsRouter);
 router.use('/newsletter', newsletterRouter);
 router.use('/config', configRouter);
+router.use('/forum', forumRouter);
 
 // CANBus 设置
 router.use('/canbus-settings', authenticateContentAccess, canbusSettingsRouter);
