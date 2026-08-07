@@ -65,14 +65,11 @@ FLARUM_BASE_URL=$finalFlarumUrl
 DB_PASSWORD=$dbPassword
 "@ | Set-Content -Path ".\.env.flarum" -Encoding UTF8
 
-# -v 删除命名卷（flarum_db_data、flarum_data），确保全新安装
+# Re-deployment must preserve the forum database and uploaded assets.
 $ErrorActionPreference = 'Continue'
-docker compose -f docker-compose.flarum.yml --env-file .env.flarum down -v 2>&1 | Out-Null
+docker compose -f docker-compose.flarum.yml --env-file .env.flarum down 2>&1 | Out-Null
 Start-Sleep -Seconds 2
 $ErrorActionPreference = 'Stop'
-# 若曾用 mondedie 镜像，清理旧绑定目录
-if (Test-Path ".\flarum\assets") { Remove-Item -Recurse -Force ".\flarum\assets" }
-if (Test-Path ".\flarum\extensions") { Remove-Item -Recurse -Force ".\flarum\extensions" }
 
 Update-Status -Status "deploying_pull" -Log "Step 1/3: Pulling images..."
 $errPrev = $ErrorActionPreference
@@ -110,13 +107,27 @@ $ErrorActionPreference = 'Continue'
 docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d flarum 2>&1 | Out-Null
 $ErrorActionPreference = 'Stop'
 
-Start-Sleep -Seconds 5
+# A running container may still be performing its first installation.
+$flarumReady = $false
+for ($i = 0; $i -lt 45; $i++) {
+  try {
+    $response = Invoke-WebRequest -Uri "http://localhost:8888/" -UseBasicParsing -TimeoutSec 5
+    if ($response.StatusCode -eq 200 -or $response.StatusCode -eq 302) {
+      $flarumReady = $true
+      break
+    }
+  } catch {
+    # Keep waiting until the startup deadline.
+  }
+  Start-Sleep -Seconds 2
+}
+
 $ErrorActionPreference = 'Continue'
 $flarumId = docker compose -f docker-compose.flarum.yml ps -q flarum 2>$null
 $ErrorActionPreference = 'Stop'
-if (-not $flarumId) {
-  Update-Status -Status "failed" -Log "Flarum container failed to start. Check Docker logs."
-  docker compose -f docker-compose.flarum.yml logs
+if (-not $flarumId -or -not $flarumReady) {
+  Update-Status -Status "failed" -Log "Flarum did not become ready within 90 seconds. Check Docker logs."
+  docker compose -f docker-compose.flarum.yml logs --tail 120
   exit 1
 }
 

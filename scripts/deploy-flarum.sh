@@ -69,10 +69,9 @@ FLARUM_BASE_URL=${FINAL_FLARUM_URL}
 DB_PASSWORD=${DB_PASSWORD}
 EOL
 
-# -v 删除命名卷（flarum_db_data、flarum_data），确保全新安装
-docker compose -f docker-compose.flarum.yml --env-file .env.flarum down -v 2>/dev/null || true
+# Re-deployment must preserve the forum database and uploaded assets.
+docker compose -f docker-compose.flarum.yml --env-file .env.flarum down 2>/dev/null || true
 sleep 2
-rm -rf flarum/assets flarum/extensions
 
 # Step 2: Pull Docker images
 update_status "deploying_pull" "步骤 1/3: 正在下载所需镜像 (预计 1-3 分钟)..."
@@ -87,12 +86,21 @@ sleep 10 # Wait for DB to initialize
 update_status "deploying_app" "步骤 3/3: 正在启动 Flarum 应用服务..."
 docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d flarum
 
-# Final verification
-sleep 5
+# Final verification: a running container may still be installing Flarum.
+FLARUM_HTTP_READY=0
+for _ in $(seq 1 45); do
+  HTTP_CODE=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8888/ 2>/dev/null || true)
+  if [[ "$HTTP_CODE" == "200" || "$HTTP_CODE" == "302" ]]; then
+    FLARUM_HTTP_READY=1
+    break
+  fi
+  sleep 2
+done
+
 FLARUM_STATUS=$(docker compose -f docker-compose.flarum.yml ps -q flarum)
-if [ -z "$FLARUM_STATUS" ]; then
-  update_status "failed" "错误：Flarum 应用容器启动失败。请检查日志。"
-  docker compose -f docker-compose.flarum.yml logs
+if [[ -z "$FLARUM_STATUS" || "$FLARUM_HTTP_READY" != "1" ]]; then
+  update_status "failed" "Flarum 服务未能在 90 秒内就绪，请检查容器日志。"
+  docker compose -f docker-compose.flarum.yml logs --tail 120
   exit 1
 else
   update_status "deployed" "部署成功！"

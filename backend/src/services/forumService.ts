@@ -84,6 +84,10 @@ export const deployForum = async (): Promise<void> => {
     }
   }, DEPLOY_TIMEOUT);
 
+  // Docker and PHP often write progress or warnings to stderr on success.
+  // Keep it for diagnostics and only fail after a non-zero process exit.
+  let deployStderr = '';
+
   deployProcess.stdout?.on('data', (data: Buffer) => {
     const output = data.toString();
     logger.info({ output }, 'Deploy stdout');
@@ -100,19 +104,15 @@ export const deployForum = async (): Promise<void> => {
   deployProcess.stderr?.on('data', (data: Buffer) => {
     const errorOutput = data.toString();
     logger.error({ errorOutput }, 'Deploy stderr');
-    updateForumStatus('failed', errorOutput);
+    deployStderr = `${deployStderr}${errorOutput}`.slice(-8000);
   });
 
   deployProcess.on('close', (code) => {
     clearTimeout(timeoutId);
     if (code !== 0) {
       logger.error({ code }, 'Deployment script exited with non-zero code');
-      // Final status might have been set by stderr, so we check
-      ModuleSettings.findOne().then(settings => {
-        if (settings?.forum.status !== 'failed') {
-          updateForumStatus('failed', `部署脚本异常退出，代码: ${code}`);
-        }
-      });
+      const details = deployStderr.trim() || `部署脚本异常退出，代码: ${code}`;
+      updateForumStatus('failed', details);
     }
     deployProcess = null;
   });
