@@ -188,6 +188,7 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, o
               style={announcement.noticeCardStyle || 'glass'}
               title={t('announcement.details') || 'Announcement Details'}
               content={announcement.content}
+              contentHtml={announcement.contentHtml}
               imageUrl={announcement.imageUrl}
               teamName={teamName}
               dateText={formatNoticeDate(noticeDate)}

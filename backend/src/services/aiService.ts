@@ -2262,7 +2262,7 @@ Examples:
     const lastTestSucceeded = this.config.lastTestSucceeded === true;
 
     return {
-      online: configured && lastTestSucceeded,
+      online: configured && (this.client !== null || lastTestSucceeded),
       configured,
       lastTestSucceeded,
       lastTestedAt: this.config.lastTestedAt

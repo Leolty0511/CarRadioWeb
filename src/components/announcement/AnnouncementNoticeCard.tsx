@@ -7,11 +7,14 @@ import { Mail } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { NoticeCardStyle } from '@/services/announcementService'
 import '@/styles/announcement-notice-cards.css'
+import { getAnnouncementHtml } from '@/utils/announcementContent'
+import { sanitizeHTMLForReact } from '@/utils/sanitize'
 
 export interface AnnouncementNoticeCardProps {
   style: NoticeCardStyle
   title: string
   content: string
+  contentHtml?: string
   imageUrl?: string
   teamName: string
   dateText: string
@@ -33,6 +36,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
   style,
   title,
   content,
+  contentHtml,
   imageUrl,
   teamName,
   dateText,
@@ -43,12 +47,6 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
   sealMarkLabel = DEFAULT_SEAL_MARK,
   waxSealChar = DEFAULT_WAX_SEAL_CHAR
 }) => {
-  // Normalize pasted line endings and literal escaped newlines before rendering.
-  const displayContent = content
-    .replace(/\\r\\n/g, '\n')
-    .replace(/\\n/g, '\n')
-    .replace(/\r\n?/g, '\n')
-
   const bodyContent = (
     <>
       {imageUrl && (
@@ -58,7 +56,10 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
           className="notice-card-image"
         />
       )}
-      <div className="notice-card-body-text">{displayContent}</div>
+      <div
+        className="notice-card-body-text announcement-rich-content"
+        dangerouslySetInnerHTML={sanitizeHTMLForReact(getAnnouncementHtml(content, contentHtml))}
+      />
     </>
   )
 

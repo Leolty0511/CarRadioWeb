@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 import AnnouncementManager from '@/components/admin/AnnouncementManager'
 import { getAnnouncement, updateAnnouncement, toggleAnnouncement } from '@/services/announcementService'
 import type { NoticeCardStyle } from '@/services/announcementService'
+import { announcementHtmlToPlainText, getAnnouncementHtml } from '@/utils/announcementContent'
 
 import { useToast } from '@/components/ui/Toast'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
@@ -20,6 +21,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
 
   // 公告状态
   const [announcementContent, setAnnouncementContent] = useState('')
+  const [announcementContentHtml, setAnnouncementContentHtml] = useState('')
   const [announcementEnabled, setAnnouncementEnabled] = useState(false)
   const [announcementType, setAnnouncementType] = useState<'info' | 'warning' | 'danger' | 'success'>('info')
   const [announcementFontSize, setAnnouncementFontSize] = useState<'sm' | 'md' | 'lg'>('md')
@@ -39,6 +41,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
         const data = await getAnnouncement(dataLanguage)
         if (data) {
           setAnnouncementContent(data.content)
+          setAnnouncementContentHtml(getAnnouncementHtml(data.content, data.contentHtml))
           setAnnouncementEnabled(data.enabled)
           setAnnouncementType(data.style.type)
           setAnnouncementFontSize(data.style.fontSize)
@@ -64,6 +67,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       await updateAnnouncement(dataLanguage, {
         enabled: announcementEnabled,
         content: announcementContent,
+        contentHtml: announcementContentHtml,
         imageUrl: announcementImageUrl,
         noticeCardStyle,
         style: {
@@ -116,7 +120,11 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
   return (
     <AnnouncementManager
       announcementContent={announcementContent}
-      setAnnouncementContent={setAnnouncementContent}
+      announcementContentHtml={announcementContentHtml}
+      setAnnouncementContentHtml={(html) => {
+        setAnnouncementContentHtml(html)
+        setAnnouncementContent(announcementHtmlToPlainText(html))
+      }}
       announcementEnabled={announcementEnabled}
       announcementType={announcementType}
       setAnnouncementType={setAnnouncementType}

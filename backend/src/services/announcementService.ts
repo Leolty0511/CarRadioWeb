@@ -1,5 +1,6 @@
 import { Announcement, IAnnouncement } from '../models/Announcement'
 import { createLogger } from '../utils/logger'
+import { plainTextToAnnouncementHtml, sanitizeAnnouncementHtml } from '../utils/announcementHtml'
 
 const logger = createLogger('announcement-service')
 
@@ -19,6 +20,7 @@ export const getAnnouncement = async (language: 'en' | 'ru'): Promise<IAnnouncem
         language,
         enabled: false,
         content: defaultContent,
+        contentHtml: plainTextToAnnouncementHtml(defaultContent),
         style: {
           type: 'info',
           fontSize: 'md',
@@ -46,13 +48,21 @@ export const getAnnouncement = async (language: 'en' | 'ru'): Promise<IAnnouncem
  */
 export const updateAnnouncement = async (language: 'en' | 'ru', data: Partial<IAnnouncement>): Promise<IAnnouncement> => {
   try {
+    const updateData: Partial<IAnnouncement> = { ...data }
+    const incomingHtml = typeof updateData.contentHtml === 'string' ? updateData.contentHtml : ''
+    if (incomingHtml) {
+      updateData.contentHtml = sanitizeAnnouncementHtml(incomingHtml)
+    } else if (typeof updateData.content === 'string') {
+      updateData.contentHtml = plainTextToAnnouncementHtml(updateData.content)
+    }
+
     let announcement = await Announcement.findOne({ language })
     const now = new Date()
 
     if (!announcement) {
-      announcement = await Announcement.create({ ...data, language, publishedAt: now })
+      announcement = await Announcement.create({ ...updateData, language, publishedAt: now })
     } else {
-      Object.assign(announcement, data)
+      Object.assign(announcement, updateData)
       announcement.publishedAt = now
       await announcement.save()
     }

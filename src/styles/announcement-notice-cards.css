@@ -20,10 +20,42 @@
 .notice-card-body-text {
   font-size: 14.5px;
   line-height: 1.85;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+.announcement-rich-content {
+  white-space: normal;
+}
+
+.announcement-rich-content > :first-child { margin-top: 0; }
+.announcement-rich-content > :last-child { margin-bottom: 0; }
+.announcement-rich-content p { margin: 0 0 1rem; }
+.announcement-rich-content br + br { display: block; content: ''; margin-top: 0.65rem; }
+.announcement-rich-content h1,
+.announcement-rich-content h2,
+.announcement-rich-content h3,
+.announcement-rich-content h4 {
+  margin: 1.35rem 0 0.65rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+.announcement-rich-content h1 { font-size: 1.65rem; }
+.announcement-rich-content h2 { font-size: 1.4rem; }
+.announcement-rich-content h3 { font-size: 1.2rem; }
+.announcement-rich-content ul,
+.announcement-rich-content ol { margin: 0.75rem 0 1rem; padding-left: 1.5rem; }
+.announcement-rich-content li { margin: 0.35rem 0; }
+.announcement-rich-content blockquote {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid currentColor;
+  opacity: 0.85;
+}
+.announcement-rich-content a { text-decoration: underline; text-underline-offset: 2px; }
+.announcement-rich-content img { max-width: 100%; height: auto; border-radius: 8px; margin: 1rem 0; }
+.announcement-rich-content pre,
+.announcement-rich-content code { overflow-wrap: anywhere; white-space: pre-wrap; }
 
 /* ---------- 玻璃拟态 (Glass) ---------- */
 .notice-card--glass {

@@ -96,6 +96,7 @@ const AIAssistant: React.FC = () => {
       removeTypingMessages()
 
       if (response.success && response.message) {
+        setAssistantStatus('online')
         // 添加AI回复
         addMessage({
           content: response.message,
@@ -174,6 +175,7 @@ const AIAssistant: React.FC = () => {
       removeTypingMessages()
 
       if (response.success && response.message) {
+        setAssistantStatus('online')
         addMessage({
           content: response.message,
           sender: 'ai',

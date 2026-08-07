@@ -4,13 +4,16 @@ import { Bell, Info, AlertTriangle, CheckCircle, Download, X, FileText, Palette,
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import ImagePicker from '@/components/ImagePicker'
+import LazyRichTextEditor from '@/components/LazyRichTextEditor'
 import type { NoticeCardStyle } from '@/services/announcementService'
+import { getAnnouncementHtml } from '@/utils/announcementContent'
 
 const MAX_ANNOUNCEMENT_LENGTH = 5000
 
 interface AnnouncementManagerProps {
   announcementContent: string
-  setAnnouncementContent: (content: string) => void
+  announcementContentHtml: string
+  setAnnouncementContentHtml: (content: string) => void
   announcementEnabled: boolean
   announcementType: 'info' | 'warning' | 'danger' | 'success'
   setAnnouncementType: (type: 'info' | 'warning' | 'danger' | 'success') => void
@@ -39,7 +42,8 @@ interface AnnouncementManagerProps {
 
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
   announcementContent,
-  setAnnouncementContent,
+  announcementContentHtml,
+  setAnnouncementContentHtml,
   announcementEnabled,
   announcementType,
   setAnnouncementType,
@@ -136,13 +140,11 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
         <CardContent className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-2">{t('admin.announcement.contentTitle')}</label>
-            <textarea
-              value={announcementContent}
-              onChange={(e) => setAnnouncementContent(e.target.value)}
+            <LazyRichTextEditor
+              value={announcementContentHtml || getAnnouncementHtml(announcementContent)}
+              onChange={setAnnouncementContentHtml}
               placeholder={t('admin.announcement.contentPlaceholder')}
-              className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-800 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-              rows={4}
-              maxLength={MAX_ANNOUNCEMENT_LENGTH}
+              className="bg-white dark:bg-gray-700"
             />
             <p className="text-xs text-slate-500 dark:text-gray-500 mt-2">{announcementContent.length} / {MAX_ANNOUNCEMENT_LENGTH} {t('admin.announcement.characters')}</p>
           </div>

@@ -1,5 +1,14 @@
 # 更新日志
 
+## [1.1.7] - 2026-08-07
+
+### Fixes
+
+- Add rich-text announcement editing with headings, paragraphs, lists, and safe links.
+- Preserve announcement line breaks and wrap long English text in detail dialogs.
+- Keep legacy plain-text announcements compatible and show the formatted preview in admin.
+- Show the AI assistant as online when its configured client is ready.
+
 ## [1.1.6] - 2026-08-07
 
 ### 修复

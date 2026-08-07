@@ -22,6 +22,7 @@ export interface Announcement {
   language: 'en' | 'ru'
   enabled: boolean
   content: string
+  contentHtml?: string
   imageUrl?: string
   style: AnnouncementStyle
   behavior: AnnouncementBehavior

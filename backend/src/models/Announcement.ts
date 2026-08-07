@@ -4,6 +4,8 @@ export interface IAnnouncement extends Document {
   language: 'en' | 'ru'
   enabled: boolean
   content: string
+  /** 富文本正文，保留 content 作为横幅纯文本和旧数据兼容字段 */
+  contentHtml?: string
   imageUrl?: string
   style: {
     type: 'info' | 'warning' | 'danger' | 'success'
@@ -40,6 +42,11 @@ const AnnouncementSchema: Schema = new Schema(
       type: String,
       required: true,
       maxlength: 5000
+    },
+    contentHtml: {
+      type: String,
+      default: '',
+      maxlength: 20000
     },
     imageUrl: {
       type: String,
