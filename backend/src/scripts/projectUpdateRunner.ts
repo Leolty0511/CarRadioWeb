@@ -168,6 +168,15 @@ async function downloadArtifact(url: string): Promise<string> {
   return archivePath
 }
 
+async function hasGitCheckout(): Promise<boolean> {
+  try {
+    await fs.access(path.join(payload.repoRoot, '.git'))
+    return true
+  } catch {
+    return false
+  }
+}
+
 async function moveIntoBackup(relativePath: string): Promise<void> {
   if (!artifactBackupDir) throw new Error('artifact backup directory is not initialized')
   const current = path.join(payload.repoRoot, relativePath)
@@ -200,11 +209,23 @@ async function applyArtifact(): Promise<void> {
     try { await fs.access(path.join(stagingDir, relative)) } catch { throw new Error(`deployment package is incomplete: ${relative}`) }
   }
 
-  await run('git', ['fetch', '--quiet', 'origin', payload.branch], 'fetching', 'Fetching the latest source revision', 2 * 60_000)
-  const fetched = spawnSync('git', ['rev-parse', `origin/${payload.branch}`], { cwd: payload.repoRoot, encoding: 'utf8' })
-  if (fetched.status !== 0 || fetched.stdout.trim() !== payload.targetCommit) throw new Error('remote revision changed; check for updates again')
-  await run('git', ['reset', '--hard', payload.targetCommit], 'updating_code', 'Updating source code', 2 * 60_000)
-  merged = true
+  const stagedRelease = JSON.parse(await fs.readFile(path.join(stagingDir, 'release.json'), 'utf8')) as { commit?: string }
+  if (stagedRelease.commit && stagedRelease.commit !== payload.targetCommit) {
+    throw new Error('deployment package is not built from the selected remote revision; check for updates again')
+  }
+
+  // Production artifact deployments intentionally omit .git and source files.
+  // Only synchronize Git when the server is a full checkout; the prebuilt
+  // package is the source of truth for a release deployment.
+  if (await hasGitCheckout()) {
+    await run('git', ['fetch', '--quiet', 'origin', payload.branch], 'fetching', 'Fetching the latest source revision', 2 * 60_000)
+    const fetched = spawnSync('git', ['rev-parse', `origin/${payload.branch}`], { cwd: payload.repoRoot, encoding: 'utf8' })
+    if (fetched.status !== 0 || fetched.stdout.trim() !== payload.targetCommit) throw new Error('remote revision changed; check for updates again')
+    await run('git', ['reset', '--hard', payload.targetCommit], 'updating_code', 'Updating source code', 2 * 60_000)
+    merged = true
+  } else {
+    await writeStatus({ stage: 'updating_artifacts', message: 'Applying the prebuilt deployment package' })
+  }
 
   for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
     await moveIntoBackup(relative)
