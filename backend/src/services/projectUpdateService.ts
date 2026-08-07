@@ -149,7 +149,7 @@ function toUpdateLog(commits: GithubCommit[]): ProjectUpdateLogEntry[] {
     .filter(entry => Boolean(entry.commit && entry.message))
 }
 
-async function getArtifactRemoteInfo(branch: string, currentCommit: string | null): Promise<{
+async function getArtifactRemoteInfo(branch: string, currentCommit: string | null, currentVersion: string): Promise<{
   remoteVersion: string | null
   remoteCommit: string | null
   remoteCommitMessage: string | null
@@ -171,7 +171,7 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
   let commitsAhead = 0
   let commitsBehind = 0
   let updateLog: ProjectUpdateLogEntry[] = []
-  if (currentCommit && remoteCommit && currentCommit !== remoteCommit) {
+  if (currentCommit && remoteCommit && currentCommit !== remoteCommit && currentCommit !== 'artifact') {
     try {
       const comparison = await fetchGithubJson<GithubCompareResponse>(`${GITHUB_API_URL}/compare/${currentCommit}...${remoteCommit}`)
       // The current deployment is the compare base and the remote branch is
@@ -183,6 +183,8 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
       commitsBehind = 1
       updateLog = []
     }
+  } else if (currentCommit === 'artifact' && remoteVersion && remoteVersion !== currentVersion) {
+    commitsBehind = 1
   }
   lastRemoteCheckedAt = new Date().toISOString()
   return { remoteVersion, remoteCommit, remoteCommitMessage, commitsAhead, commitsBehind, updateLog }
@@ -367,14 +369,14 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
   // Production deployments use a prebuilt archive and intentionally do not
   // contain .git. Treat the release metadata as the local revision and use
   // GitHub's API for update checks in that mode.
-  if (!gitRepository && releaseMetadata?.commit) {
+  if (!gitRepository && getSelfUpdateEnabled()) {
     gitRepository = true
     repositoryValid = true
     workingTreeClean = true
-    currentCommit = releaseMetadata.commit
+    currentCommit = releaseMetadata?.commit || 'artifact'
     currentCommitMessage = currentCommitMessage || null
     try {
-      const remote = await getArtifactRemoteInfo(branch, currentCommit)
+      const remote = await getArtifactRemoteInfo(branch, currentCommit, currentVersion)
       remoteVersion = remote.remoteVersion
       remoteCommit = remote.remoteCommit
       remoteCommitMessage = remote.remoteCommitMessage
