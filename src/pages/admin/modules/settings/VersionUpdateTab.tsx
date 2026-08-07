@@ -91,7 +91,7 @@ export function VersionUpdateTab() {
         const next = await getProjectUpdateStatus()
         setStatus(next)
         if (next.state === 'completed') {
-          showToast({ type: 'success', title: '项目更新完成', description: '服务器已重启，请刷新页面。' })
+          showToast({ type: 'success', title: '项目更新完成', description: '前后端服务已重启，请刷新页面。' })
           window.clearInterval(timer)
         } else if (next.state === 'failed') {
           showToast({ type: 'error', title: '项目更新失败', description: next.message })
@@ -131,7 +131,7 @@ export function VersionUpdateTab() {
     try {
       const next = await applyProjectUpdate()
       setStatus(next)
-      showToast({ type: 'info', title: '更新已开始', description: '页面会持续显示安装与重启进度。' })
+      showToast({ type: 'info', title: '更新已开始', description: '页面会持续显示前端、后端安装与重启进度。' })
     } catch (error) {
       showToast({ type: 'error', title: '无法开始更新', description: error instanceof Error ? error.message : '' })
     } finally {
@@ -273,7 +273,7 @@ export function VersionUpdateTab() {
         onClose={() => setConfirmOpen(false)}
         onConfirm={() => void handleApply()}
         title="确认更新项目"
-        message={`将拉取 ${info.commitsBehind} 个新提交，重新安装依赖、构建项目并重启服务器。更新期间网站会短暂不可访问，是否继续？`}
+        message={`将拉取 ${info.commitsBehind} 个新提交，安装依赖并构建项目，然后重启前端和后端服务。更新期间网站会短暂不可访问，是否继续？`}
         confirmText="开始更新"
         cancelText="取消"
         type="warning"

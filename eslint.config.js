@@ -60,6 +60,12 @@ export default [
       "react-hooks/exhaustive-deps": "off",
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/immutability": "off",
+      // These React Compiler diagnostics are not applicable to the current
+      // ref-based editors and third-party table integrations.
+      "react-hooks/static-components": "off",
+      "react-hooks/preserve-manual-memoization": "off",
+      "react-hooks/refs": "off",
+      "react-hooks/incompatible-library": "off",
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/unsupported-syntax": "off",
     },

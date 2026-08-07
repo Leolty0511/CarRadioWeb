@@ -54,6 +54,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install backend dependencies for shared type-check
+        working-directory: backend
+        run: npm ci
+
       - name: Run TypeScript check
         run: npm run type-check
 
@@ -104,6 +108,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
+        run: npm ci
+
+      - name: Install backend dependencies for shared build
+        working-directory: backend
         run: npm ci
 
       - name: Build

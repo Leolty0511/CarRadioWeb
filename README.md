@@ -215,9 +215,14 @@ Optional environment variables:
 SELF_UPDATE_ENABLED=true
 UPDATE_BRANCH=main
 PM2_PROCESS_NAME=official-backend
+# Optional when the frontend runs as a separate PM2 app.
+FRONTEND_PM2_PROCESS_NAME=official-frontend
 ```
 
-Docker deployments can check version information, but must still be rebuilt by the host deployment process.
+The updater downloads the prebuilt GitHub release package, refreshes the frontend
+(separate PM2 app or nginx when available), restarts the backend, and checks its
+health. Docker deployments should expose the PM2/nginx commands to the updater;
+otherwise the backend restart reloads the bundled frontend assets.
 
 ### Flarum Forum (optional)
 

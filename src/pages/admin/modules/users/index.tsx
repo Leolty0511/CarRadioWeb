@@ -25,11 +25,11 @@ import { UserAvatar } from '@/components/ui/UserAvatar'
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function getInvitationStatus(invitation: AdminInvitationRecord): { label: string; className: string } {
-  if (invitation.acceptedAt) return { label: '已接受', className: 'text-green-600 dark:text-green-400' }
-  if (invitation.deliveryStatus === 'failed') return { label: '邮件发送失败', className: 'text-red-600 dark:text-red-400' }
-  if (invitation.revokedAt) return { label: '已撤销', className: 'text-slate-500 dark:text-slate-400' }
-  if (new Date(invitation.expiresAt).getTime() <= Date.now()) return { label: '已过期', className: 'text-amber-600 dark:text-amber-400' }
-  if (invitation.deliveryStatus === 'pending') return { label: '发送中', className: 'text-blue-600 dark:text-blue-400' }
+  if (invitation.acceptedAt) {return { label: '已接受', className: 'text-green-600 dark:text-green-400' }}
+  if (invitation.deliveryStatus === 'failed') {return { label: '邮件发送失败', className: 'text-red-600 dark:text-red-400' }}
+  if (invitation.revokedAt) {return { label: '已撤销', className: 'text-slate-500 dark:text-slate-400' }}
+  if (new Date(invitation.expiresAt).getTime() <= Date.now()) {return { label: '已过期', className: 'text-amber-600 dark:text-amber-400' }}
+  if (invitation.deliveryStatus === 'pending') {return { label: '发送中', className: 'text-blue-600 dark:text-blue-400' }}
   return { label: '待接受', className: 'text-blue-600 dark:text-blue-400' }
 }
 

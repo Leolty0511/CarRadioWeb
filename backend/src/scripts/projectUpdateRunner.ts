@@ -11,6 +11,7 @@ interface RunnerPayload {
   targetCommit: string
   statusFile: string
   pm2Target: string
+  frontendPm2Target?: string
   healthUrl: string
   artifactUrl?: string
   githubToken?: string
@@ -109,6 +110,34 @@ async function waitForHealth(timeoutMs = 90_000): Promise<void> {
   throw new Error(`server health check failed: ${lastError}`)
 }
 
+/**
+ * Refresh the frontend after replacing the built assets. Deployments may run
+ * the frontend under PM2, behind nginx, or from the same backend process.
+ * Keep the update usable in all three layouts while recording what happened.
+ */
+async function restartFrontend(): Promise<void> {
+  if (payload.frontendPm2Target && payload.frontendPm2Target !== payload.pm2Target) {
+    try {
+      await run(pm2Command, ['restart', payload.frontendPm2Target, '--update-env'], 'restarting_frontend', 'Restarting the frontend service', 2 * 60_000)
+      return
+    } catch (error) {
+      appendLog(`Frontend PM2 restart unavailable: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+
+  try {
+    await run('nginx', ['-s', 'reload'], 'reloading_frontend', 'Reloading the frontend proxy', 30_000)
+    return
+  } catch (error) {
+    appendLog(`Nginx reload unavailable: ${error instanceof Error ? error.message : String(error)}`)
+  }
+
+  // The built frontend is also served by the backend in the standard package.
+  // Backend restart below reloads those files, so this is a valid no-op when
+  // no separate frontend process or nginx instance exists.
+  await writeStatus({ stage: 'frontend_refreshed', message: 'Frontend assets updated; no separate frontend process requires a restart' })
+}
+
 async function downloadArtifact(url: string): Promise<string> {
   const timeout = AbortSignal.timeout(15 * 60_000)
   const authorizedHeaders = {
@@ -202,6 +231,7 @@ async function rollbackArtifact(reason: string): Promise<boolean> {
       await fs.rename(backup, current)
     }
     if (merged) await run('git', ['reset', '--hard', payload.previousCommit], 'rollback_code', 'Restoring the previous source revision', 2 * 60_000)
+    await restartFrontend()
     await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting the previous version', 2 * 60_000)
     await waitForHealth()
     await fs.rm(artifactBackupDir, { recursive: true, force: true })
@@ -223,6 +253,7 @@ async function rollbackLegacy(reason: string): Promise<void> {
     await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'rollback_dependencies', 'Restoring frontend dependencies')
     await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'rollback_backend_dependencies', 'Restoring backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
     await run(npmCommand, ['run', 'build'], 'rollback_build', 'Rebuilding the previous version', 20 * 60_000)
+    await restartFrontend()
     await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting the previous version', 2 * 60_000)
     await waitForHealth()
     await writeStatus({ state: 'failed', stage: 'rolled_back', message: `Update failed and was rolled back: ${reason}`, completedAt: new Date().toISOString() })
@@ -236,6 +267,7 @@ async function main(): Promise<void> {
     if (payload.artifactUrl) {
       await writeStatus({ stage: 'downloading', message: 'Downloading the prebuilt package from GitHub' })
       await applyArtifact()
+      await restartFrontend()
       await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
       await writeStatus({ stage: 'health_check', message: 'Checking the new version health' })
       await waitForHealth()
@@ -252,6 +284,7 @@ async function main(): Promise<void> {
     await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_frontend', 'Installing frontend dependencies')
     await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_backend', 'Installing backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
     await run(npmCommand, ['run', 'build'], 'building', 'Building the new version', 20 * 60_000)
+    await restartFrontend()
     await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
     await waitForHealth()
     await writeStatus({ state: 'completed', stage: 'completed', message: 'Update completed successfully', completedAt: new Date().toISOString() })

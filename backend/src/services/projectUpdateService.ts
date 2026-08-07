@@ -544,6 +544,7 @@ export async function startProjectUpdate(): Promise<UpdateJobStatus> {
     targetCommit: info.remoteCommit,
     statusFile: STATUS_FILE,
     pm2Target: process.env.PM2_PROCESS_NAME || process.env.name || 'official-backend',
+    frontendPm2Target: process.env.FRONTEND_PM2_PROCESS_NAME?.trim() || undefined,
     healthUrl: process.env.UPDATE_HEALTH_URL || `http://127.0.0.1:${process.env.PORT || 3000}/health/ready`,
     artifactUrl,
     githubToken: process.env.UPDATE_GITHUB_TOKEN?.trim() || undefined,
