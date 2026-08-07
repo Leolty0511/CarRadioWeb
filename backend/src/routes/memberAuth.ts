@@ -13,6 +13,7 @@ import { getClientIP, getGeoLocationByIP } from '../services/geoLocationService'
 import { authLimiter, codeLimiter } from '../middleware/rateLimit'
 import { notificationService } from '../services/notificationService'
 import { optionalContentAccess } from '../middleware/contentAccess'
+import { escapeMongoRegex } from '../utils/mongoRegex'
 
 const router = Router()
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -116,11 +117,19 @@ router.post('/register', authLimiter, async (req, res) => {
 })
 
 router.post('/login', authLimiter, async (req, res) => {
-  const login = String(req.body.login || req.body.email || '').trim().toLowerCase()
+  const loginInput = String(req.body.login || req.body.email || '').trim()
+  const login = loginInput.toLowerCase()
   const password = String(req.body.password || '')
   if (!login || !password) return res.status(400).json({ success: false, error: 'credentials_required' })
 
-  const admin = await User.findOne({ provider: 'email', $or: [{ email: login }, { loginUsername: login }] }).select('+passwordHash')
+  const admin = await User.findOne({
+    provider: 'email',
+    $or: [
+      { email: login },
+      { loginUsername: login },
+      { nickname: { $regex: new RegExp(`^${escapeMongoRegex(loginInput)}$`, 'i') } },
+    ],
+  }).select('+passwordHash')
   if (admin?.passwordHash && admin.isActive && await bcrypt.compare(password, admin.passwordHash)) {
     const tokens = signTokenPair({ userId: String(admin._id), email: admin.email || admin.loginUsername || '', role: admin.role })
     setTokenCookie(res, tokens.accessToken)

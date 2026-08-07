@@ -104,6 +104,14 @@ if [[ -z "$FLARUM_STATUS" || "$FLARUM_HTTP_READY" != "1" ]]; then
   exit 1
 else
   update_status "deployed" "部署成功！"
+  DOCKER_BIN=$(command -v docker)
+  if [[ -n "$DOCKER_BIN" && -d /etc/cron.d && -w /etc/cron.d ]]; then
+    cat > /etc/cron.d/carradioweb-flarum << EOL
+* * * * * root ${DOCKER_BIN} exec flarum_app php flarum schedule:run --no-interaction >/dev/null 2>&1
+EOL
+    chmod 0644 /etc/cron.d/carradioweb-flarum
+    "$DOCKER_BIN" exec flarum_app php flarum schedule:run --no-interaction >/dev/null 2>&1 || true
+  fi
   echo "FLARUM_URL_IS=${FINAL_FLARUM_URL}" # Final output for service
   exit 0
 fi

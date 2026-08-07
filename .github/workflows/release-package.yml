@@ -51,6 +51,7 @@ jobs:
           cp -R backend/dist release-package/backend/dist
           cp -R backend/node_modules release-package/backend/node_modules
           cp docker-compose.flarum.yml release-package/docker-compose.flarum.yml
+          cp ecosystem.config.cjs release-package/ecosystem.config.cjs
           cp scripts/deploy-flarum.sh scripts/deploy-flarum.ps1 scripts/cancel-deploy.sh scripts/cancel-deploy.ps1 scripts/ensure-docker.sh release-package/scripts/
           cp package.json package-lock.json release-package/
           cp backend/package.json backend/package-lock.json release-package/backend/

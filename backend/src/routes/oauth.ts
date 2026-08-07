@@ -17,6 +17,7 @@ import { authLimiter, codeLimiter } from '../middleware/rateLimit'
 import { isDuplicateKeyError, isDuplicateKeyOnField } from '../utils/mongoErrors'
 import emailVerificationService from '../services/emailVerificationService'
 import { ensureDefaultAdmin } from '../services/defaultAdminService'
+import { escapeMongoRegex } from '../utils/mongoRegex'
 
 const logger = createSecureLogger('auth-route')
 
@@ -385,7 +386,8 @@ router.post('/register', async (req: Request, res: Response) => {
  */
 router.post('/login', async (req: Request, res: Response) => {
   try {
-    const login = String(req.body.login ?? req.body.email ?? '').trim().toLowerCase()
+    const loginInput = String(req.body.login ?? req.body.email ?? '').trim()
+    const login = loginInput.toLowerCase()
     const password = req.body.password
 
     if (!login) {
@@ -397,7 +399,11 @@ router.post('/login', async (req: Request, res: Response) => {
 
     const user = await User.findOne({
       provider: 'email',
-      $or: [{ email: String(login) }, { loginUsername: String(login) }],
+      $or: [
+        { email: login },
+        { loginUsername: login },
+        { nickname: { $regex: new RegExp(`^${escapeMongoRegex(loginInput)}$`, 'i') } },
+      ],
     }).select('+passwordHash')
 
     if (!user || !user.passwordHash) {

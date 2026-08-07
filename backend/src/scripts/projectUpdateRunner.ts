@@ -66,8 +66,8 @@ async function writeStatus(patch: Partial<RunnerStatus>): Promise<void> {
   await fs.rename(tempFile, payload.statusFile)
 }
 
-function run(command: string, args: string[], stage: string, message: string, timeout = 15 * 60_000, cwd = payload.repoRoot): void {
-  void writeStatus({ stage, message })
+async function run(command: string, args: string[], stage: string, message: string, timeout = 15 * 60_000, cwd = payload.repoRoot): Promise<void> {
+  await writeStatus({ stage, message })
   const result = spawnSync(command, args, {
     cwd,
     encoding: 'utf8',
@@ -99,13 +99,29 @@ async function waitForHealth(timeoutMs = 90_000): Promise<void> {
 }
 
 async function downloadArtifact(url: string): Promise<string> {
-  const response = await fetch(url, {
-    signal: AbortSignal.timeout(15 * 60_000),
-    headers: {
-      accept: 'application/octet-stream',
-      ...(payload.githubToken ? { authorization: `Bearer ${payload.githubToken}` } : {}),
-    },
-  })
+  const timeout = AbortSignal.timeout(15 * 60_000)
+  const authorizedHeaders = {
+    accept: 'application/octet-stream',
+    ...(payload.githubToken ? { authorization: `Bearer ${payload.githubToken}` } : {}),
+  }
+  const unsignedHeaders = { accept: 'application/octet-stream' }
+  let currentUrl = url
+  let response: Response | undefined
+
+  // Private GitHub release assets redirect to a short-lived signed URL. Do the
+  // redirect manually so the bearer token is never sent to the asset host.
+  for (let redirectCount = 0; redirectCount <= 3; redirectCount += 1) {
+    response = await fetch(currentUrl, {
+      redirect: 'manual',
+      signal: timeout,
+      headers: redirectCount === 0 ? authorizedHeaders : unsignedHeaders,
+    })
+    if (response.status < 300 || response.status >= 400) break
+    const location = response.headers.get('location')
+    if (!location) throw new Error(`deployment package redirect missing location (HTTP ${response.status})`)
+    currentUrl = new URL(location, currentUrl).toString()
+  }
+  if (!response) throw new Error('deployment package download returned no response')
   if (!response.ok) throw new Error(`deployment package download failed (HTTP ${response.status})`)
   const archivePath = path.join(os.tmpdir(), `carradioweb-${payload.jobId}.tar.gz`)
   await fs.writeFile(archivePath, Buffer.from(await response.arrayBuffer()))
@@ -134,17 +150,23 @@ async function applyArtifact(): Promise<void> {
 
   const archivePath = await downloadArtifact(payload.artifactUrl)
   try {
-    run('tar', ['-xzf', archivePath, '-C', stagingDir], 'extracting', 'Extracting the prebuilt deployment package', 5 * 60_000)
+    await run('tar', ['-xzf', archivePath, '-C', stagingDir], 'extracting', 'Extracting the prebuilt deployment package', 5 * 60_000)
   } finally {
     await fs.rm(archivePath, { force: true })
   }
 
-  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'docker-compose.flarum.yml', 'scripts']) {
+  artifactApplied = true
+  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
     try { await fs.access(path.join(stagingDir, relative)) } catch { throw new Error(`deployment package is incomplete: ${relative}`) }
   }
 
-  run(pm2Command, ['stop', payload.pm2Target], 'stopping', 'Stopping the backend service', 2 * 60_000)
-  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'docker-compose.flarum.yml', 'scripts', 'package.json', 'package-lock.json', 'release.json']) {
+  await run('git', ['fetch', '--quiet', 'origin', payload.branch], 'fetching', 'Fetching the latest source revision', 2 * 60_000)
+  const fetched = spawnSync('git', ['rev-parse', `origin/${payload.branch}`], { cwd: payload.repoRoot, encoding: 'utf8' })
+  if (fetched.status !== 0 || fetched.stdout.trim() !== payload.targetCommit) throw new Error('remote revision changed; check for updates again')
+  await run('git', ['reset', '--hard', payload.targetCommit], 'updating_code', 'Updating source code', 2 * 60_000)
+  merged = true
+
+  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
     await moveIntoBackup(relative)
     const staged = path.join(stagingDir, relative)
     const current = path.join(payload.repoRoot, relative)
@@ -155,25 +177,21 @@ async function applyArtifact(): Promise<void> {
       if (error?.code !== 'ENOENT') throw error
     }
   }
-  artifactApplied = true
   await fs.rm(stagingDir, { recursive: true, force: true })
 }
 
 async function rollbackArtifact(reason: string): Promise<boolean> {
   if (!artifactBackupDir || !artifactApplied) return false
   try {
-    run(pm2Command, ['stop', payload.pm2Target], 'rollback', 'Restoring the previous deployment package', 2 * 60_000)
-    for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'docker-compose.flarum.yml', 'scripts', 'package.json', 'package-lock.json', 'release.json']) {
+    for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
       const backup = path.join(artifactBackupDir, relative)
       const current = path.join(payload.repoRoot, relative)
-      try {
-        await fs.rm(current, { recursive: true, force: true })
-        await fs.rename(backup, current)
-      } catch (error: any) {
-        if (error?.code !== 'ENOENT') throw error
-      }
+      try { await fs.access(backup) } catch { continue }
+      await fs.rm(current, { recursive: true, force: true })
+      await fs.rename(backup, current)
     }
-    run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting the previous version', 2 * 60_000)
+    if (merged) await run('git', ['reset', '--hard', payload.previousCommit], 'rollback_code', 'Restoring the previous source revision', 2 * 60_000)
+    await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting the previous version', 2 * 60_000)
     await waitForHealth()
     await fs.rm(artifactBackupDir, { recursive: true, force: true })
     await writeStatus({ state: 'failed', stage: 'rolled_back', message: `Update failed and was rolled back: ${reason}`, completedAt: new Date().toISOString() })
@@ -190,11 +208,11 @@ async function rollbackLegacy(reason: string): Promise<void> {
     return
   }
   try {
-    run('git', ['reset', '--hard', payload.previousCommit], 'rollback', 'Restoring the previous source revision')
-    run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'rollback_dependencies', 'Restoring frontend dependencies')
-    run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'rollback_backend_dependencies', 'Restoring backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
-    run(npmCommand, ['run', 'build'], 'rollback_build', 'Rebuilding the previous version', 20 * 60_000)
-    run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting the previous version', 2 * 60_000)
+    await run('git', ['reset', '--hard', payload.previousCommit], 'rollback', 'Restoring the previous source revision')
+    await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'rollback_dependencies', 'Restoring frontend dependencies')
+    await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'rollback_backend_dependencies', 'Restoring backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
+    await run(npmCommand, ['run', 'build'], 'rollback_build', 'Rebuilding the previous version', 20 * 60_000)
+    await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'rollback_restart', 'Restarting the previous version', 2 * 60_000)
     await waitForHealth()
     await writeStatus({ state: 'failed', stage: 'rolled_back', message: `Update failed and was rolled back: ${reason}`, completedAt: new Date().toISOString() })
   } catch (error) {
@@ -207,7 +225,7 @@ async function main(): Promise<void> {
     if (payload.artifactUrl) {
       await writeStatus({ stage: 'downloading', message: 'Downloading the prebuilt package from GitHub' })
       await applyArtifact()
-      run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
+      await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
       await writeStatus({ stage: 'health_check', message: 'Checking the new version health' })
       await waitForHealth()
       if (artifactBackupDir) await fs.rm(artifactBackupDir, { recursive: true, force: true })
@@ -215,15 +233,15 @@ async function main(): Promise<void> {
       return
     }
 
-    run('git', ['fetch', '--quiet', 'origin', payload.branch], 'fetching', 'Fetching the latest source revision', 2 * 60_000)
+    await run('git', ['fetch', '--quiet', 'origin', payload.branch], 'fetching', 'Fetching the latest source revision', 2 * 60_000)
     const fetched = spawnSync('git', ['rev-parse', `origin/${payload.branch}`], { cwd: payload.repoRoot, encoding: 'utf8' })
     if (fetched.status !== 0 || fetched.stdout.trim() !== payload.targetCommit) throw new Error('remote revision changed; check for updates again')
-    run('git', ['merge', '--ff-only', payload.targetCommit], 'updating_code', 'Updating source code')
+    await run('git', ['merge', '--ff-only', payload.targetCommit], 'updating_code', 'Updating source code')
     merged = true
-    run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_frontend', 'Installing frontend dependencies')
-    run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_backend', 'Installing backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
-    run(npmCommand, ['run', 'build'], 'building', 'Building the new version', 20 * 60_000)
-    run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
+    await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_frontend', 'Installing frontend dependencies')
+    await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_backend', 'Installing backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
+    await run(npmCommand, ['run', 'build'], 'building', 'Building the new version', 20 * 60_000)
+    await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
     await waitForHealth()
     await writeStatus({ state: 'completed', stage: 'completed', message: 'Update completed successfully', completedAt: new Date().toISOString() })
   } catch (error) {

@@ -70,6 +70,10 @@ coverage/
 # Temporary files
 *.tmp
 *.temp
+.update-staging-*/
+.update-backup-*/
+backend/dist.backup-*/
+release.json
 
 # Accidentally created files from commands
 *status*

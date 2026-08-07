@@ -13,6 +13,7 @@ module.exports = {
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       autorestart: true,
+      treekill: false,
       watch: false,
       max_memory_restart: '1G',
       env_production: {
@@ -21,4 +22,3 @@ module.exports = {
     },
   ],
 };
-

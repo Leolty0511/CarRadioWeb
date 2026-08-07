@@ -479,7 +479,21 @@ const idleStatus: UpdateJobStatus = {
 export async function getProjectUpdateStatus(): Promise<UpdateJobStatus> {
   try {
     const raw = await fsPromises.readFile(STATUS_FILE, 'utf8')
-    return { ...idleStatus, ...(JSON.parse(raw) as UpdateJobStatus) }
+    const status = { ...idleStatus, ...(JSON.parse(raw) as UpdateJobStatus) }
+    const updatedAt = status.updatedAt ? Date.parse(status.updatedAt) : 0
+    if ((status.state === 'running' || status.state === 'restarting') && (!updatedAt || Date.now() - updatedAt > 30 * 60_000)) {
+      const interrupted: UpdateJobStatus = {
+        ...status,
+        state: 'failed',
+        stage: 'interrupted',
+        message: '上次更新意外中断，请重新检查后再更新。',
+        updatedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+      }
+      await writeStatus(interrupted)
+      return interrupted
+    }
+    return status
   } catch {
     return idleStatus
   }
