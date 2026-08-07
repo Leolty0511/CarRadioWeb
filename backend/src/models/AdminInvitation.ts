@@ -9,6 +9,8 @@ export interface IAdminInvitation extends Document {
   expiresAt: Date
   acceptedAt: Date | null
   revokedAt: Date | null
+  deliveryStatus: 'pending' | 'sent' | 'failed'
+  sendError: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -54,6 +56,16 @@ const AdminInvitationSchema = new Schema<IAdminInvitation>(
     revokedAt: {
       type: Date,
       default: null,
+    },
+    deliveryStatus: {
+      type: String,
+      enum: ['pending', 'sent', 'failed'],
+      default: 'pending',
+    },
+    sendError: {
+      type: String,
+      default: null,
+      maxlength: 500,
     },
   },
   { timestamps: true }

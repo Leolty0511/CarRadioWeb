@@ -8,6 +8,7 @@ import { createLogger } from '../utils/logger'
 
 const REPOSITORY = 'Leolty0511/CarRadioWeb'
 const REPOSITORY_URL = `https://github.com/${REPOSITORY}`
+const DEFAULT_ARTIFACT_URL = `${REPOSITORY_URL}/releases/download/latest/caradioweb-deploy.tar.gz`
 const DEFAULT_BRANCH = 'main'
 const COMMAND_TIMEOUT_MS = 60_000
 const AUTO_CHECK_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000
@@ -74,12 +75,23 @@ interface CommandResult {
   stderr: string
 }
 
-function runCommand(command: string, args: string[], cwd = REPO_ROOT, timeout = COMMAND_TIMEOUT_MS): Promise<CommandResult> {
+function getGitEnvironment(): NodeJS.ProcessEnv {
+  const token = process.env.UPDATE_GITHUB_TOKEN?.trim()
+  if (!token) return process.env
+  return {
+    ...process.env,
+    GIT_CONFIG_COUNT: '1',
+    GIT_CONFIG_KEY_0: 'http.extraheader',
+    GIT_CONFIG_VALUE_0: `AUTHORIZATION: bearer ${token}`,
+  }
+}
+
+function runCommand(command: string, args: string[], cwd = REPO_ROOT, timeout = COMMAND_TIMEOUT_MS, env = process.env): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     execFile(
       command,
       args,
-      { cwd, timeout, windowsHide: true, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8' },
+      { cwd, timeout, windowsHide: true, maxBuffer: 4 * 1024 * 1024, encoding: 'utf8', env },
       (error, stdout, stderr) => {
         if (error) {
           const detail = String(stderr || stdout || error.message).trim()
@@ -93,7 +105,7 @@ function runCommand(command: string, args: string[], cwd = REPO_ROOT, timeout = 
 }
 
 function runGit(args: string[], timeout?: number): Promise<CommandResult> {
-  return runCommand('git', args, REPO_ROOT, timeout)
+  return runCommand('git', args, REPO_ROOT, timeout, getGitEnvironment())
 }
 
 async function refreshRemoteBranch(branch: string): Promise<void> {
@@ -356,6 +368,8 @@ export async function startProjectUpdate(): Promise<UpdateJobStatus> {
     statusFile: STATUS_FILE,
     pm2Target: process.env.PM2_PROCESS_NAME || process.env.name || 'official-backend',
     healthUrl: process.env.UPDATE_HEALTH_URL || `http://127.0.0.1:${process.env.PORT || 3000}/health/ready`,
+    artifactUrl: process.env.UPDATE_ARTIFACT_URL?.trim() || DEFAULT_ARTIFACT_URL,
+    githubToken: process.env.UPDATE_GITHUB_TOKEN?.trim() || undefined,
   })).toString('base64url')
 
   const child = require('child_process').spawn(process.execPath, [runnerPath, payload], {

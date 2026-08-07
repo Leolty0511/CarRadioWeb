@@ -1,0 +1,76 @@
+name: Build and publish deployment package
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  publish:
+    name: Build release package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install backend dependencies for build
+        working-directory: backend
+        run: npm ci --no-audit --no-fund
+
+      - name: Build frontend and backend
+        run: npm run build
+
+      - name: Remove backend development dependencies
+        working-directory: backend
+        run: npm prune --omit=dev --no-audit --no-fund
+
+      - name: Assemble deployment package
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf release-package caradioweb-deploy.tar.gz
+          mkdir -p release-package/backend
+          cp -R dist release-package/dist
+          cp -R backend/dist release-package/backend/dist
+          cp -R backend/node_modules release-package/backend/node_modules
+          cp package.json package-lock.json release-package/
+          cp backend/package.json backend/package-lock.json release-package/backend/
+          node -e "const fs=require('fs'); const p=require('./package.json'); fs.writeFileSync('release-package/release.json', JSON.stringify({version:p.version,commit:process.env.GITHUB_SHA,ref:process.env.GITHUB_REF,generatedAt:new Date().toISOString()},null,2))"
+          tar -czf caradioweb-deploy.tar.gz -C release-package .
+
+      - name: Publish latest deployment package
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          target_commitish: ${{ github.sha }}
+          name: CarRadioWeb latest
+          prerelease: true
+          make_latest: false
+          body: |
+            Automated deployment package for `${{ github.sha }}`.
+            This release is consumed by the admin one-click updater.
+          files: caradioweb-deploy.tar.gz
+
+      - name: Publish tagged release package
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          files: caradioweb-deploy.tar.gz

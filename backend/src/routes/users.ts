@@ -262,6 +262,21 @@ router.get('/', async (_req: Request, res: Response) => {
   }
 })
 
+/** GET /api/users/invitations - list administrator invitations and delivery status */
+router.get('/invitations', async (_req: Request, res: Response) => {
+  try {
+    const invitations = await AdminInvitation.find()
+      .select('-tokenHash -__v')
+      .populate('invitedBy', 'nickname email loginUsername')
+      .sort({ createdAt: -1 })
+      .limit(200)
+    res.json({ success: true, data: invitations })
+  } catch (error) {
+    logger.error({ error }, 'Fetch admin invitations failed')
+    res.status(500).json({ success: false, error: 'fetch_failed' })
+  }
+})
+
 /** GET /api/users/permissions — return all available permissions */
 router.get('/permissions', (_req: Request, res: Response) => {
   res.json({ success: true, data: ALL_PERMISSIONS })
@@ -381,6 +396,8 @@ router.post('/', async (req: Request, res: Response) => {
       tokenHash: crypto.createHash('sha256').update(token).digest('hex'),
       invitedBy: req.user!._id,
       expiresAt: new Date(Date.now() + INVITE_EXPIRES_MS),
+      deliveryStatus: 'pending',
+      sendError: null,
     })
 
     const emailResult = await emailVerificationService.sendAdminInvitation(
@@ -390,9 +407,15 @@ router.post('/', async (req: Request, res: Response) => {
     )
     if (!emailResult.success) {
       invitation.revokedAt = new Date()
+      invitation.deliveryStatus = 'failed'
+      invitation.sendError = emailResult.error || 'send_failed'
       await invitation.save()
       return res.status(400).json({ success: false, error: emailResult.error || 'send_failed' })
     }
+
+    invitation.deliveryStatus = 'sent'
+    invitation.sendError = null
+    await invitation.save()
 
     res.status(201).json({ success: true, data: invitation })
   } catch (error: unknown) {

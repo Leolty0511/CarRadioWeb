@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import {
   createUser,
   deleteUser,
+  getAdminInvitations,
   getPermissions,
   getUsers,
   transferSuperAdmin,
@@ -15,12 +16,22 @@ import {
   updateOwnNickname,
   updateUser,
   type AdminUserRecord,
+  type AdminInvitationRecord,
   type CreateUserPayload,
 } from '@/services/userService'
 import type { AdminUser } from '@/services/authService'
 import { UserAvatar } from '@/components/ui/UserAvatar'
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function getInvitationStatus(invitation: AdminInvitationRecord): { label: string; className: string } {
+  if (invitation.acceptedAt) return { label: '已接受', className: 'text-green-600 dark:text-green-400' }
+  if (invitation.deliveryStatus === 'failed') return { label: '邮件发送失败', className: 'text-red-600 dark:text-red-400' }
+  if (invitation.revokedAt) return { label: '已撤销', className: 'text-slate-500 dark:text-slate-400' }
+  if (new Date(invitation.expiresAt).getTime() <= Date.now()) return { label: '已过期', className: 'text-amber-600 dark:text-amber-400' }
+  if (invitation.deliveryStatus === 'pending') return { label: '发送中', className: 'text-blue-600 dark:text-blue-400' }
+  return { label: '待接受', className: 'text-blue-600 dark:text-blue-400' }
+}
 
 const LOGIN_PROVIDER_LABELS: Record<string, string> = {
   google: 'Google',
@@ -342,6 +353,7 @@ interface UserManagementProps {
 export function UserManagement({ currentUser, forceAccountSetup = false, onAccountUpdated }: UserManagementProps) {
   const { showToast } = useToast()
   const [users, setUsers] = useState<AdminUserRecord[]>([])
+  const [invitations, setInvitations] = useState<AdminInvitationRecord[]>([])
   const [allPermissions, setAllPermissions] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogUser, setDialogUser] = useState<AdminUserRecord | null | 'new'>(null)
@@ -360,9 +372,10 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [u, p] = await Promise.all([getUsers(), getPermissions()])
+      const [u, p, i] = await Promise.all([getUsers(), getPermissions(), getAdminInvitations()])
       setUsers(u)
       setAllPermissions(p)
+      setInvitations(i)
     } catch {
       showToast({ type: 'error', title: '加载失败' })
     } finally {
@@ -606,6 +619,48 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                       </td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">邀请记录</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {invitations.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">暂无邀请记录</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" role="table">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">邮箱</th>
+                    <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">昵称</th>
+                    <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">创建时间</th>
+                    <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">过期时间</th>
+                    <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invitations.map(invitation => {
+                    const status = getInvitationStatus(invitation)
+                    return (
+                      <tr key={invitation._id} className="border-b border-slate-100 dark:border-slate-800">
+                        <td className="px-2 py-3 text-slate-700 dark:text-slate-200">{invitation.email}</td>
+                        <td className="px-2 py-3 text-slate-600 dark:text-slate-300">{invitation.nickname}</td>
+                        <td className="whitespace-nowrap px-2 py-3 text-slate-500">{new Date(invitation.createdAt).toLocaleString('zh-CN')}</td>
+                        <td className="whitespace-nowrap px-2 py-3 text-slate-500">{new Date(invitation.expiresAt).toLocaleString('zh-CN')}</td>
+                        <td className={`px-2 py-3 font-medium ${status.className}`} title={invitation.sendError || undefined}>
+                          {status.label}
+                          {invitation.sendError && <span className="ml-2 text-xs font-normal text-slate-400">({invitation.sendError})</span>}
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>

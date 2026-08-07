@@ -27,7 +27,7 @@ export interface CreateUserPayload {
   email?: string
 }
 
-interface AdminInvitationRecord {
+export interface AdminInvitationRecord {
   _id: string
   email: string
   nickname: string
@@ -37,6 +37,9 @@ interface AdminInvitationRecord {
   revokedAt: string | null
   createdAt: string
   updatedAt: string
+  deliveryStatus?: 'pending' | 'sent' | 'failed'
+  sendError?: string | null
+  invitedBy?: { nickname?: string; email?: string | null; loginUsername?: string | null } | string
 }
 
 interface UpdateUserPayload {
@@ -67,6 +70,12 @@ export async function getPermissions(): Promise<string[]> {
 /** Create a new admin invitation */
 export async function createUser(data: CreateUserPayload) {
   return apiClient.post<AdminInvitationRecord>('/users', data)
+}
+
+/** Fetch recent administrator invitations, including delivery and acceptance state. */
+export async function getAdminInvitations(): Promise<AdminInvitationRecord[]> {
+  const res = await apiClient.get<AdminInvitationRecord[]>('/users/invitations')
+  return res.success && res.data ? res.data : []
 }
 
 /** Update admin user */

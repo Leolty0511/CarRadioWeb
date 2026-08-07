@@ -119,9 +119,26 @@ interface SmtpConfig {
   from: string;
 }
 
+const SMTP_PROVIDER_DEFAULTS: Record<string, { host: string; port: number; secure: boolean }> = {
+  'qq.com': { host: 'smtp.qq.com', port: 465, secure: true },
+  'gmail.com': { host: 'smtp.gmail.com', port: 465, secure: true },
+  '163.com': { host: 'smtp.163.com', port: 465, secure: true },
+  '126.com': { host: 'smtp.126.com', port: 465, secure: true },
+};
+
+function getProviderDefaults(user?: string): { host: string; port: number; secure: boolean } | null {
+  const domain = user?.split('@')[1]?.trim().toLowerCase();
+  return domain ? SMTP_PROVIDER_DEFAULTS[domain] || null : null;
+}
+
+function isLocalTestSmtp(host: string, user?: string, pass?: string): boolean {
+  return ['127.0.0.1', 'localhost'].includes(host.trim().toLowerCase()) && !user && !pass;
+}
+
 /**
- * Get SMTP config from environment or GlobalSiteSettings
- * Priority: environment variables > database settings
+ * Get SMTP config from environment or GlobalSiteSettings.
+ * A blank local Mailpit configuration is only a development fallback; it must
+ * not override the real SMTP settings saved from the admin panel.
  */
 async function getSmtpConfig(): Promise<SmtpConfig | null> {
   // Try environment variables first
@@ -129,11 +146,12 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
   const envUser = process.env.SMTP_USER;
   const envPass = process.env.SMTP_PASS;
 
-  if (envHost) {
+  if (envHost && !isLocalTestSmtp(envHost, envUser, envPass)) {
+    const defaults = getProviderDefaults(envUser);
     return {
-      host: envHost,
-      port: parseInt(process.env.SMTP_PORT || '1025', 10),
-      secure: process.env.SMTP_SECURE === 'true',
+      host: envHost || defaults?.host || '',
+      port: parseInt(process.env.SMTP_PORT || String(defaults?.port || 465), 10),
+      secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : defaults?.secure !== false,
       user: envUser || undefined,
       pass: envPass || undefined,
       from: process.env.SMTP_FROM || envUser || 'noreply@localhost',
@@ -146,11 +164,12 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
     const settings = await GlobalSiteSettings.findOne().lean();
     const ns = (settings as any)?.newsletterSmtp;
 
-    if (ns?.enabled && ns?.host && ns?.user && ns?.pass) {
+    const defaults = getProviderDefaults(String(ns?.user || ''));
+    if (ns?.enabled && (ns?.host || defaults?.host) && ns?.user && ns?.pass) {
       return {
-        host: ns.host,
-        port: ns.port || 465,
-        secure: ns.secure !== false,
+        host: ns.host || defaults!.host,
+        port: ns.port || defaults?.port || 465,
+        secure: ns.secure !== undefined ? ns.secure !== false : defaults?.secure !== false,
         user: ns.user,
         pass: ns.pass,
         from: ns.from || ns.user,
@@ -158,6 +177,20 @@ async function getSmtpConfig(): Promise<SmtpConfig | null> {
     }
   } catch (err) {
     logger.warn({ err }, 'Failed to load SMTP from database');
+  }
+
+  // Preserve support for a fully configured environment SMTP even when the
+  // host is local (for example, an authenticated relay on the same server).
+  if (envHost && envUser && envPass) {
+    const defaults = getProviderDefaults(envUser);
+    return {
+      host: envHost,
+      port: parseInt(process.env.SMTP_PORT || String(defaults?.port || 465), 10),
+      secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : defaults?.secure !== false,
+      user: envUser,
+      pass: envPass,
+      from: process.env.SMTP_FROM || envUser,
+    };
   }
 
   return null;
