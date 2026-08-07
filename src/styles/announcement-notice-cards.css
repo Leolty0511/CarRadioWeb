@@ -59,20 +59,18 @@
 
 /* ---------- 玻璃拟态 (Glass) ---------- */
 .notice-card--glass {
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.2);
 }
 
 .dark .notice-card--glass {
-  background: rgba(30, 30, 40, 0.6);
-  border-color: rgba(255, 255, 255, 0.08);
+  background: #111827;
+  color: #f8fafc;
+  border-color: #334155;
 }
 
 .notice-card__glow,
@@ -89,6 +87,9 @@
   background: radial-gradient(circle, rgba(99, 179, 237, 0.2) 0%, transparent 70%);
 }
 
+.notice-card--glass .notice-card__glow,
+.notice-card--glass .notice-card__glow-2 { display: none; }
+
 .notice-card__glow-2 {
   bottom: -30px;
   left: -30px;
@@ -98,8 +99,8 @@
 }
 
 .notice-card__top-section {
-  padding: 24px 32px 18px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 20px 28px 16px;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -119,10 +120,10 @@
 }
 
 .notice-card__top-title {
-  color: rgba(255, 255, 255, 0.9);
+  color: inherit;
   font-size: 17px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0;
 }
 
 .notice-card__badge {
@@ -136,24 +137,37 @@
 }
 
 .notice-card__inner {
-  padding: 24px 32px 32px;
+  padding: 24px 28px 28px;
 }
 
 .notice-card--glass .notice-card-body-text {
-  color: rgba(255, 255, 255, 0.65);
+  color: #334155;
+}
+
+.dark .notice-card--glass .notice-card__top-section {
+  border-bottom-color: #334155;
+}
+
+.dark .notice-card--glass .notice-card-body-text {
+  color: #cbd5e1;
 }
 
 .notice-card__footer-bar {
   margin-top: 20px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   flex-wrap: wrap;
   gap: 12px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.3);
+  color: #64748b;
+}
+
+.dark .notice-card--glass .notice-card__footer-bar {
+  border-top-color: #334155;
+  color: #94a3b8;
 }
 
 .notice-card__action-btn {
