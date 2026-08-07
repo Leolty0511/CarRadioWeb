@@ -101,7 +101,10 @@ async function waitForHealth(timeoutMs = 90_000): Promise<void> {
 async function downloadArtifact(url: string): Promise<string> {
   const response = await fetch(url, {
     signal: AbortSignal.timeout(15 * 60_000),
-    headers: payload.githubToken ? { authorization: `Bearer ${payload.githubToken}` } : undefined,
+    headers: {
+      accept: 'application/octet-stream',
+      ...(payload.githubToken ? { authorization: `Bearer ${payload.githubToken}` } : {}),
+    },
   })
   if (!response.ok) throw new Error(`deployment package download failed (HTTP ${response.status})`)
   const archivePath = path.join(os.tmpdir(), `carradioweb-${payload.jobId}.tar.gz`)
