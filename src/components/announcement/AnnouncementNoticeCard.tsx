@@ -43,6 +43,12 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
   sealMarkLabel = DEFAULT_SEAL_MARK,
   waxSealChar = DEFAULT_WAX_SEAL_CHAR
 }) => {
+  // Normalize pasted line endings and literal escaped newlines before rendering.
+  const displayContent = content
+    .replace(/\\r\\n/g, '\n')
+    .replace(/\\n/g, '\n')
+    .replace(/\r\n?/g, '\n')
+
   const bodyContent = (
     <>
       {imageUrl && (
@@ -52,7 +58,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
           className="notice-card-image"
         />
       )}
-      <div className="notice-card-body-text whitespace-pre-wrap break-words">{content}</div>
+      <div className="notice-card-body-text">{displayContent}</div>
     </>
   )
 

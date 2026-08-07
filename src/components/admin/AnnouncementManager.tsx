@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button'
 import ImagePicker from '@/components/ImagePicker'
 import type { NoticeCardStyle } from '@/services/announcementService'
 
+const MAX_ANNOUNCEMENT_LENGTH = 5000
+
 interface AnnouncementManagerProps {
   announcementContent: string
   setAnnouncementContent: (content: string) => void
@@ -140,9 +142,9 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
               placeholder={t('admin.announcement.contentPlaceholder')}
               className="w-full px-4 py-3 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-800 dark:text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
               rows={4}
-              maxLength={500}
+              maxLength={MAX_ANNOUNCEMENT_LENGTH}
             />
-            <p className="text-xs text-slate-500 dark:text-gray-500 mt-2">{announcementContent.length} / 500 {t('admin.announcement.characters')}</p>
+            <p className="text-xs text-slate-500 dark:text-gray-500 mt-2">{announcementContent.length} / {MAX_ANNOUNCEMENT_LENGTH} {t('admin.announcement.characters')}</p>
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-2">{t('admin.announcement.imageTitle', '公告图片')} <span className="text-slate-400 font-normal">({t('common.optional', '可选')})</span></label>
@@ -430,4 +432,3 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
 }
 
 export default AnnouncementManager
-

@@ -20,6 +20,9 @@
 .notice-card-body-text {
   font-size: 14.5px;
   line-height: 1.85;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* ---------- 玻璃拟态 (Glass) ---------- */

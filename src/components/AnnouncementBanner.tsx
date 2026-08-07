@@ -181,7 +181,7 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, o
           aria-labelledby="announcement-modal-title"
         >
           <div
-            className="w-full max-w-4xl relative"
+            className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto relative"
             onClick={(e) => e.stopPropagation()}
           >
             <AnnouncementNoticeCard

@@ -39,7 +39,7 @@ const AnnouncementSchema: Schema = new Schema(
     content: {
       type: String,
       required: true,
-      maxlength: 500
+      maxlength: 5000
     },
     imageUrl: {
       type: String,
