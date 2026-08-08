@@ -406,6 +406,9 @@ import membersRouter from './routes/members';
 // Authentication routes (email verification + password login)
 app.use('/api/auth', authRouter);
 app.use('/api/member-auth', memberAuthRouter);
+app.get('/api/csrf-token', (_req, res) => {
+  res.json({ success: true });
+});
 // 前端展示数据（只读）
 app.use('/api/documents', authenticateContentAccess, documentsRouter);
 app.use('/api/images', imagesRouter);

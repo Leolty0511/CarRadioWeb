@@ -66,6 +66,23 @@ export const requirePermission = (...permissions: string[]) => {
   }
 }
 
+/** Require at least one permission for shared admin resources. */
+export const requireAnyPermission = (...permissions: string[]) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      res.status(401).json({ success: false, error: 'not_authenticated' })
+      return
+    }
+
+    if (!permissions.some((permission) => req.user!.hasPermission(permission))) {
+      res.status(403).json({ success: false, error: 'insufficient_permissions' })
+      return
+    }
+
+    next()
+  }
+}
+
 /** Require super_admin role */
 export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user) {

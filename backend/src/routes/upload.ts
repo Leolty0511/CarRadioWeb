@@ -3,7 +3,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { uploadImageToOSS, deleteImageFromOSS, getImageInfo } from '../services/uploadService';
 import { createLogger } from '../utils/logger';
-import { requirePermission } from '../middleware/auth';
+import { requireAnyPermission, requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
 
 const logger = createLogger('upload-route');
@@ -96,7 +96,11 @@ const upload = multer({
  * 上传图片
  * POST /api/upload/image
  */
-router.post('/image', requirePermission(PERMISSIONS.settings.update), upload.single('image'), async (req, res): Promise<void> => {
+router.post('/image', requireAnyPermission(
+  PERMISSIONS.settings.update,
+  PERMISSIONS.documents.create,
+  PERMISSIONS.documents.update,
+), upload.single('image'), async (req, res): Promise<void> => {
   try {
     if (!req.file) {
       res.status(400).json({
@@ -176,7 +180,11 @@ router.post('/image', requirePermission(PERMISSIONS.settings.update), upload.sin
  * 批量上传图片
  * POST /api/upload/images
  */
-router.post('/images', requirePermission(PERMISSIONS.settings.update), upload.array('images', 10), async (req, res): Promise<void> => {
+router.post('/images', requireAnyPermission(
+  PERMISSIONS.settings.update,
+  PERMISSIONS.documents.create,
+  PERMISSIONS.documents.update,
+), upload.array('images', 10), async (req, res): Promise<void> => {
   try {
     if (!req.files || req.files.length === 0) {
       res.status(400).json({

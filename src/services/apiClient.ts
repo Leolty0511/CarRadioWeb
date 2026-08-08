@@ -81,6 +81,22 @@ class ApiClient {
     return match ? decodeURIComponent(match[1]) : null;
   }
 
+  /** Ensure the browser has a CSRF cookie before a write request. */
+  private async ensureCsrfToken(): Promise<string | null> {
+    const existing = this.getCsrfToken()
+    if (existing) {return existing}
+
+    try {
+      await fetch(`${this.resolveBaseURL()}/csrf-token`, {
+        method: 'GET',
+        credentials: 'include',
+      })
+    } catch {
+      // The original request will surface the actionable network error.
+    }
+    return this.getCsrfToken()
+  }
+
   /**
    * 通用请求方法
    */
@@ -105,7 +121,7 @@ class ApiClient {
     if (!(fetchConfig.body instanceof FormData)) {
       headers['Content-Type'] = 'application/json'
     }
-    const csrfToken = this.getCsrfToken()
+    const csrfToken = await this.ensureCsrfToken()
     if (csrfToken) {
       headers['X-CSRF-Token'] = csrfToken
     }
@@ -158,7 +174,12 @@ class ApiClient {
           const errorData = await response.json().catch(() => ({}));
 
           // 403 权限不足 — 发出全局事件，前端统一提示
-          if (response.status === 403) {
+          const permissionErrors = new Set([
+            'insufficient_permissions',
+            'super_admin_required',
+            'cannot_modify_super_admin',
+          ])
+          if (response.status === 403 && permissionErrors.has(errorData.error)) {
             window.dispatchEvent(new CustomEvent('permission-denied', {
               detail: { message: errorData.error || 'insufficient_permissions' }
             }))
@@ -286,6 +307,7 @@ class ApiClient {
    * 文件上传（支持进度回调）
    */
   async upload<T = any>(endpoint: string, formData: FormData, config?: RequestConfig): Promise<ApiResponse<T>> {
+    await this.ensureCsrfToken()
     const { onUploadProgress, headers, timeout = 3600000, retries = this.defaultRetries, ...restConfig } = config || {}; // 1小时超时
 
     // 如果有进度回调，使用 XMLHttpRequest

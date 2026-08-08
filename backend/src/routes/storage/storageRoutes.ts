@@ -8,7 +8,7 @@ import { Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { storageFactory } from '../../services/storage/StorageFactory';
 import configService from '../../services/config/ConfigService';
-import { authenticateUser as auth, requirePermission } from '../../middleware/auth';
+import { authenticateUser as auth, requireAnyPermission, requirePermission } from '../../middleware/auth';
 import { PERMISSIONS } from '../../config/permissions';
 import { IUser } from '../../models/User';
 
@@ -52,7 +52,11 @@ const upload = multer({
  * POST /api/v1/storage/upload
  * 上传单个文件
  */
-router.post('/upload', auth, requirePermission(PERMISSIONS.settings.update), upload.single('file'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/upload', auth, requireAnyPermission(
+  PERMISSIONS.settings.update,
+  PERMISSIONS.documents.create,
+  PERMISSIONS.documents.update,
+), upload.single('file'), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -108,7 +112,11 @@ router.post('/upload', auth, requirePermission(PERMISSIONS.settings.update), upl
  * POST /api/v1/storage/upload/multiple
  * 上传多个文件
  */
-router.post('/upload/multiple', auth, requirePermission(PERMISSIONS.settings.update), upload.array('files', 10), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/upload/multiple', auth, requireAnyPermission(
+  PERMISSIONS.settings.update,
+  PERMISSIONS.documents.create,
+  PERMISSIONS.documents.update,
+), upload.array('files', 10), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const files = req.files as Express.Multer.File[];
     

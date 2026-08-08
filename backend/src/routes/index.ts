@@ -54,6 +54,12 @@ import { authenticateContentAccess } from '../middleware/contentAccess';
 
 const router = Router();
 
+// Establish the CSRF cookie for long-lived admin pages before their first
+// state-changing request.
+router.get('/csrf-token', (_req, res) => {
+  res.json({ success: true })
+})
+
 // ==================== 公开路由 (无需认证) ====================
 
 // OAuth 认证

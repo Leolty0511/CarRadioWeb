@@ -55,8 +55,11 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
 
   // Safe method → always issue a new token
   if (SAFE_METHODS.has(req.method)) {
-    const token = generateCsrfToken()
-    setCsrfCookie(res, token)
+    // Keep the token stable while an admin page is open. Rotating it on every
+    // GET can race with uploads and cause false missing/invalid token errors.
+    if (!getCsrfTokenFromCookie(req)) {
+      setCsrfCookie(res, generateCsrfToken())
+    }
     return next()
   }
 
