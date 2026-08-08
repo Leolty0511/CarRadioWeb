@@ -41,7 +41,23 @@ let logs: string[] = []
 let merged = false
 let artifactBackupDir: string | null = null
 let artifactApplied = false
-const artifactPaths = ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json', 'package.json', 'package-lock.json']
+const artifactPaths = [
+  'dist',
+  path.join('backend', 'dist'),
+  path.join('backend', 'node_modules'),
+  path.join('backend', 'package.json'),
+  path.join('backend', 'package-lock.json'),
+  'release.json',
+  'package.json',
+  'package-lock.json',
+  'ecosystem.config.cjs',
+  'docker-compose.flarum.yml',
+  path.join('scripts', 'deploy-flarum.sh'),
+  path.join('scripts', 'deploy-flarum.ps1'),
+  path.join('scripts', 'cancel-deploy.sh'),
+  path.join('scripts', 'cancel-deploy.ps1'),
+  path.join('scripts', 'ensure-docker.sh'),
+]
 
 function getCommandEnvironment(command: string): NodeJS.ProcessEnv {
   const token = payload.githubToken?.trim()
