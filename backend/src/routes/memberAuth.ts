@@ -5,15 +5,16 @@ import Member from '../models/Member'
 import User from '../models/User'
 import MemberInvitation from '../models/MemberInvitation'
 import { getMemberSettings } from '../models/MemberSettings'
-import { signTokenPair, verifyRefreshToken } from '../utils/jwt'
+import { signTokenPair, verifyAccessToken, verifyRefreshToken } from '../utils/jwt'
 import { setTokenCookie, setRefreshTokenCookie, clearTokenCookie, clearRefreshTokenCookie } from '../utils/tokenCookie'
-import { clearMemberTokenCookies, getMemberRefreshToken, setMemberTokenCookies } from '../utils/memberTokenCookie'
+import { clearMemberTokenCookies, getMemberRefreshToken, getMemberToken, setMemberTokenCookies } from '../utils/memberTokenCookie'
 import emailVerificationService from '../services/emailVerificationService'
 import { getClientIP, getGeoLocationByIP } from '../services/geoLocationService'
 import { authLimiter, codeLimiter } from '../middleware/rateLimit'
 import { notificationService } from '../services/notificationService'
-import { optionalContentAccess } from '../middleware/contentAccess'
+import { getMemberPresence, optionalContentAccess, touchMemberPresence } from '../middleware/contentAccess'
 import { escapeMongoRegex } from '../utils/mongoRegex'
+import { formatMemberDevice, parseMemberDevice } from '../utils/memberDevice'
 
 const router = Router()
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -88,6 +89,7 @@ router.post('/register', authLimiter, async (req, res) => {
   const ip = getClientIP(req)
   const geo = await getGeoLocationByIP(ip)
   const status = settings.approvalRequired ? 'pending' : 'active'
+  const presence = status === 'active' ? getMemberPresence(req) : {}
   const member = await Member.create({
     email,
     nickname,
@@ -99,9 +101,25 @@ router.post('/register', authLimiter, async (req, res) => {
     registrationCity: geo?.city || '未知',
     invitationPrefix,
     approvedAt: status === 'active' ? new Date() : null,
+    ...(status === 'active' ? { lastLoginAt: new Date(), lastLoginIp: ip, ...presence } : {}),
   })
   if (invitationId) await MemberInvitation.updateOne({ _id: invitationId }, { $inc: { usedCount: 1 } })
   await emailVerificationService.clearVerification(email, 'register')
+
+  if (status === 'active') {
+    const device = parseMemberDevice(String(req.headers['user-agent'] || ''))
+    notificationService.notifyAll({
+      title: '新会员注册',
+      content: [
+        `会员：${nickname}`,
+        `邮箱：${email}`,
+        '状态：已激活',
+        `地区：${[geo?.country, geo?.region, geo?.city].filter(Boolean).join(' / ') || '未知'}`,
+        `IP：${ip}`,
+        `设备：${formatMemberDevice(device)}`,
+      ].join('\n'),
+    }).catch(() => undefined)
+  }
 
   if (status === 'pending') {
     notificationService.notifyAll({
@@ -148,6 +166,7 @@ router.post('/login', authLimiter, async (req, res) => {
   const geo = await getGeoLocationByIP(ip)
   member.lastLoginAt = new Date()
   member.lastLoginIp = ip
+  Object.assign(member, getMemberPresence(req))
   member.loginHistory.push({
     ip,
     country: geo?.country || '未知',
@@ -169,6 +188,7 @@ router.post('/refresh', async (req, res) => {
   if (!payload) return res.status(401).json({ success: false, error: 'invalid_refresh_token' })
   const member = await Member.findOne({ _id: payload.userId, status: 'active' })
   if (!member) return res.status(401).json({ success: false, error: 'member_inactive' })
+  touchMemberPresence(member, req)
   const tokens = signTokenPair({ userId: String(member._id), email: member.email, role: 'member' })
   setMemberTokenCookies(res, tokens.accessToken, tokens.refreshToken)
   res.json({ success: true })
@@ -191,7 +211,12 @@ router.post('/reset-password', authLimiter, async (req, res) => {
   res.json({ success: true })
 })
 
-router.post('/logout', (_req, res) => {
+router.post('/logout', async (req, res) => {
+  const accessToken = getMemberToken(req)
+  const payload = accessToken ? verifyAccessToken(accessToken) : null
+  if (payload?.userId && payload.role === 'member') {
+    await Member.updateOne({ _id: payload.userId }, { $set: { lastSeenAt: null } }).catch(() => undefined)
+  }
   clearMemberTokenCookies(res)
   clearTokenCookie(res)
   clearRefreshTokenCookie(res)

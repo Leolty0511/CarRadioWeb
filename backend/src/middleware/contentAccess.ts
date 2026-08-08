@@ -4,6 +4,8 @@ import Member, { IMember } from '../models/Member'
 import { verifyAccessToken } from '../utils/jwt'
 import { extractToken } from '../utils/tokenCookie'
 import { getMemberToken } from '../utils/memberTokenCookie'
+import { getClientIP } from '../services/geoLocationService'
+import { parseMemberDevice } from '../utils/memberDevice'
 
 declare global {
   namespace Express {
@@ -27,7 +29,30 @@ async function resolveMember(req: Request): Promise<IMember | null> {
   if (!token) return null
   const payload = verifyAccessToken(token)
   if (!payload || payload.role !== 'member') return null
-  return Member.findOne({ _id: payload.userId, status: 'active' })
+  const member = await Member.findOne({ _id: payload.userId, status: 'active' })
+  if (member) touchMemberPresence(member, req)
+  return member
+}
+
+export function getMemberPresence(req: Request) {
+  const userAgent = String(req.headers['user-agent'] || '').slice(0, 1000)
+  const device = parseMemberDevice(userAgent)
+  return {
+    lastSeenAt: new Date(),
+    lastSeenIp: getClientIP(req),
+    lastSeenUserAgent: userAgent,
+    lastSeenDeviceType: device.type,
+    lastSeenOs: device.os,
+    lastSeenBrowser: device.browser,
+    lastSeenBrowserVersion: device.browserVersion,
+  }
+}
+
+/** Throttle presence writes so normal browsing does not create a database write per request. */
+export function touchMemberPresence(member: IMember, req: Request): void {
+  const lastSeen = member.lastSeenAt ? new Date(member.lastSeenAt).getTime() : 0
+  if (lastSeen && Date.now() - lastSeen < 60_000) return
+  void Member.updateOne({ _id: member._id }, { $set: getMemberPresence(req) }).catch(() => undefined)
 }
 
 export async function optionalContentAccess(req: Request, _res: Response, next: NextFunction): Promise<void> {

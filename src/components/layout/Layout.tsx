@@ -14,6 +14,7 @@ import { getNavigationConfig, filterNavigationByRoles } from '@/config/navigatio
 import { getAnnouncement, isAnnouncementClosed, Announcement } from '@/services/announcementService'
 import { trackPageVisit } from '@/services/visitorService'
 import { CookieConsentBanner } from '@/components/compliance/CookieConsentBanner'
+import OnlineMembersBubble from '@/components/knowledge/OnlineMembersBubble'
 
 // 需要隐藏 Footer 的路由模式
 const HIDE_FOOTER_PATTERNS = [
@@ -66,6 +67,8 @@ const Layout: React.FC = () => {
   const shouldTransparentMain = useMemo(() => {
     return TRANSPARENT_MAIN_PATTERNS.some(pattern => pattern.test(location.pathname))
   }, [location.pathname])
+
+  const isKnowledgePage = /^\/?(en|ru|zh)?\/?knowledge(?:\/|$)/.test(location.pathname)
 
   // 路由切换时立即重置滚动位置（禁用平滑滚动）
   useEffect(() => {
@@ -173,9 +176,9 @@ const Layout: React.FC = () => {
         {/* 页脚 - 部分页面隐藏 */}
         {!shouldHideFooter && <Footer />}
       </main>
+      {isKnowledgePage && <OnlineMembersBubble />}
     </div>
   )
 }
 
 export default Layout
-

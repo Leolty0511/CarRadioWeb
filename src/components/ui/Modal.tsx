@@ -38,6 +38,13 @@ const Modal: React.FC<ModalProps> = ({
   // 每个 Modal 实例拥有稳定的 aria 关联 id
   const titleIdRef = useRef<string>(`modal-title-${++modalTitleCounter}`)
   const dialogRef = useRef<HTMLDivElement>(null)
+  const onCloseRef = useRef(onClose)
+
+  // Keep the latest callback without making the keyboard/focus effect restart
+  // every time a parent renders a new inline onClose handler.
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
 
   // ESC键关闭 + 打开时聚焦对话框，让屏幕阅读器/键盘用户进入对话框
   useEffect(() => {
@@ -45,7 +52,7 @@ const Modal: React.FC<ModalProps> = ({
 
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        onCloseRef.current()
       }
     }
 
@@ -66,7 +73,7 @@ const Modal: React.FC<ModalProps> = ({
       document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = 'unset'
     }
-  }, [isOpen, closeOnEscape, onClose])
+  }, [isOpen, closeOnEscape])
 
   if (!isOpen) {return null}
 

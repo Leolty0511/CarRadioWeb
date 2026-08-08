@@ -155,9 +155,9 @@ export const DesktopNav: React.FC<DesktopNavProps> = ({ items }) => {
                     <div className="absolute top-0 left-4 right-4 h-px bg-gradient-to-r from-transparent via-blue-500/50 to-transparent" />
 
                     {/* 多列布局 */}
-                    <div className="flex flex-wrap p-4 gap-6">
+                    <div className="flex flex-nowrap p-4 gap-4">
                       {groups.map((group) => (
-                        <div key={group.id} className="min-w-[180px] flex-1">
+                        <div key={group.id} className="min-w-0 flex-1">
                           {/* 分组标题 */}
                           {group.titleKey && (
                             <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-gray-500 border-b border-slate-200 dark:border-slate-700/50 mb-2">

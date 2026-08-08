@@ -1,4 +1,5 @@
 import mongoose, { Document, Schema } from 'mongoose'
+import type { MemberDeviceType } from '../utils/memberDevice'
 
 export type MemberStatus = 'pending' | 'active' | 'rejected' | 'suspended'
 
@@ -24,6 +25,13 @@ export interface IMember extends Document {
   registrationCity: string
   lastLoginAt: Date | null
   lastLoginIp: string
+  lastSeenAt: Date | null
+  lastSeenIp: string
+  lastSeenUserAgent: string
+  lastSeenDeviceType: MemberDeviceType
+  lastSeenOs: string
+  lastSeenBrowser: string
+  lastSeenBrowserVersion: string
   loginHistory: IMemberLoginRecord[]
   invitationPrefix: string
   approvedAt: Date | null
@@ -54,6 +62,13 @@ const MemberSchema = new Schema<IMember>({
   registrationCity: { type: String, default: '未知' },
   lastLoginAt: { type: Date, default: null },
   lastLoginIp: { type: String, default: '' },
+  lastSeenAt: { type: Date, default: null, index: true },
+  lastSeenIp: { type: String, default: '' },
+  lastSeenUserAgent: { type: String, default: '', maxlength: 1000 },
+  lastSeenDeviceType: { type: String, enum: ['desktop', 'mobile', 'tablet', 'unknown'], default: 'unknown' },
+  lastSeenOs: { type: String, default: '' },
+  lastSeenBrowser: { type: String, default: '' },
+  lastSeenBrowserVersion: { type: String, default: '' },
   loginHistory: { type: [LoginRecordSchema], default: [] },
   invitationPrefix: { type: String, default: '' },
   approvedAt: { type: Date, default: null },
@@ -62,5 +77,6 @@ const MemberSchema = new Schema<IMember>({
 
 MemberSchema.index({ status: 1, createdAt: -1 })
 MemberSchema.index({ lastLoginAt: -1 })
+MemberSchema.index({ status: 1, lastSeenAt: -1 })
 
 export default mongoose.model<IMember>('Member', MemberSchema)

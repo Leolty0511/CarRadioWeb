@@ -135,7 +135,7 @@ export function getNavigationConfig(
       icon: BookOpen,
       translationKey: 'navigation.userManual',
       descriptionKey: 'navigation.userManualDesc',
-      group: 'docs',
+      group: 'manual',
     },
     // 工具组
     {
@@ -144,8 +144,7 @@ export function getNavigationConfig(
       icon: Download,
       translationKey: 'navigation.downloads',
       descriptionKey: 'navigation.downloadsDesc',
-      group: 'tools',
-      groupTitleKey: 'navigation.megaMenu.tools',
+      group: 'downloads',
     },
     {
       name: 'audioEqualizer',
@@ -153,7 +152,7 @@ export function getNavigationConfig(
       icon: Music,
       translationKey: 'navigation.audioTuner',
       descriptionKey: 'navigation.audioTunerDesc',
-      group: 'tools',
+      group: 'audio',
     },
   ]
 

@@ -6,6 +6,17 @@ import MemberInvitation from '../models/MemberInvitation'
 import { requireSuperAdmin } from '../middleware/auth'
 
 const router = Router()
+
+router.get('/online', async (_req, res) => {
+  const since = new Date(Date.now() - 5 * 60 * 1000)
+  const items = await Member.find({ status: 'active', lastSeenAt: { $gte: since } })
+    .select('nickname email avatar lastSeenAt lastSeenIp lastSeenDeviceType lastSeenOs lastSeenBrowser lastSeenBrowserVersion registrationCountry registrationRegion registrationCity')
+    .sort({ lastSeenAt: -1 })
+    .limit(200)
+    .lean()
+  res.json({ success: true, data: { count: items.length, since, items } })
+})
+
 router.use(requireSuperAdmin)
 
 router.get('/', async (req, res) => {
@@ -20,11 +31,28 @@ router.get('/', async (req, res) => {
     { nickname: { $regex: search, $options: 'i' } },
     { registrationIp: { $regex: search, $options: 'i' } },
   ]
-  const [items, total] = await Promise.all([
+  const onlineSince = new Date(Date.now() - 5 * 60 * 1000)
+  const [items, total, allMembers, active, pending, online] = await Promise.all([
     Member.find(filter).select('-passwordHash').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Member.countDocuments(filter),
+    Member.countDocuments(),
+    Member.countDocuments({ ...filter, status: 'active' }),
+    Member.countDocuments({ ...filter, status: 'pending' }),
+    Member.countDocuments({ ...filter, status: 'active', lastSeenAt: { $gte: onlineSince } }),
   ])
-  res.json({ success: true, data: { items, page, limit, total, totalPages: Math.ceil(total / limit) } })
+  const normalizedItems = items.map((item) => {
+    const lastActivityAt = item.lastSeenAt || item.lastLoginAt || null
+    const isOnline = item.status === 'active' && !!lastActivityAt && new Date(lastActivityAt).getTime() >= onlineSince.getTime()
+    return { ...item, lastActivityAt, isOnline }
+  })
+  res.json({ success: true, data: {
+    items: normalizedItems,
+    page,
+    limit,
+    total,
+    totalPages: Math.ceil(total / limit),
+    stats: { total: allMembers, active, pending, online },
+  } })
 })
 
 router.put('/:id/status', async (req, res) => {

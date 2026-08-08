@@ -28,6 +28,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   useEffect(() => { refresh() }, [refresh])
 
+  // Keep member presence current while the browser remains open.
+  useEffect(() => {
+    if (user?.type !== 'member') {return}
+    const timer = window.setInterval(() => {
+      void getContentSession().then((next) => {
+        if (next) {setUser(next)}
+      })
+    }, 60_000)
+    return () => window.clearInterval(timer)
+  }, [user?.type])
+
   const logout = useCallback(async () => {
     await logoutContentSession()
     setUser(null)
