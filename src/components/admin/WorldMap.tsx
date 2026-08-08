@@ -316,7 +316,8 @@ export const WorldMap: React.FC<WorldMapProps> = ({
             const alpha2 = NUMERIC_TO_ALPHA2[numericId]
             const countryData = alpha2 ? dataMap.get(alpha2) : undefined
             if (countryData && countryData.uv > 0) {
-              return colorScale(countryData.uv)
+              // Keep low-volume countries visible instead of blending into the map background.
+              return colorScale(Math.max(countryData.uv, maxUV * 0.12))
             }
             return 'var(--map-default)'
           })
