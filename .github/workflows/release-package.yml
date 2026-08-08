@@ -73,10 +73,27 @@ jobs:
             This release is consumed by the admin one-click updater.
           files: caradioweb-deploy.tar.gz
 
+      - name: Prepare tagged release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs')
+          const version = require('./package.json').version
+          const changelog = fs.readFileSync('CHANGELOG.md', 'utf8')
+          const heading = `## [${version}]`
+          const start = changelog.indexOf(heading)
+          if (start < 0) throw new Error(`Missing ${heading} in CHANGELOG.md`)
+          const remaining = changelog.slice(start + heading.length)
+          const nextHeading = remaining.search(/^## \[/m)
+          const notes = (nextHeading < 0 ? changelog.slice(start) : changelog.slice(start, start + heading.length + nextHeading)).trim()
+          fs.writeFileSync('release-notes.md', `${notes}\n`)
+          NODE
+
       - name: Publish tagged release package
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          generate_release_notes: true
+          body_path: release-notes.md
           files: caradioweb-deploy.tar.gz
