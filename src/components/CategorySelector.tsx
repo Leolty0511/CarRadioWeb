@@ -40,20 +40,36 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
 
   // 加载分类列表
   useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
     const loadCategories = async () => {
       try {
         const data = await getActiveCategories();
+        if (cancelled) {return;}
         const filtered = documentType
-          ? data.filter(cat => cat.documentTypes.includes(documentType))
+          ? data.filter(category =>
+            !Array.isArray(category.documentTypes) ||
+            category.documentTypes.length === 0 ||
+            category.documentTypes.includes(documentType)
+          )
           : data;
-        setCategories(filtered);
-        setFilteredCategories(filtered);
+        const selected = selectedCategory
+          ? data.find(category => category.name === selectedCategory)
+          : undefined;
+        const available = selected && !filtered.some(category => category._id === selected._id)
+          ? [...filtered, selected]
+          : filtered;
+        setCategories(available);
+        setFilteredCategories(available);
       } catch (error) {
         console.error('加载分类失败:', error);
+      } finally {
+        if (!cancelled) {setLoading(false);}
       }
     };
 
     loadCategories();
+    return () => {cancelled = true;};
   }, [documentType]);
 
   // 搜索过滤
@@ -157,7 +173,11 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
 
             {/* 分类列表 */}
             <div className="max-h-48 overflow-y-auto">
-              {filteredCategories.length > 0 ? (
+              {loading ? (
+                <div className="px-3 py-4 text-center text-gray-500">
+                  {t('common.loading')}
+                </div>
+              ) : filteredCategories.length > 0 ? (
                 filteredCategories.map((category) => (
                   <button
                     key={category._id}

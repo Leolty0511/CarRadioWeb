@@ -1,5 +1,13 @@
 # 更新日志
 
+## [1.2.4] - 2026-08-08
+
+### Fixed
+
+- Fixed the image-and-text tutorial category selector so existing categories are loaded and searchable.
+- Kept legacy categories visible when older records do not contain document type metadata.
+- Added a loading state while categories are being fetched.
+
 ## [1.2.3] - 2026-08-08
 
 ### Added
