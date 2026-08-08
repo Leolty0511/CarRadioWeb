@@ -41,6 +41,7 @@ let logs: string[] = []
 let merged = false
 let artifactBackupDir: string | null = null
 let artifactApplied = false
+const artifactPaths = ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json', 'package.json', 'package-lock.json']
 
 function getCommandEnvironment(command: string): NodeJS.ProcessEnv {
   const token = payload.githubToken?.trim()
@@ -205,7 +206,7 @@ async function applyArtifact(): Promise<void> {
   }
 
   artifactApplied = true
-  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
+  for (const relative of artifactPaths) {
     try { await fs.access(path.join(stagingDir, relative)) } catch { throw new Error(`deployment package is incomplete: ${relative}`) }
   }
 
@@ -227,7 +228,7 @@ async function applyArtifact(): Promise<void> {
     await writeStatus({ stage: 'updating_artifacts', message: 'Applying the prebuilt deployment package' })
   }
 
-  for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
+  for (const relative of artifactPaths) {
     await moveIntoBackup(relative)
     const staged = path.join(stagingDir, relative)
     const current = path.join(payload.repoRoot, relative)
@@ -244,7 +245,7 @@ async function applyArtifact(): Promise<void> {
 async function rollbackArtifact(reason: string): Promise<boolean> {
   if (!artifactBackupDir || !artifactApplied) return false
   try {
-    for (const relative of ['dist', path.join('backend', 'dist'), path.join('backend', 'node_modules'), 'release.json']) {
+    for (const relative of artifactPaths) {
       const backup = path.join(artifactBackupDir, relative)
       const current = path.join(payload.repoRoot, relative)
       try { await fs.access(backup) } catch { continue }
