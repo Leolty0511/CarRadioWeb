@@ -156,7 +156,7 @@ export class DocumentService {
       const updatedDocument = await GeneralDocument.findByIdAndUpdate(
         id,
         { ...updates, updatedAt: new Date() },
-        { new: true }
+        { new: true, runValidators: true }
       );
 
       // 如果分类或状态发生变化，更新相关分类的文档统计
@@ -213,7 +213,7 @@ export class DocumentService {
       const updatedDocument = await VideoTutorial.findByIdAndUpdate(
         id,
         { ...updates, updatedAt: new Date() },
-        { new: true }
+        { new: true, runValidators: true }
       );
 
       // 如果分类或状态发生变化，更新相关分类的文档统计
@@ -263,7 +263,7 @@ export class DocumentService {
       const updatedDocument = await StructuredArticle.findByIdAndUpdate(
         id,
         { ...updates, updatedAt: new Date() },
-        { new: true }
+        { new: true, runValidators: true }
       );
 
       // 注意：StructuredArticle 不使用分类系统，所以不需要更新分类统计

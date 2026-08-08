@@ -199,7 +199,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
       }
 
       if (editingEnhancedDocument) {
-        await updateDocument(editingEnhancedDocument._id, documentData)
+        await updateDocument(editingEnhancedDocument._id, documentData, 'general')
         showToast({ type: 'success', title: '更新成功' })
       } else {
         await createDocument(documentData)
@@ -250,7 +250,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
       }
 
       if (editingStructuredArticle?._id) {
-        await updateDocument(editingStructuredArticle._id, documentData)
+        await updateDocument(editingStructuredArticle._id, documentData, 'structured')
         showToast({ type: 'success', title: '更新成功' })
       } else {
         await createDocument(documentData)

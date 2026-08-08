@@ -82,7 +82,11 @@ class ApiClient {
   }
 
   /** Ensure the browser has a CSRF cookie before a write request. */
-  private async ensureCsrfToken(): Promise<string | null> {
+  private async ensureCsrfToken(forceRefresh = false): Promise<string | null> {
+    if (forceRefresh && typeof document !== 'undefined') {
+      document.cookie = 'csrf_token=; Max-Age=0; Path=/; SameSite=Lax'
+    }
+
     const existing = this.getCsrfToken()
     if (existing) {return existing}
 
@@ -90,6 +94,7 @@ class ApiClient {
       await fetch(`${this.resolveBaseURL()}/csrf-token`, {
         method: 'GET',
         credentials: 'include',
+        cache: 'no-store',
       })
     } catch {
       // The original request will surface the actionable network error.
@@ -127,12 +132,12 @@ class ApiClient {
     }
 
     const defaultConfig: RequestInit = {
+      ...fetchConfig,
       credentials: 'include',
       headers: {
         ...headers,
         ...fetchConfig.headers,
       },
-      ...fetchConfig,
     };
 
     let lastError: Error | undefined;
@@ -177,11 +182,14 @@ class ApiClient {
               (errorData.error === 'csrf_token_missing' || errorData.error === 'csrf_token_invalid') &&
               !csrfRetryAttempted) {
             csrfRetryAttempted = true;
-            const refreshedCsrf = await this.ensureCsrfToken();
+            const refreshedCsrf = await this.ensureCsrfToken(true);
             if (refreshedCsrf) {
               const retryHeaders = new Headers(defaultConfig.headers);
               retryHeaders.set('X-CSRF-Token', refreshedCsrf);
               defaultConfig.headers = retryHeaders;
+              // A CSRF recovery replay is independent of the configured
+              // network retry count (uploads intentionally use retries: 0).
+              attempt -= 1;
               continue;
             }
           }
@@ -199,9 +207,18 @@ class ApiClient {
           }
 
           // 如果有详细错误信息，将其包含在错误消息中
-          let errorMessage = errorData.error || errorData.message || `HTTP error! status: ${response.status}`;
-          if (errorData.details && Array.isArray(errorData.details) && errorData.details.length > 0) {
-            errorMessage += '\n' + errorData.details.join(', ');
+          const structuredError = errorData.error && typeof errorData.error === 'object'
+            ? errorData.error
+            : null;
+          let errorMessage = (typeof errorData.error === 'string' ? errorData.error : undefined)
+            || errorData.message
+            || structuredError?.message
+            || `HTTP error! status: ${response.status}`;
+          const details = errorData.details || structuredError?.details;
+          if (Array.isArray(details) && details.length > 0) {
+            errorMessage += '\n' + details
+              .map((detail: any) => typeof detail === 'string' ? detail : `${detail.field || 'field'}: ${detail.message || 'invalid'}`)
+              .join(', ');
           }
           throw new Error(errorMessage);
         }

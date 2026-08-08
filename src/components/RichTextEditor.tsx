@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/Button'
 import { useState, useCallback } from 'react'
 import { compressImage } from '@/utils/imageCompression'
 import { useToast } from '@/components/ui/Toast'
+import { apiClient } from '@/services/apiClient'
 
 interface RichTextEditorProps {
   value: string
@@ -156,15 +157,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     if (folder) {formData.append('folder', folder)}
     if (customName) {formData.append('fileName', customName)}
 
-    const res = await fetch('/api/upload/image', {
-      method: 'POST',
-      body: formData
-    })
-    const json = await res.json()
-    if (!res.ok || !json?.success || !json?.url) {
-      throw new Error(json?.error || t('errors.uploadFailed'))
+    const result = await apiClient.upload<{ url: string }>('/upload/image', formData, { retries: 0 })
+    const url = result.url || result.data?.url
+    if (!result.success || !url) {
+      throw new Error(result.error || t('errors.uploadFailed'))
     }
-    return json.url as string
+    return url
   }
 
   // 处理文件 → 压缩 → 上传 → 插入（顺序处理保证多图顺序）

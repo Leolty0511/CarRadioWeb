@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/Button'
 import { compressImage } from '@/utils/imageCompression'
 import { useToast } from '@/components/ui/Toast'
+import { apiClient } from '@/services/apiClient'
 
 interface GeneralDocumentRichTextEditorProps {
   value: string
@@ -135,15 +136,12 @@ const GeneralDocumentRichTextEditor: React.FC<GeneralDocumentRichTextEditorProps
     formData.append('image', file)
     if (folder) {formData.append('folder', folder)}
 
-    const res = await fetch('/api/upload/image', {
-      method: 'POST',
-      body: formData
-    })
-    const json = await res.json()
-    if (!res.ok || !json?.success || !json?.url) {
-      throw new Error(json?.error || 'Upload failed')
+    const result = await apiClient.upload<{ url: string }>('/upload/image', formData, { retries: 0 })
+    const url = result.url || result.data?.url
+    if (!result.success || !url) {
+      throw new Error(result.error || 'Upload failed')
     }
-    return json.url as string
+    return url
   }
 
   // 处理文件 → 高质量压缩 → 上传 → 插入

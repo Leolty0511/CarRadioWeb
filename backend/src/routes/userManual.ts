@@ -7,7 +7,7 @@ import fs from 'fs';
 import fsp from 'fs/promises';
 import path from 'path';
 import multer from 'multer';
-import { authenticateUser, requirePermission } from '../middleware/auth';
+import { authenticateUser, requireAnyPermission, requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
 import logger from '../utils/logger';
 
@@ -182,7 +182,10 @@ router.get('/download/:filename', async (req: Request, res: Response) => {
  * POST /api/user-manual/upload
  * 上传用户手册 PDF（需要管理员权限）
  */
-router.post('/upload', authenticateUser, requirePermission(PERMISSIONS.resources.update), upload.single('file'), async (req: Request, res: Response) => {
+router.post('/upload', authenticateUser, requireAnyPermission(
+  PERMISSIONS.resources.create,
+  PERMISSIONS.resources.update,
+), upload.single('file'), async (req: Request, res: Response) => {
   try {
     if (!req.file) {
       return res.status(400).json({

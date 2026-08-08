@@ -17,6 +17,7 @@ import { useToast } from '@/components/ui/Toast'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import { imageService, HomepageImage } from '@/services/imageService'
 import ImageUpload from '@/components/ImageUpload'
+import { apiClient } from '@/services/apiClient'
 
 /**
  * 图片管理组件
@@ -121,11 +122,7 @@ const ImageManager: React.FC = () => {
       const img = images.find(i => i.id === id)
       if (img?.url && (img.url.startsWith('http://') || img.url.startsWith('https://'))) {
         try {
-          await fetch('/api/upload/image', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageUrl: img.url })
-          })
+          await apiClient.delete('/upload/image', { imageUrl: img.url })
         } catch {
           // 忽略后端删除失败，继续删本地记录
         }

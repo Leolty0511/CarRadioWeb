@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAI } from '@/contexts/AIContext'
 import { sendAIMessage, AIMessage, aiService } from '@/services/aiService'
 import { useContentLanguage } from '@/contexts/ContentLanguageContext'
@@ -12,6 +13,7 @@ type AssistantStatus = 'online' | 'offline'
 const AIAssistant: React.FC = () => {
   const {
     state,
+    dispatch,
     openChat,
     closeChat,
     addMessage,
@@ -22,7 +24,10 @@ const AIAssistant: React.FC = () => {
 
   const { t } = useTranslation()
   const { contentLanguage } = useContentLanguage()
-  const { isAuthenticated } = useAuth()
+  const { user, isAuthenticated, loading: authLoading } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const previousPrincipalId = useRef<string | null>(null)
   const [assistantStatus, setAssistantStatus] = useState<AssistantStatus>('offline')
 
   // 组件挂载时加载AI配置
@@ -32,6 +37,11 @@ const AIAssistant: React.FC = () => {
 
   useEffect(() => {
     let cancelled = false
+
+    if (!isAuthenticated) {
+      setAssistantStatus('offline')
+      return () => { cancelled = true }
+    }
 
     aiService.getStatus()
       .then(result => {
@@ -47,7 +57,17 @@ const AIAssistant: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [isAuthenticated])
+
+  // Prevent a previous member's conversation from being visible to another account.
+  useEffect(() => {
+    const principalId = user?.id || null
+    if (!isAuthenticated || (previousPrincipalId.current && previousPrincipalId.current !== principalId)) {
+      dispatch({ type: 'CLOSE_CHAT' })
+      dispatch({ type: 'CLEAR_MESSAGES' })
+    }
+    previousPrincipalId.current = principalId
+  }, [dispatch, isAuthenticated, user?.id])
 
   const handleSendMessage = async (messageContent: string) => {
     // 检查是否是数字选择
@@ -200,6 +220,12 @@ const AIAssistant: React.FC = () => {
   }
 
   const handleToggleChat = () => {
+    if (!isAuthenticated) {
+      const returnTo = `${location.pathname}${location.search}${location.hash}`
+      navigate(`/login?returnTo=${encodeURIComponent(returnTo)}`)
+      return
+    }
+
     if (state.isOpen) {
       closeChat()
     } else {
@@ -218,13 +244,13 @@ const AIAssistant: React.FC = () => {
     clearMessages()
   }
 
-  if (!isAuthenticated) {return null}
+  if (authLoading) {return null}
 
   return (
     <>
       {/* 悬浮按钮 */}
       <AIFloatingButton
-        isOpen={state.isOpen && !state.isMinimized}
+        isOpen={isAuthenticated && state.isOpen && !state.isMinimized}
         onClick={handleToggleChat}
         hasUnread={false} // TODO: 实现未读消息逻辑
       />

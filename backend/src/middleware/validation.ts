@@ -560,15 +560,17 @@ export const validateDocument = (documentType: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
     const validator = createValidator();
     const data = req.body;
+    const isCreate = req.method === 'POST';
+    const requireGeneralFields = isCreate && documentType === 'general';
     
-    // 基础字段验证 - 只验证标题必填，其他字段允许为空（草稿状态）
+    // Fields required by every persisted document schema.
     validator
-      .validateString(data.title, 'title', { required: true, maxLength: 200 })
-      .validateString(data.content, 'content')
-      .validateString(data.summary, 'summary', { maxLength: 500 })
+      .validateString(data.title, 'title', { required: isCreate, maxLength: 200 })
+      .validateString(data.content, 'content', { required: requireGeneralFields })
+      .validateString(data.summary, 'summary', { required: requireGeneralFields, maxLength: 500 })
       .validateString(data.description, 'description', { maxLength: 1000 })
-      .validateString(data.category, 'category', { maxLength: 100 })
-      .validateString(data.author, 'author', { maxLength: 100 });
+      .validateString(data.category, 'category', { required: requireGeneralFields, maxLength: 100 })
+      .validateString(data.author, 'author', { required: requireGeneralFields, maxLength: 100 });
     
     // documentType 和 tags 不强制验证，允许为空
     if (data.documentType) {
@@ -578,9 +580,29 @@ export const validateDocument = (documentType: string) => {
     // 根据文档类型进行特定验证
     switch (documentType) {
       case 'general':
-        // 通用文档允许所有字段为空，后续编辑
-        if (data.type) {
-          validator.validateString(data.type, 'type', { maxLength: 50 });
+        validator
+          .validateEnum(data.type, 'type', ['article', 'tutorial', 'guide'], { required: isCreate })
+          .validateArray(data.sections, 'sections')
+          .validateArray(data.images, 'images');
+
+        if (Array.isArray(data.sections)) {
+          data.sections.forEach((section: any, index: number) => {
+            validator
+              .validateString(section.id, `sections[${index}].id`, { required: true })
+              .validateString(section.heading, `sections[${index}].heading`, { required: true, maxLength: 200 })
+              .validateString(section.content, `sections[${index}].content`, { required: true })
+              .validateEnum(section.layout, `sections[${index}].layout`, ['imageLeft', 'imageRight'], { required: true });
+          });
+        }
+
+        if (Array.isArray(data.images)) {
+          data.images.forEach((image: any, index: number) => {
+            validator
+              // Local storage returns paths such as /uploads/documents/a.jpg.
+              .validateString(image.url, `images[${index}].url`, { required: true, maxLength: 2048 })
+              .validateString(image.alt, `images[${index}].alt`, { maxLength: 200 })
+              .validateNumber(image.order, `images[${index}].order`, { min: 0, integer: true });
+          });
         }
         break;
         

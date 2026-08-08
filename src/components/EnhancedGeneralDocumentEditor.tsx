@@ -22,14 +22,17 @@ interface ContentSection {
 }
 
 interface EnhancedDocument {
-  id?: number
+  id?: string | number
+  _id?: string
   title: string
   author: string
   summary: string
+  content: string
   heroImageUrl: string
   heroImageAlt: string
+  images: Array<{ url: string; alt?: string; order: number }>
   sections: ContentSection[]
-  type: 'enhanced-article'
+  type: 'article' | 'tutorial' | 'guide'
   category?: string  // 分类名称
 }
 
@@ -64,10 +67,12 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
     title: document?.title || '',
     author: document?.author || 'Technical Team',
     summary: document?.summary || '',
-    heroImageUrl: document?.heroImageUrl || '',
-    heroImageAlt: document?.heroImageAlt || '',
+    content: document?.content || '',
+    heroImageUrl: document?.heroImageUrl || document?.images?.[0]?.url || '',
+    heroImageAlt: document?.heroImageAlt || document?.images?.[0]?.alt || '',
+    images: document?.images || [],
     sections: document?.sections || [],
-    type: 'enhanced-article',
+    type: document?.type || 'article',
     category: document?.category || 'general'
   })
 
@@ -165,11 +170,44 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
 
   // 保存文档
   const handleSave = () => {
-    if (!formData.title.trim()) {
+    const title = formData.title.trim()
+    const author = formData.author.trim() || 'Technical Team'
+    const category = formData.category?.trim() || 'general'
+    const textFromHtml = (value: string) => value
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/\s+/g, ' ')
+      .trim()
+    const hasVisibleContent = (value: string) =>
+      textFromHtml(value).length > 0 || /<(img|video|iframe)\b/i.test(value)
+
+    if (!title) {
       showToast({
         type: 'error',
         title: t('common.error'),
         description: t('knowledge.documentTitlePlaceholder')
+      })
+      return
+    }
+
+    if (formData.sections.length === 0) {
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+        description: '请至少添加一个图文内容段落'
+      })
+      return
+    }
+
+    const invalidSectionIndex = formData.sections.findIndex(section =>
+      !section.heading.trim() || !hasVisibleContent(section.content)
+    )
+    if (invalidSectionIndex >= 0) {
+      showToast({
+        type: 'error',
+        title: t('common.error'),
+        description: `请填写第 ${invalidSectionIndex + 1} 段的标题和内容`
       })
       return
     }
@@ -183,10 +221,37 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
       return
     }
 
-    deleteDraft('general', document?.id?.toString())
+    const escapeHtml = (value: string) => value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;')
+    const content = formData.sections
+      .map(section => `<h2>${escapeHtml(section.heading.trim())}</h2>${section.content}`)
+      .join('\n')
+    const summary = (formData.summary.trim() || textFromHtml(content) || title).slice(0, 500)
+    const images = [
+      { url: formData.heroImageUrl, alt: formData.heroImageAlt.trim() || title, order: 0 },
+      ...formData.sections
+        .filter(section => Boolean(section.imageUrl))
+        .map((section, index) => ({
+          url: section.imageUrl,
+          alt: section.imageAlt.trim() || section.heading.trim(),
+          order: index + 1
+        }))
+    ]
+
+    deleteDraft('general', (document?._id || document?.id)?.toString())
     onSave({
       ...formData,
-      id: document?.id
+      title,
+      author,
+      category,
+      type: formData.type,
+      content,
+      summary,
+      images
     })
   }
 

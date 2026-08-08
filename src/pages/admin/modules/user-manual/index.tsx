@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FileText, Upload, Trash2, Download, Eye, Loader2, AlertCircle } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import { apiClient } from '@/services/apiClient';
 
 interface Manual {
   name: string;
@@ -62,16 +63,11 @@ const UserManualManager: React.FC = () => {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch('/api/user-manual/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const result = await apiClient.upload('/user-manual/upload', formData, { retries: 0 });
+      if (result.success) {
         await fetchManuals();
       } else {
-        setError(data.message || '上传失败');
+        setError(result.error || result.message || '上传失败');
       }
     } catch (err) {
       setError('上传失败，请稍后重试');
@@ -88,15 +84,11 @@ const UserManualManager: React.FC = () => {
       setDeleting(filename);
       setError(null);
 
-      const response = await fetch(`/api/user-manual/${encodeURIComponent(filename)}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-      if (data.success) {
+      const result = await apiClient.delete(`/user-manual/${encodeURIComponent(filename)}`);
+      if (result.success) {
         await fetchManuals();
       } else {
-        setError(data.message || '删除失败');
+        setError(result.error || result.message || '删除失败');
       }
     } catch (err) {
       setError('删除失败，请稍后重试');

@@ -196,7 +196,8 @@ class DocumentService extends BaseCrudService<DocumentResponse, DocumentData, Pa
    * 更新文档
    */
   async updateDocument(id: string, documentData: Partial<DocumentData>, documentType?: 'general' | 'video' | 'structured'): Promise<DocumentResponse> {
-    const endpoint = documentType ? `${this.getDocumentEndpoint(documentType)}/${id}` : `${this.baseEndpoint}/${id}`;
+    const resolvedType = documentType || documentData.documentType;
+    const endpoint = resolvedType ? `${this.getDocumentEndpoint(resolvedType)}/${id}` : `${this.baseEndpoint}/${id}`;
     const response = await this.client.put<DocumentResponse>(endpoint, documentData);
 
     if (!response.success) {

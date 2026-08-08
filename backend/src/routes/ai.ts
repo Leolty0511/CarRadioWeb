@@ -123,7 +123,7 @@ router.post('/select', authenticateContentAccess, aiChatRateLimit, async (req, r
 /**
  * GET /api/ai/config - 获取AI配置（需要认证）
  */
-router.get('/status', (_req, res) => {
+router.get('/status', authenticateContentAccess, (_req, res) => {
   try {
     res.json({
       success: true,

@@ -1,5 +1,22 @@
 # 更新日志
 
+## [1.2.3] - 2026-08-08
+
+### Added
+
+- Restricted the AI assistant to authenticated members and administrators, matching knowledge-base access rules.
+- Added regression tests for multipart CSRF handling and typed document update endpoints.
+
+### Fixed
+
+- Fixed image uploads returning 403 because multipart request headers overwrote the CSRF token.
+- Added forced CSRF token refresh and one replay for uploads when the browser token is missing or invalid.
+- Fixed user-manual upload and deletion requests to use authenticated, CSRF-protected API calls.
+- Restored the user-manual upload route in the deployable backend and allowed resource create or update permission.
+- Fixed image-and-text tutorial saves by sending valid document type, content, summary, category, and persisted image metadata.
+- Fixed updates to general and structured documents using a nonexistent generic endpoint.
+- Added database update validators and clearer general-document request validation.
+
 ## [1.2.2] - 2026-08-08
 
 ### Fixed

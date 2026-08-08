@@ -12,7 +12,7 @@ const options: swaggerJsdoc.Options = {
     openapi: '3.0.0',
     info: {
       title: 'Knowledge Base API',
-      version: '1.2.2',
+      version: '1.2.3',
       description: '现代化知识库管理系统的 RESTful API 文档',
       contact: {
         name: 'API Support',
