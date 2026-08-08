@@ -1,6 +1,6 @@
 import express from 'express'
 import { imageService } from '../services/imageService'
-import { authenticateUser, requirePermission } from '../middleware/auth'
+import { authenticateUser, requireAnyPermission } from '../middleware/auth'
 import { PERMISSIONS } from '../config/permissions'
 import { createLogger } from '../utils/logger'
 
@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
 })
 
 // 更新图片 - 需要认证
-router.put('/:id', authenticateUser, async (req, res) => {
+router.put('/:id', authenticateUser, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req, res) => {
   try {
     const { id } = req.params
     const updates = req.body
@@ -33,7 +33,7 @@ router.put('/:id', authenticateUser, async (req, res) => {
 })
 
 // 删除图片 - 需要认证
-router.delete('/:id', authenticateUser, requirePermission(PERMISSIONS.settings.update), async (req, res) => {
+router.delete('/:id', authenticateUser, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req, res) => {
   try {
     const { id } = req.params
     const success = await imageService.deleteImage(id)
@@ -45,7 +45,7 @@ router.delete('/:id', authenticateUser, requirePermission(PERMISSIONS.settings.u
 })
 
 // 添加新图片 - 需要认证
-router.post('/', authenticateUser, requirePermission(PERMISSIONS.settings.update), async (req, res) => {
+router.post('/', authenticateUser, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.create, PERMISSIONS.documents.update), async (req, res) => {
   try {
     const imageData = req.body
     const success = await imageService.addImage(imageData)
@@ -57,7 +57,7 @@ router.post('/', authenticateUser, requirePermission(PERMISSIONS.settings.update
 })
 
 // 重置为默认图片 - 需要认证
-router.post('/reset', authenticateUser, requirePermission(PERMISSIONS.settings.update), async (req, res) => {
+router.post('/reset', authenticateUser, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req, res) => {
   try {
     const success = await imageService.resetToDefault()
     res.json({ success })

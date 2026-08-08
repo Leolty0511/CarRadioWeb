@@ -98,6 +98,7 @@ export const imageUploadSchema = z.object({
 export const contactFormSchema = z.object({
   name: z.string().min(1).max(100),
   email: z.string().email(),
+  orderNumber: z.string().trim().min(2).max(100),
   phone: z.string().optional(),
   subject: z.string().min(1).max(200),
   message: z.string().min(1).max(5000),
@@ -206,4 +207,3 @@ export const validateParams = (schema: ZodSchema) => {
 
 // 常用参数校验
 export const validateObjectId = validateParams(z.object({ id: objectIdSchema }));
-

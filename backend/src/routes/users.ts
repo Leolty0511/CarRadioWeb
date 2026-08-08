@@ -24,15 +24,58 @@ const MIN_PASSWORD_LENGTH = 10
 
 const router = Router()
 
+const PAGE_PERMISSION_DEPENDENCIES: Record<string, string[]> = {
+  'pages:documents': ['documents:read'],
+  'pages:products': ['products:read'],
+  'pages:categories': ['categories:read'],
+  'pages:vehicles': ['vehicles:read'],
+  'pages:banners': ['banners:read'],
+  'pages:announcements': ['announcements:read'],
+  'pages:software': ['software:read'],
+  'pages:resources': ['resources:read'],
+  'pages:feedback': ['feedback:read'],
+  'pages:forms': ['feedback:read'],
+  'pages:contact': ['contacts:read'],
+  'pages:canbus-settings': ['canbus:read'],
+  'pages:visitors': ['visitors:read'],
+  'pages:seo': ['seo:read'],
+  'pages:module-settings': ['settings:read'],
+  'pages:oss-storage': ['settings:read'],
+  'pages:notification': ['notifications:read'],
+  'pages:system-monitor': ['system:read'],
+  'pages:settings': ['settings:read'],
+}
+
 function buildInviteUrl(token: string): string {
-  const base = (process.env.FRONTEND_URL || process.env.CORS_ORIGIN?.split(',')[0] || 'http://localhost:5173').replace(/\/$/, '')
-  return `${base}/admin?invite=${encodeURIComponent(token)}`
+  const configuredBase = (process.env.FRONTEND_URL || process.env.CORS_ORIGIN?.split(',')[0] || '').trim()
+  const base = configuredBase || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001')
+  if (!base) {throw new Error('INVITE_URL_NOT_CONFIGURED')}
+
+  let parsed: URL
+  try {
+    parsed = new URL(base)
+  } catch {
+    throw new Error('INVITE_URL_NOT_CONFIGURED')
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {throw new Error('INVITE_URL_NOT_CONFIGURED')}
+  if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') {
+    throw new Error('INVITE_URL_NOT_CONFIGURED')
+  }
+
+  return `${parsed.origin}/admin?invite=${encodeURIComponent(token)}`
 }
 
 function normalizePermissions(permissions: unknown): string[] {
-  return Array.isArray(permissions)
-    ? permissions.filter((p: unknown): p is string => typeof p === 'string' && ALL_PERMISSIONS.includes(p as any))
-    : []
+  if (!Array.isArray(permissions)) {return []}
+  const normalized = new Set(
+    permissions.filter((p: unknown): p is string => typeof p === 'string' && ALL_PERMISSIONS.includes(p as any))
+  )
+  for (const permission of [...normalized]) {
+    for (const dependency of PAGE_PERMISSION_DEPENDENCIES[permission] ?? []) {
+      normalized.add(dependency)
+    }
+  }
+  return [...normalized]
 }
 
 function hasInvalidPermissions(permissions: unknown): boolean {
@@ -277,6 +320,60 @@ router.get('/invitations', async (_req: Request, res: Response) => {
   }
 })
 
+/** POST /api/users/invitations/:id/resend - issue a fresh token and resend an invitation */
+router.post('/invitations/:id/resend', async (req: Request, res: Response) => {
+  try {
+    const invitation = await AdminInvitation.findById(req.params.id)
+    if (!invitation) {
+      return res.status(404).json({ success: false, error: 'invitation_not_found' })
+    }
+    if (invitation.acceptedAt) {
+      return res.status(409).json({ success: false, error: 'invitation_already_accepted' })
+    }
+    if (await User.exists({ email: invitation.email })) {
+      return res.status(409).json({ success: false, error: 'email_already_exists' })
+    }
+
+    const token = crypto.randomBytes(32).toString('base64url')
+    const inviteUrl = buildInviteUrl(token)
+    await AdminInvitation.updateMany(
+      { _id: { $ne: invitation._id }, email: invitation.email, acceptedAt: null, revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    )
+    invitation.tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    invitation.expiresAt = new Date(Date.now() + INVITE_EXPIRES_MS)
+    invitation.permissions = normalizePermissions(invitation.permissions)
+    invitation.acceptedAt = null
+    invitation.revokedAt = null
+    invitation.deliveryStatus = 'pending'
+    invitation.sendError = null
+    await invitation.save()
+
+    const emailResult = await emailVerificationService.sendAdminInvitation(
+      invitation.email,
+      inviteUrl,
+      invitation.nickname
+    )
+    if (!emailResult.success) {
+      invitation.revokedAt = new Date()
+      invitation.deliveryStatus = 'failed'
+      invitation.sendError = emailResult.error || 'send_failed'
+      await invitation.save()
+      return res.status(400).json({ success: false, error: invitation.sendError })
+    }
+
+    invitation.deliveryStatus = 'sent'
+    await invitation.save()
+    return res.json({ success: true, data: invitation })
+  } catch (error) {
+    if (error instanceof Error && error.message === 'INVITE_URL_NOT_CONFIGURED') {
+      return res.status(503).json({ success: false, error: 'invite_url_not_configured' })
+    }
+    logger.error({ error, invitationId: req.params.id }, 'Resend admin invitation failed')
+    return res.status(500).json({ success: false, error: 'resend_failed' })
+  }
+})
+
 /** GET /api/users/permissions — return all available permissions */
 router.get('/permissions', (_req: Request, res: Response) => {
   res.json({ success: true, data: ALL_PERMISSIONS })
@@ -378,17 +475,19 @@ router.post('/', async (req: Request, res: Response) => {
       return res.status(409).json({ success: false, error: 'email_already_exists' })
     }
 
-    await AdminInvitation.updateMany(
-      { email: normalizedEmail, acceptedAt: null, revokedAt: null },
-      { $set: { revokedAt: new Date() } }
-    )
-
     if (hasInvalidPermissions(permissions)) {
       return res.status(400).json({ success: false, error: 'invalid_permissions' })
     }
 
     const safePermissions = normalizePermissions(permissions)
     const token = crypto.randomBytes(32).toString('base64url')
+    const inviteUrl = buildInviteUrl(token)
+
+    await AdminInvitation.updateMany(
+      { email: normalizedEmail, acceptedAt: null, revokedAt: null },
+      { $set: { revokedAt: new Date() } }
+    )
+
     const invitation = await AdminInvitation.create({
       email: normalizedEmail,
       nickname: nickname.trim(),
@@ -402,7 +501,7 @@ router.post('/', async (req: Request, res: Response) => {
 
     const emailResult = await emailVerificationService.sendAdminInvitation(
       normalizedEmail,
-      buildInviteUrl(token),
+      inviteUrl,
       invitation.nickname
     )
     if (!emailResult.success) {
@@ -419,6 +518,9 @@ router.post('/', async (req: Request, res: Response) => {
 
     res.status(201).json({ success: true, data: invitation })
   } catch (error: unknown) {
+    if (error instanceof Error && error.message === 'INVITE_URL_NOT_CONFIGURED') {
+      return res.status(503).json({ success: false, error: 'invite_url_not_configured' })
+    }
     if (isDuplicateKeyOnField(error, 'email')) {
       return res.status(409).json({ success: false, error: 'active_invitation_exists' })
     }

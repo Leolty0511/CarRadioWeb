@@ -78,6 +78,11 @@ export async function getAdminInvitations(): Promise<AdminInvitationRecord[]> {
   return res.success && res.data ? res.data : []
 }
 
+/** Resend an invitation with a fresh 48-hour token. */
+export async function resendAdminInvitation(id: string) {
+  return apiClient.post<AdminInvitationRecord>(`/users/invitations/${id}/resend`, {})
+}
+
 /** Update admin user */
 export async function updateUser(id: string, data: UpdateUserPayload) {
   return apiClient.put<AdminUserRecord>(`/users/${id}`, data)

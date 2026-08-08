@@ -385,7 +385,7 @@ app.use(sitemapRouter);
 app.get('/', (req, res) => {
   res.json({
     message: 'Knowledge Base Backend API',
-    version: '1.2.0',
+    version: '1.2.1',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     endpoints: {
       health: '/health',

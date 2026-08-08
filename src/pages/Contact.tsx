@@ -45,7 +45,7 @@ const VALIDATION_RULES = {
   orderNumber: {
     minLength: 2,
     maxLength: 100,
-    required: false,
+    required: true,
   },
   subject: {
     minLength: 5,
@@ -450,6 +450,7 @@ const Contact: React.FC = () => {
                   <div>
                     <label className="block text-sm font-bold text-slate-700 dark:text-white mb-1">
                       {t('contact.form.orderNumber')}
+                      <span className="text-red-400 ml-1">*</span>
                     </label>
                     <p className="text-xs text-slate-500 dark:text-gray-400 mb-2">{t('contact.form.orderNumberHint')}</p>
                     <Input
@@ -457,6 +458,8 @@ const Contact: React.FC = () => {
                       onChange={(e) => handleInputChange('orderNumber', e.target.value)}
                       onBlur={() => handleFieldBlur('orderNumber')}
                       placeholder={t('contact.form.orderNumberPlaceholder')}
+                      required
+                      aria-required="true"
                       className={`bg-white dark:bg-[#1A2744]/60 border-2 text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-gray-400 focus:ring-primary-500 transition-all duration-300 ${
                         formErrors.orderNumber ? 'border-red-500 focus:border-red-500' : 'border-gray-300 dark:border-blue-900/40 focus:border-primary-500'
                       }`}

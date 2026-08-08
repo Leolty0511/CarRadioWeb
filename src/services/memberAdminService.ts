@@ -18,7 +18,13 @@ export interface MemberRecord {
 
 export const getMemberAdminSettings = () => apiClient.get('/members/settings/current')
 export const saveMemberAdminSettings = (data: { registrationEnabled: boolean; approvalRequired: boolean; invitationRequired: boolean }) => apiClient.put('/members/settings/current', data)
-export const getMembers = (params?: Record<string, unknown>) => apiClient.get<{ items: MemberRecord[]; total: number }>('/members', params)
+export const getMembers = (params?: Record<string, unknown>) => apiClient.get<{
+  items: MemberRecord[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}>('/members', params)
 export const setMemberStatus = (id: string, status: string, reviewNote = '') => apiClient.put(`/members/${id}/status`, { status, reviewNote })
 export const getMemberInvitations = () => apiClient.get('/members/invitations/list')
 export const createMemberInvitation = (data: { maxUses: number; expiresAt?: string; note?: string }) => apiClient.post('/members/invitations', data)

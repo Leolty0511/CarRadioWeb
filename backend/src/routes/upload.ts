@@ -253,7 +253,7 @@ router.post('/images', requireAnyPermission(
  * 删除图片
  * DELETE /api/upload/image
  */
-router.delete('/image', requirePermission(PERMISSIONS.settings.update), async (req, res): Promise<void> => {
+router.delete('/image', requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req, res): Promise<void> => {
   try {
     const { imageUrl } = req.body;
 
@@ -292,7 +292,7 @@ router.delete('/image', requirePermission(PERMISSIONS.settings.update), async (r
  * 获取图片信息
  * GET /api/upload/image-info
  */
-router.get('/image-info', requirePermission(PERMISSIONS.settings.read), async (req, res): Promise<void> => {
+router.get('/image-info', requireAnyPermission(PERMISSIONS.settings.read, PERMISSIONS.documents.read), async (req, res): Promise<void> => {
   try {
     const { imageUrl } = req.query;
 
@@ -331,7 +331,7 @@ router.get('/image-info', requirePermission(PERMISSIONS.settings.read), async (r
  * 获取已上传的图片列表
  * GET /api/upload/images
  */
-router.get('/images', requirePermission(PERMISSIONS.settings.read), async (req, res) => {
+router.get('/images', requireAnyPermission(PERMISSIONS.settings.read, PERMISSIONS.documents.read), async (req, res) => {
   try {
     const { getUploadedImages } = require('../services/uploadService');
     const images = await getUploadedImages();

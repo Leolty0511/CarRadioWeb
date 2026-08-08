@@ -7,6 +7,7 @@
 import { Router, Request, Response } from 'express'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import mongoose from 'mongoose'
 import User, { IUser } from '../models/User'
 import AdminInvitation from '../models/AdminInvitation'
 import { signTokenPair, verifyAccessToken, verifyRefreshToken } from '../utils/jwt'
@@ -35,6 +36,111 @@ function hashInviteToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
+function isTransactionUnsupported(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('Transaction numbers are only allowed') ||
+    message.includes('replica set member or mongos')
+}
+
+interface AcceptedInvitation {
+  user: IUser
+  invitationId: string
+}
+
+async function acceptInvitationWithTransaction(
+  tokenHash: string,
+  passwordHash: string,
+  nickname: string
+): Promise<AcceptedInvitation> {
+  const session = await mongoose.startSession()
+  let accepted: AcceptedInvitation | null = null
+  try {
+    await session.withTransaction(async () => {
+      const acceptedAt = new Date()
+      const invitation = await AdminInvitation.findOne({
+        tokenHash,
+        acceptedAt: null,
+        revokedAt: null,
+        expiresAt: { $gt: acceptedAt },
+      }).session(session)
+      if (!invitation) {throw new Error('INVITATION_NOT_FOUND')}
+
+      const existing = await User.exists({ email: invitation.email }).session(session)
+      if (existing) {throw new Error('EMAIL_ALREADY_EXISTS')}
+
+      const [user] = await User.create([{
+        email: invitation.email,
+        nickname: nickname || invitation.nickname,
+        avatar: '',
+        role: 'admin',
+        provider: 'email',
+        providerId: `email_${invitation.email}`,
+        passwordHash,
+        permissions: invitation.permissions,
+        isActive: true,
+        lastLoginAt: acceptedAt,
+      }], { session })
+
+      invitation.acceptedAt = acceptedAt
+      await invitation.save({ session })
+      accepted = { user, invitationId: invitation._id.toString() }
+    })
+    if (!accepted) {throw new Error('INVITATION_NOT_FOUND')}
+    return accepted
+  } finally {
+    await session.endSession()
+  }
+}
+
+async function acceptInvitationWithoutTransaction(
+  tokenHash: string,
+  passwordHash: string,
+  nickname: string
+): Promise<AcceptedInvitation> {
+  const acceptedAt = new Date()
+  const invitation = await AdminInvitation.findOneAndUpdate(
+    {
+      tokenHash,
+      acceptedAt: null,
+      revokedAt: null,
+      expiresAt: { $gt: acceptedAt },
+    },
+    { $set: { acceptedAt } },
+    { new: true }
+  )
+  if (!invitation) {throw new Error('INVITATION_NOT_FOUND')}
+
+  try {
+    if (await User.exists({ email: invitation.email })) {
+      invitation.revokedAt = acceptedAt
+      await invitation.save()
+      throw new Error('EMAIL_ALREADY_EXISTS')
+    }
+
+    const user = await User.create({
+      email: invitation.email,
+      nickname: nickname || invitation.nickname,
+      avatar: '',
+      role: 'admin',
+      provider: 'email',
+      providerId: `email_${invitation.email}`,
+      passwordHash,
+      permissions: invitation.permissions,
+      isActive: true,
+      lastLoginAt: acceptedAt,
+    })
+    return { user, invitationId: invitation._id.toString() }
+  } catch (error) {
+    if (!(error instanceof Error && error.message === 'EMAIL_ALREADY_EXISTS')) {
+      await AdminInvitation.updateOne(
+        { _id: invitation._id, acceptedAt, revokedAt: null },
+        { $set: { acceptedAt: null } }
+      )
+    }
+    throw error
+  }
+}
+
 function validatePassword(password: string): string | null {
   if (password.length < MIN_PASSWORD_LENGTH) {
     return 'password_too_short'
@@ -55,6 +161,7 @@ router.use('/send-code', codeLimiter)
 // 密码重置/修改同样涉及 bcrypt 计算，需限流防暴力/DoS
 router.use('/reset-password', authLimiter)
 router.use('/change-password', authLimiter)
+router.use('/accept-invitation', authLimiter)
 
 router.get('/bootstrap-status', async (_req: Request, res: Response) => {
   try {
@@ -106,7 +213,6 @@ router.get('/invitations/:token', async (req: Request, res: Response) => {
 })
 
 router.post('/accept-invitation', async (req: Request, res: Response) => {
-  let claimedInvitationId: unknown = null
   try {
     const token = String(req.body.token || '')
     const password = String(req.body.password || '')
@@ -121,64 +227,34 @@ router.post('/accept-invitation', async (req: Request, res: Response) => {
       return res.status(400).json({ success: false, error: passwordError })
     }
 
-    const acceptedAt = new Date()
-    const invitation = await AdminInvitation.findOneAndUpdate(
-      {
-        tokenHash: hashInviteToken(token),
-        acceptedAt: null,
-        revokedAt: null,
-        expiresAt: { $gt: acceptedAt },
-      },
-      { $set: { acceptedAt } },
-      { new: true }
-    )
-
-    if (!invitation) {
-      return res.status(404).json({ success: false, error: 'invitation_not_found_or_expired' })
-    }
-    claimedInvitationId = invitation._id
-
-    const existing = await User.findOne({ email: invitation.email })
-    if (existing) {
-      invitation.revokedAt = acceptedAt
-      await invitation.save()
-      return res.status(409).json({ success: false, error: 'email_already_exists' })
-    }
-
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS)
-    const user = await User.create({
-      email: invitation.email,
-      nickname: nickname || invitation.nickname,
-      avatar: '',
-      role: 'admin',
-      provider: 'email',
-      providerId: `email_${invitation.email}`,
-      passwordHash,
-      permissions: invitation.permissions,
-      isActive: true,
-      lastLoginAt: new Date(),
-    })
+    const tokenHash = hashInviteToken(token)
+    let accepted: AcceptedInvitation
+    try {
+      accepted = await acceptInvitationWithTransaction(tokenHash, passwordHash, nickname)
+    } catch (error) {
+      if (!isTransactionUnsupported(error)) {throw error}
+      logger.info({}, 'MongoDB transactions unavailable; using invitation acceptance fallback')
+      accepted = await acceptInvitationWithoutTransaction(tokenHash, passwordHash, nickname)
+    }
 
     const tokens = signTokenPair({
-      userId: user._id.toString(),
-      email: adminJwtEmailField(user),
-      role: user.role,
+      userId: accepted.user._id.toString(),
+      email: adminJwtEmailField(accepted.user),
+      role: accepted.user.role,
     })
     setTokenCookie(res, tokens.accessToken)
     setRefreshTokenCookie(res, tokens.refreshToken)
 
-    logger.info({ userId: user._id, invitationId: invitation._id }, 'Invitation accepted')
+    logger.info({ userId: accepted.user._id, invitationId: accepted.invitationId }, 'Invitation accepted')
 
     return res.status(201).json({ success: true })
   } catch (error: unknown) {
-    if (isDuplicateKeyError(error)) {
-      if (claimedInvitationId) {
-        await AdminInvitation.findByIdAndUpdate(claimedInvitationId, { $set: { revokedAt: new Date() } })
-      }
+    if (isDuplicateKeyError(error) || (error instanceof Error && error.message === 'EMAIL_ALREADY_EXISTS')) {
       return res.status(409).json({ success: false, error: 'email_already_exists' })
     }
-    if (claimedInvitationId) {
-      await AdminInvitation.findByIdAndUpdate(claimedInvitationId, { $set: { acceptedAt: null } })
+    if (error instanceof Error && error.message === 'INVITATION_NOT_FOUND') {
+      return res.status(404).json({ success: false, error: 'invitation_not_found_or_expired' })
     }
     logger.error({ error }, 'Accept invitation failed')
     return res.status(500).json({ success: false, error: 'server_error' })

@@ -21,7 +21,7 @@ export interface ContactForm {
   id: string
   name: string
   email: string
-  orderNumber?: string
+  orderNumber: string
   subject: string
   message: string
   submitTime: string
@@ -33,6 +33,8 @@ export interface ContactForm {
 const NAME_MIN_LENGTH = 2
 const NAME_MAX_LENGTH = 50
 const EMAIL_MAX_LENGTH = 100
+const ORDER_NUMBER_MIN_LENGTH = 2
+const ORDER_NUMBER_MAX_LENGTH = 100
 const SUBJECT_MIN_LENGTH = 5
 const SUBJECT_MAX_LENGTH = 100
 const MESSAGE_MIN_LENGTH = 10
@@ -49,6 +51,11 @@ const VALIDATION_RULES = {
     required: true,
     pattern: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     maxLength: EMAIL_MAX_LENGTH
+  },
+  orderNumber: {
+    minLength: ORDER_NUMBER_MIN_LENGTH,
+    maxLength: ORDER_NUMBER_MAX_LENGTH,
+    required: true
   },
   subject: {
     minLength: SUBJECT_MIN_LENGTH,
@@ -126,6 +133,18 @@ const validateFormData = (formData: Omit<ContactForm, 'id' | 'submitTime' | 'sta
     }
     if (email.length > VALIDATION_RULES.email.maxLength) {
       errors.push(t('contact.form.validation.emailMaxLength', { max: VALIDATION_RULES.email.maxLength }))
+    }
+  }
+
+  if (!formData.orderNumber || !formData.orderNumber.trim()) {
+    errors.push(t('contact.form.validation.orderNumberRequired'))
+  } else {
+    const orderNumber = formData.orderNumber.trim()
+    if (orderNumber.length < VALIDATION_RULES.orderNumber.minLength) {
+      errors.push(t('contact.form.validation.orderNumberTooShort', { min: VALIDATION_RULES.orderNumber.minLength }))
+    }
+    if (orderNumber.length > VALIDATION_RULES.orderNumber.maxLength) {
+      errors.push(t('contact.form.validation.orderNumberTooLong', { max: VALIDATION_RULES.orderNumber.maxLength }))
     }
   }
 
@@ -221,7 +240,7 @@ const mapFormItem = (item: FormRecord): ContactForm => ({
   id: item._id as string,
   name: item.name as string,
   email: item.email as string,
-  orderNumber: item.orderNumber as string | undefined,
+  orderNumber: typeof item.orderNumber === 'string' ? item.orderNumber : '',
   subject: item.subject as string,
   message: item.message as string,
   submitTime: item.submitTime as string,

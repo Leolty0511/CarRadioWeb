@@ -73,10 +73,18 @@ router.post('/', feedbackRateLimit, async (req, res) => {
   try {
     const { name, email, orderNumber, subject, message, userAgent, language } = req.body
 
-    if (!name || !email || !subject || !message) {
+    const normalizedOrderNumber = typeof orderNumber === 'string' ? orderNumber.trim() : ''
+    if (!name || !email || !normalizedOrderNumber || !subject || !message) {
       res.status(400).json({
         success: false,
         error: '缺少必要字段'
+      })
+      return
+    }
+    if (normalizedOrderNumber.length < 2 || normalizedOrderNumber.length > 100) {
+      res.status(400).json({
+        success: false,
+        error: 'invalid_order_number'
       })
       return
     }
@@ -90,7 +98,7 @@ router.post('/', feedbackRateLimit, async (req, res) => {
     const feedback = await createFeedback({
       name,
       email,
-      orderNumber,
+      orderNumber: normalizedOrderNumber,
       subject,
       message,
       ip: clientIP,

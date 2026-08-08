@@ -48,7 +48,7 @@ import { MemberManagement } from './modules/members'
 import { AuditLogManagement } from './modules/audit-log'
 import { ComplianceHubManagement } from './modules/compliance-hub'
 import { ChangePasswordDialog } from './components/ChangePasswordDialog'
-import { NAV_TAB_PAGE_PERMISSION, getFirstAccessibleNavTab } from './constants/navConfig'
+import { getFirstAccessibleNavTab, getRequiredPermissionsForNavId } from './constants/navConfig'
 import { userHasPermission } from '@/services/authService'
 
 import { UserAvatar } from '@/components/ui/UserAvatar'
@@ -187,8 +187,8 @@ export const AdminLayout: React.FC = () => {
   // 无当前页 pages 权限时跳到首个可访问 tab（防止直接改 state 硬闯）
   React.useEffect(() => {
     if (!user || user.role === 'super_admin') {return}
-    const p = NAV_TAB_PAGE_PERMISSION[activeTab]
-    if (p && !userHasPermission(user, p)) {
+    const required = getRequiredPermissionsForNavId(activeTab)
+    if (required.length > 0 && !required.every(permission => userHasPermission(user, permission))) {
       const next = getFirstAccessibleNavTab(false, perm => userHasPermission(user, perm))
       setActiveTab(next ?? 'dashboard')
     }

@@ -13,7 +13,7 @@ import { LogOut, ChevronDown, Pin, PinOff } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import {
   NAV_CONFIG,
-  getPagePermissionForNavId,
+  getRequiredPermissionsForNavId,
   type NavItem,
   type NavGroup,
 } from '../constants/navConfig'
@@ -71,9 +71,8 @@ export const AdminNav: React.FC<AdminNavProps> = ({
       items.filter(item => {
         if (item.superAdminOnly) {return isSuperAdmin}
         if (isSuperAdmin) {return true}
-        const p = getPagePermissionForNavId(item.id)
-        if (!p) {return false}
-        return userHasPermission(user ?? null, p)
+        const required = getRequiredPermissionsForNavId(item.id)
+        return required.length > 0 && required.every(permission => userHasPermission(user ?? null, permission))
       }),
     [isSuperAdmin, user]
   )

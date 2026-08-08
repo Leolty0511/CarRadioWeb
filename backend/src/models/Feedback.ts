@@ -3,7 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose'
 export interface IFeedback extends Document {
   name: string
   email: string
-  orderNumber?: string
+  orderNumber: string
   subject: string
   message: string
   submitTime: Date
@@ -30,6 +30,7 @@ const feedbackSchema = new Schema<IFeedback>({
   },
   orderNumber: {
     type: String,
+    required: true,
     trim: true,
     maxlength: 100
   },

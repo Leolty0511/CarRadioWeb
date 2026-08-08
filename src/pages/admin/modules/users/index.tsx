@@ -11,6 +11,7 @@ import {
   getAdminInvitations,
   getPermissions,
   getUsers,
+  resendAdminInvitation,
   transferSuperAdmin,
   updateOwnAccount,
   updateOwnNickname,
@@ -361,6 +362,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
   const [transferTarget, setTransferTarget] = useState<AdminUserRecord | null>(null)
   const [transferPassword, setTransferPassword] = useState('')
   const [transferring, setTransferring] = useState(false)
+  const [resendingInvitationId, setResendingInvitationId] = useState<string | null>(null)
 
   const eligibleTransferTargets = users.filter(user =>
     user.role === 'admin' &&
@@ -409,6 +411,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
           smtp_not_configured: '邮件服务未配置，无法发送邀请',
           send_failed: '邀请邮件发送失败',
           invite_failed: '邀请失败',
+          invite_url_not_configured: '网站地址未配置，无法生成邀请链接',
         }
         showToast({ type: 'error', title: errMap[res.error ?? ''] ?? res.error ?? '邀请失败' })
       }
@@ -462,6 +465,30 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
     if (res.success) {
       showToast({ type: 'success', title: u.isActive ? '已停用' : '已启用' })
       fetchData()
+    }
+  }
+
+  const handleResendInvitation = async (invitation: AdminInvitationRecord) => {
+    setResendingInvitationId(invitation._id)
+    try {
+      const res = await resendAdminInvitation(invitation._id)
+      if (res.success) {
+        showToast({ type: 'success', title: '邀请已重新发送' })
+        await fetchData()
+        return
+      }
+      const errMap: Record<string, string> = {
+        invitation_not_found: '邀请记录不存在',
+        invitation_already_accepted: '该邀请已被接受',
+        email_already_exists: '该邮箱已存在管理员账号',
+        invite_url_not_configured: '网站地址未配置，无法生成邀请链接',
+        smtp_not_configured: '邮件服务未配置',
+        send_failed: '邀请邮件发送失败',
+        resend_failed: '重新发送失败',
+      }
+      showToast({ type: 'error', title: errMap[res.error ?? ''] ?? res.error ?? '重新发送失败' })
+    } finally {
+      setResendingInvitationId(null)
     }
   }
 
@@ -643,6 +670,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                     <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">创建时间</th>
                     <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">过期时间</th>
                     <th className="px-2 py-3 text-left font-medium text-slate-500 dark:text-slate-400">状态</th>
+                    <th className="px-2 py-3 text-right font-medium text-slate-500 dark:text-slate-400">操作</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -657,6 +685,18 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                         <td className={`px-2 py-3 font-medium ${status.className}`} title={invitation.sendError || undefined}>
                           {status.label}
                           {invitation.sendError && <span className="ml-2 text-xs font-normal text-slate-400">({invitation.sendError})</span>}
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          {!invitation.acceptedAt && (
+                            <button
+                              type="button"
+                              onClick={() => handleResendInvitation(invitation)}
+                              disabled={resendingInvitationId === invitation._id}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              {resendingInvitationId === invitation._id ? '发送中...' : '重新发送'}
+                            </button>
+                          )}
                         </td>
                       </tr>
                     )

@@ -191,7 +191,7 @@ router.post('/upload/multiple', auth, requireAnyPermission(
  * GET /api/v1/storage/files
  * 列出文件
  */
-router.get('/files', auth, requirePermission(PERMISSIONS.settings.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/files', auth, requireAnyPermission(PERMISSIONS.settings.read, PERMISSIONS.documents.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     // 获取存储服务
     const storageSettings = await configService.getStorageSettings();
@@ -221,7 +221,7 @@ router.get('/files', auth, requirePermission(PERMISSIONS.settings.read), async (
  * GET /api/v1/storage/files/:key
  * 获取文件信息
  */
-router.get('/files/:key(*)', auth, requirePermission(PERMISSIONS.settings.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/files/:key(*)', auth, requireAnyPermission(PERMISSIONS.settings.read, PERMISSIONS.documents.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const key = req.params.key;
     
@@ -254,7 +254,7 @@ router.get('/files/:key(*)', auth, requirePermission(PERMISSIONS.settings.read),
  * GET /api/v1/storage/files/:key/url
  * 获取文件访问URL
  */
-router.get('/files/:key(*)/url', auth, requirePermission(PERMISSIONS.settings.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/files/:key(*)/url', auth, requireAnyPermission(PERMISSIONS.settings.read, PERMISSIONS.documents.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const key = req.params.key;
     const expiresIn = parseInt(req.query.expiresIn as string) || 3600;
@@ -292,7 +292,7 @@ router.get('/files/:key(*)/url', auth, requirePermission(PERMISSIONS.settings.re
  * GET /api/v1/storage/files/:key/download
  * 下载文件
  */
-router.get('/files/:key(*)/download', auth, requirePermission(PERMISSIONS.settings.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.get('/files/:key(*)/download', auth, requireAnyPermission(PERMISSIONS.settings.read, PERMISSIONS.documents.read), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const key = req.params.key;
     
@@ -332,7 +332,7 @@ router.get('/files/:key(*)/download', auth, requirePermission(PERMISSIONS.settin
  * DELETE /api/v1/storage/files/:key
  * 删除文件
  */
-router.delete('/files/:key(*)', auth, requirePermission(PERMISSIONS.settings.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.delete('/files/:key(*)', auth, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const key = req.params.key;
     
@@ -375,7 +375,7 @@ router.delete('/files/:key(*)', auth, requirePermission(PERMISSIONS.settings.upd
  * POST /api/v1/storage/files/delete/batch
  * 批量删除文件
  */
-router.post('/files/delete/batch', auth, requirePermission(PERMISSIONS.settings.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/files/delete/batch', auth, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const { keys } = req.body;
     
@@ -409,7 +409,7 @@ router.post('/files/delete/batch', auth, requirePermission(PERMISSIONS.settings.
  * POST /api/v1/storage/files/:sourceKey/copy
  * 复制文件
  */
-router.post('/files/:sourceKey(*)/copy', auth, requirePermission(PERMISSIONS.settings.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/files/:sourceKey(*)/copy', auth, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const sourceKey = req.params.sourceKey;
     const { targetKey } = req.body;
@@ -454,7 +454,7 @@ router.post('/files/:sourceKey(*)/copy', auth, requirePermission(PERMISSIONS.set
  * POST /api/v1/storage/files/:sourceKey/move
  * 移动文件
  */
-router.post('/files/:sourceKey(*)/move', auth, requirePermission(PERMISSIONS.settings.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+router.post('/files/:sourceKey(*)/move', auth, requireAnyPermission(PERMISSIONS.settings.update, PERMISSIONS.documents.update), async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
   try {
     const sourceKey = req.params.sourceKey;
     const { targetKey } = req.body;

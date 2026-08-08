@@ -20,6 +20,16 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('email-verification');
 
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] || character);
+}
+
 // ==================== Verification Code Schema ====================
 
 interface IVerificationCode {
@@ -358,9 +368,11 @@ ${type === 'register' ? '如非本人操作，请忽略此邮件。' : '如非�
       return { success: false, error: 'smtp_not_configured' };
     }
 
-    const safeNickname = nickname || normalizedEmail.split('@')[0];
+    const displayNickname = nickname || normalizedEmail.split('@')[0];
+    const safeNickname = escapeHtml(displayNickname);
+    const safeInviteUrl = escapeHtml(inviteUrl);
     const subject = 'Admin invitation';
-    const text = `Hello ${safeNickname},
+    const text = `Hello ${displayNickname},
 
 You have been invited to join the admin panel.
 
@@ -374,10 +386,10 @@ This invitation expires in 48 hours. If you did not expect this invitation, igno
   <p style="color: #334155; line-height: 1.6;">Hello ${safeNickname},</p>
   <p style="color: #334155; line-height: 1.6;">You have been invited to join the admin panel. Use the button below to set your own password.</p>
   <p style="margin: 24px 0;">
-    <a href="${inviteUrl}" style="display: inline-block; background: #334155; color: white; text-decoration: none; padding: 12px 18px; border-radius: 8px;">Accept invitation</a>
+    <a href="${safeInviteUrl}" style="display: inline-block; background: #334155; color: white; text-decoration: none; padding: 12px 18px; border-radius: 8px;">Accept invitation</a>
   </p>
   <p style="color: #64748b; font-size: 14px; line-height: 1.6;">This invitation expires in 48 hours. If the button does not work, copy this link into your browser:</p>
-  <p style="word-break: break-all; color: #475569; font-size: 13px;">${inviteUrl}</p>
+  <p style="word-break: break-all; color: #475569; font-size: 13px;">${safeInviteUrl}</p>
 </div>`;
 
     try {

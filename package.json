@@ -1,6 +1,6 @@
 {
   "name": "knowledge-base",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "现代化知识库管理系统",
   "type": "module",
   "scripts": {

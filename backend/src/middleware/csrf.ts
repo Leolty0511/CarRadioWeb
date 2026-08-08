@@ -89,10 +89,9 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
     return
   }
 
-  // Token valid — regenerate to limit replay attacks
-  const newToken = generateCsrfToken()
-  setCsrfCookie(res, newToken)
-
+  // Keep the token stable for the lifetime of the cookie. Rotating it here
+  // makes concurrent uploads race: the first request changes the cookie while
+  // the remaining multipart requests still carry the previous header token.
   next()
 }
 

@@ -99,6 +99,11 @@ export const NAV_TAB_PAGE_PERMISSION: Record<string, string> = {
   settings: 'pages:settings',
 }
 
+/** Permissions required to open a page, beyond its pages:* visibility flag. */
+export const NAV_TAB_RESOURCE_PERMISSIONS: Partial<Record<string, string[]>> = {
+  documents: ['documents:read'],
+}
+
 export const NAV_CONFIG: NavGroup[] = [
   {
     group: 'content',
@@ -187,6 +192,12 @@ export function getPagePermissionForNavId(tabId: string): string | undefined {
   return NAV_TAB_PAGE_PERMISSION[tabId]
 }
 
+export function getRequiredPermissionsForNavId(tabId: string): string[] {
+  const pagePermission = NAV_TAB_PAGE_PERMISSION[tabId]
+  if (!pagePermission) {return []}
+  return [pagePermission, ...(NAV_TAB_RESOURCE_PERMISSIONS[tabId] ?? [])]
+}
+
 /** 首个当前用户有权访问的导航 tab（不含 superAdminOnly 项）；无则 null */
 export function getFirstAccessibleNavTab(
   isSuperAdmin: boolean,
@@ -195,8 +206,8 @@ export function getFirstAccessibleNavTab(
   if (isSuperAdmin) {return 'dashboard'}
   for (const item of getAllNavItems()) {
     if (item.superAdminOnly) {continue}
-    const p = NAV_TAB_PAGE_PERMISSION[item.id]
-    if (p && permissionsCheck(p)) {return item.id}
+    const required = getRequiredPermissionsForNavId(item.id)
+    if (required.length > 0 && required.every(permissionsCheck)) {return item.id}
   }
   return null
 }
