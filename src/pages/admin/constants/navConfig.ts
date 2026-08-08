@@ -102,6 +102,10 @@ export const NAV_TAB_PAGE_PERMISSION: Record<string, string> = {
 /** Permissions required to open a page, beyond its pages:* visibility flag. */
 export const NAV_TAB_RESOURCE_PERMISSIONS: Partial<Record<string, string[]>> = {
   documents: ['documents:read'],
+  categories: ['categories:read'],
+  'user-manual': ['resources:read'],
+  'resource-links': ['resources:read'],
+  downloads: ['software:read'],
 }
 
 export const NAV_CONFIG: NavGroup[] = [

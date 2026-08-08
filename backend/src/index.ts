@@ -51,6 +51,7 @@ import visitorsRouter from './routes/visitors';
 import { recordPageVisit } from './middleware/visitorTracking';
 // Ensure models are registered before MongoDB connects
 import User from './models/User';
+import { StorageSettings } from './models/StorageSettings';
 import './models/AuditLog';
 import './models/LegalVersion';
 import './models/LegalPageContent';
@@ -375,8 +376,26 @@ app.set('trust proxy', 1);
 // 公开 API 全局限流
 app.use('/api', publicApiLimiter);
 
-// 本地存储上传文件静态访问（与 StorageSettings.providers.local.uploadPath 默认 ./uploads 对应）
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+// Serve local-disk uploads from the configured directory. The old route always
+// served <project>/uploads, which made a custom absolute uploadPath appear to
+// upload successfully while the returned URL could not be read.
+let localUploadRoot = path.join(process.cwd(), 'uploads');
+let localUploadRootLoadedAt = 0;
+app.use('/uploads', async (req, res, next) => {
+  try {
+    if (Date.now() - localUploadRootLoadedAt > 30_000) {
+      const settings = await StorageSettings.findOne().lean();
+      const configuredPath = settings?.providers?.local?.uploadPath || './uploads';
+      localUploadRoot = path.isAbsolute(configuredPath)
+        ? configuredPath
+        : path.resolve(process.cwd(), configuredPath);
+      localUploadRootLoadedAt = Date.now();
+    }
+  } catch {
+    // Keep the default path available while MongoDB is reconnecting.
+  }
+  express.static(localUploadRoot)(req, res, next);
+});
 
 // Sitemap — public, no auth required
 app.use(sitemapRouter);
@@ -385,7 +404,7 @@ app.use(sitemapRouter);
 app.get('/', (req, res) => {
   res.json({
     message: 'Knowledge Base Backend API',
-    version: '1.2.1',
+    version: '1.2.2',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     endpoints: {
       health: '/health',

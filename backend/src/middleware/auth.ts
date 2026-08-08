@@ -58,6 +58,7 @@ export const requirePermission = (...permissions: string[]) => {
 
     const hasAll = permissions.every((p) => req.user!.hasPermission(p))
     if (!hasAll) {
+      logger.warn({ userId: req.user._id, role: req.user.role, path: req.path, required: permissions, granted: req.user.permissions }, 'Permission denied')
       res.status(403).json({ success: false, error: 'insufficient_permissions' })
       return
     }
@@ -75,6 +76,7 @@ export const requireAnyPermission = (...permissions: string[]) => {
     }
 
     if (!permissions.some((permission) => req.user!.hasPermission(permission))) {
+      logger.warn({ userId: req.user._id, role: req.user.role, path: req.path, requiredAny: permissions, granted: req.user.permissions }, 'Permission denied')
       res.status(403).json({ success: false, error: 'insufficient_permissions' })
       return
     }

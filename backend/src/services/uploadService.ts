@@ -1,6 +1,7 @@
 import { storageFactory } from './storage/StorageFactory';
 import { StorageSettings } from '../models/StorageSettings';
 import { createLogger } from '../utils/logger';
+import configService from './config/ConfigService';
 
 const logger = createLogger('upload');
 
@@ -32,12 +33,10 @@ const FOLDER_PATHS: Record<string, string> = {
  * 获取存储服务（从数据库加载配置，支持本地存储与云存储）
  */
 const getStorageService = async () => {
-  let service = storageFactory.getCurrentService();
-  if (service) {
-    return service;
-  }
-
-  const settings = await StorageSettings.findOne();
+  // Resolve settings for every request so PM2 workers cannot keep a stale
+  // local/OSS provider after an administrator changes storage configuration.
+  let service;
+  const settings = await configService.getStorageSettings();
   if (!settings) {
     throw new Error('未找到存储配置，请先在管理后台配置存储（本地或云存储）');
   }

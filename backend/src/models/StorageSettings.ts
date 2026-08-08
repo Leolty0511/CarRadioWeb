@@ -133,7 +133,7 @@ export interface IStorageSettings extends Document {
  * 默认存储设置
  */
 export const DEFAULT_STORAGE_SETTINGS = {
-  currentProvider: STORAGE_PROVIDERS.OSS,
+  currentProvider: STORAGE_PROVIDERS.LOCAL,
   providers: {
     local: {
       uploadPath: './uploads',
@@ -213,7 +213,7 @@ const StorageSettingsSchema = new Schema<IStorageSettings>({
   currentProvider: {
     type: String,
     enum: Object.values(STORAGE_PROVIDERS),
-    default: STORAGE_PROVIDERS.OSS,
+    default: STORAGE_PROVIDERS.LOCAL,
     required: true
   },
   

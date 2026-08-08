@@ -16,6 +16,9 @@
 import { Request, Response, NextFunction } from 'express'
 import crypto from 'crypto'
 import { setCsrfCookie, getCsrfTokenFromCookie } from '../utils/tokenCookie'
+import { createLogger } from '../utils/logger'
+
+const logger = createLogger('csrf')
 
 const CSRF_HEADER = 'x-csrf-token'
 
@@ -78,6 +81,7 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
   const cookieToken = getCsrfTokenFromCookie(req)
 
   if (!headerToken || !cookieToken) {
+    logger.warn({ method: req.method, path: req.path, hasHeader: !!headerToken, hasCookie: !!cookieToken, ip: req.ip }, 'CSRF token missing')
     res.status(403).json({ success: false, error: 'csrf_token_missing' })
     return
   }
@@ -85,6 +89,7 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
   // Constant-time comparison to prevent timing attacks
   if (headerToken.length !== cookieToken.length ||
       !crypto.timingSafeEqual(Buffer.from(headerToken), Buffer.from(cookieToken))) {
+    logger.warn({ method: req.method, path: req.path, ip: req.ip }, 'CSRF token invalid')
     res.status(403).json({ success: false, error: 'csrf_token_invalid' })
     return
   }

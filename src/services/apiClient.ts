@@ -137,6 +137,7 @@ class ApiClient {
 
     let lastError: Error | undefined;
     let authRefreshAttempted = false;
+    let csrfRetryAttempted = false;
 
     for (let attempt = 0; attempt <= retries; attempt++) {
       try {
@@ -172,6 +173,18 @@ class ApiClient {
 
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
+          if (response.status === 403 &&
+              (errorData.error === 'csrf_token_missing' || errorData.error === 'csrf_token_invalid') &&
+              !csrfRetryAttempted) {
+            csrfRetryAttempted = true;
+            const refreshedCsrf = await this.ensureCsrfToken();
+            if (refreshedCsrf) {
+              const retryHeaders = new Headers(defaultConfig.headers);
+              retryHeaders.set('X-CSRF-Token', refreshedCsrf);
+              defaultConfig.headers = retryHeaders;
+              continue;
+            }
+          }
 
           // 403 权限不足 — 发出全局事件，前端统一提示
           const permissionErrors = new Set([

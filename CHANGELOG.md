@@ -1,5 +1,15 @@
 # 更新日志
 
+## [1.2.2] - 2026-08-08
+
+### Fixed
+
+- Fixed local-disk uploads when the configured directory is outside the project default uploads folder.
+- Rebuilt storage services when provider configuration changes across PM2 workers.
+- Added one automatic CSRF token refresh and retry for browser uploads.
+- Completed knowledge-base resource permission checks for categories, manuals, resource links, and downloads.
+- Added production logs for CSRF and permission denials to identify 403 responses quickly.
+
 ## [1.2.1] - 2026-08-08
 
 ### 修复

@@ -28,6 +28,7 @@ export class StorageFactory {
   private static instance: StorageFactory;
   private currentService: IStorageService | null = null;
   private currentProvider: string | null = null;
+  private currentConfigFingerprint: string | null = null;
 
   static getInstance(): StorageFactory {
     if (!StorageFactory.instance) {
@@ -49,13 +50,15 @@ export class StorageFactory {
       }
       throw new Error('未配置可用的存储，请先配置云存储或本地存储');
     }
-    if (this.currentService && this.currentProvider === provider) {
+    const config = (settings.providers as any)[provider];
+    const configFingerprint = this.fingerprintConfig(config);
+    if (this.currentService && this.currentProvider === provider && this.currentConfigFingerprint === configFingerprint) {
       return this.currentService;
     }
-    const config = (settings.providers as any)[provider];
     const service = await this.createFromConfig(provider, config);
     this.currentService = service;
     this.currentProvider = provider;
+    this.currentConfigFingerprint = configFingerprint;
     logger.info({ provider }, '存储服务已初始化');
     return service;
   }
@@ -102,6 +105,12 @@ export class StorageFactory {
 
   getCurrentService(): IStorageService | null {
     return this.currentService;
+  }
+
+  private fingerprintConfig(config: unknown): string {
+    if (!config || typeof config !== 'object') return '';
+    const keys = Object.keys(config as Record<string, unknown>).sort();
+    return JSON.stringify(config, keys);
   }
 
   /**
@@ -164,6 +173,7 @@ export class StorageFactory {
   reset(): void {
     this.currentService = null;
     this.currentProvider = null;
+    this.currentConfigFingerprint = null;
   }
 }
 

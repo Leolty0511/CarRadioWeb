@@ -33,6 +33,8 @@ const PAGE_PERMISSION_DEPENDENCIES: Record<string, string[]> = {
   'pages:announcements': ['announcements:read'],
   'pages:software': ['software:read'],
   'pages:resources': ['resources:read'],
+  'pages:downloads': ['software:read'],
+  'pages:user-manual': ['resources:read'],
   'pages:feedback': ['feedback:read'],
   'pages:forms': ['feedback:read'],
   'pages:contact': ['contacts:read'],
