@@ -150,7 +150,7 @@ export async function getCountryStats(options?: {
   if (options?.sortBy) {
     params.sortBy = options.sortBy;
   }
-  if (options?.limit) {
+  if (options?.limit !== undefined) {
     params.limit = options.limit;
   }
 

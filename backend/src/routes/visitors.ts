@@ -84,10 +84,13 @@ router.get('/countries', authenticateUser, requirePermission(PERMISSIONS.visitor
   try {
     const { includeInvalid, sortBy, limit } = req.query;
     
+    const parsedLimit = limit ? Number.parseInt(limit as string, 10) : undefined;
     const stats = await visitorService.getCountryStats({
       includeInvalid: includeInvalid === 'true',
       sortBy: (sortBy as 'uv' | 'pv') || 'uv',
-      limit: limit ? parseInt(limit as string) : 50
+      // Omit the limit by default. There are fewer than 250 ISO countries,
+      // and the map must receive every country with recorded visitors.
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined
     });
     
     res.json({

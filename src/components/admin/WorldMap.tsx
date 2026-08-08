@@ -14,6 +14,7 @@ interface CountryData {
   countryCode: string
   country: string
   uv: number
+  pv: number
   percentage: number
 }
 
@@ -30,7 +31,8 @@ interface TooltipState {
   x: number
   y: number
   countryName: string
-  visitors: number
+  uv: number
+  pv: number
   showBelow: boolean // true = show below cursor, false = show above
 }
 
@@ -173,6 +175,7 @@ const NUMERIC_TO_ALPHA2: Record<string, string> = {
   '800': 'UG', '804': 'UA', '807': 'MK', '818': 'EG', '826': 'GB',
   '834': 'TZ', '840': 'US', '854': 'BF', '858': 'UY', '860': 'UZ',
   '862': 'VE', '887': 'YE', '894': 'ZM',
+  '383': 'XK', // Kosovo
   '010': 'AQ' // Antarctica
 }
 
@@ -204,7 +207,8 @@ export const WorldMap: React.FC<WorldMapProps> = ({
     x: 0,
     y: 0,
     countryName: '',
-    visitors: 0,
+    uv: 0,
+    pv: 0,
     showBelow: false
   })
 
@@ -212,7 +216,23 @@ export const WorldMap: React.FC<WorldMapProps> = ({
   const dataMap = useMemo(() => {
     const map = new Map<string, CountryData>()
     data.forEach(d => {
-      map.set(d.countryCode.toUpperCase(), d)
+      const rawCode = String(d.countryCode || '').trim().toUpperCase()
+      const normalizedCode = NUMERIC_TO_ALPHA2[rawCode] || rawCode
+      if (!normalizedCode) {return}
+
+      // Keep the aggregate if a legacy API response still contains duplicate
+      // rows for one country code.
+      const existing = map.get(normalizedCode)
+      if (existing) {
+        map.set(normalizedCode, {
+          ...existing,
+          uv: existing.uv + d.uv,
+          pv: existing.pv + d.pv,
+          percentage: existing.percentage + d.percentage
+        })
+      } else {
+        map.set(normalizedCode, { ...d, countryCode: normalizedCode })
+      }
     })
     return map
   }, [data])
@@ -244,7 +264,8 @@ export const WorldMap: React.FC<WorldMapProps> = ({
       x,
       y,
       countryName,
-      visitors: countryData?.uv ?? 0,
+      uv: countryData?.uv ?? 0,
+      pv: countryData?.pv ?? 0,
       showBelow
     })
   }, [dataMap])
@@ -404,7 +425,9 @@ export const WorldMap: React.FC<WorldMapProps> = ({
         >
           <div className="text-sm font-medium">{tooltip.countryName}</div>
           <div className="text-xs text-blue-300">
-            {tooltip.visitors > 0 ? `${formatNumber(tooltip.visitors)} 访客` : '暂无访客'}
+            {tooltip.uv > 0 ? `UV ${formatNumber(tooltip.uv)}` : 'UV 0'}
+            <span className="mx-1 text-slate-400">·</span>
+            {tooltip.pv > 0 ? `PV ${formatNumber(tooltip.pv)}` : 'PV 0'}
           </div>
           {/* Arrow - points up when showing below, points down when showing above */}
           <div

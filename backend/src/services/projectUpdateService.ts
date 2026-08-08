@@ -158,7 +158,9 @@ function toUpdateLog(commits: GithubCommit[]): ProjectUpdateLogEntry[] {
   return commits
     .map(entry => {
       const commit = entry.sha || ''
-      const message = (entry.commit?.message || '').split('\n')[0].trim()
+      // Preserve the full commit message so the admin detail dialog can show
+      // the body and its original line breaks.
+      const message = (entry.commit?.message || '').trim()
       return {
         commit,
         shortCommit: commit.slice(0, 7),
@@ -373,7 +375,7 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
             const log = await runGit([
               'log',
               '--max-count=30',
-              '--format=%H%x00%h%x00%s%x00%an%x00%aI%x1e',
+              '--format=%H%x00%h%x00%B%x00%an%x00%aI%x1e',
               `HEAD..origin/${branch}`,
             ])
             updateLog = parseUpdateLog(log.stdout)

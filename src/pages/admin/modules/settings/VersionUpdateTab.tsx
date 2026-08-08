@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
 import {
   applyProjectUpdate,
@@ -17,6 +18,7 @@ import {
   getProjectUpdateInfo,
   getProjectUpdateStatus,
   type ProjectUpdateInfo,
+  type ProjectUpdateLogEntry,
   type UpdateJobStatus,
 } from '@/services/projectUpdateService'
 
@@ -59,6 +61,7 @@ export function VersionUpdateTab() {
   const [checking, setChecking] = useState(false)
   const [starting, setStarting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [selectedLog, setSelectedLog] = useState<ProjectUpdateLogEntry | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -232,12 +235,21 @@ export function VersionUpdateTab() {
               </div>
               <ol className="max-h-72 divide-y divide-slate-100 overflow-y-auto border-y border-slate-100 dark:divide-slate-800 dark:border-slate-800">
                 {updateLog.map(entry => (
-                  <li key={entry.commit} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4">
-                    <div className="min-w-0">
-                      <p className="break-words text-sm font-medium text-slate-800 dark:text-slate-200">{entry.message}</p>
-                      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.shortCommit} · {entry.author}</p>
-                    </div>
-                    <time className="text-xs text-slate-400" dateTime={entry.committedAt}>{formatLogDate(entry.committedAt)}</time>
+                  <li key={entry.commit}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLog(entry)}
+                      className="grid w-full gap-1 py-3 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 dark:hover:bg-slate-800/60 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-4"
+                      aria-label={`查看提交 ${entry.shortCommit} 的完整更新内容`}
+                    >
+                      <div className="min-w-0 px-2 sm:px-3">
+                        <p className="break-words text-sm font-medium text-slate-800 dark:text-slate-200">
+                          {entry.message.split(/\r?\n/, 1)[0]}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{entry.shortCommit} · {entry.author}</p>
+                      </div>
+                      <time className="px-2 text-xs text-slate-400 sm:px-3" dateTime={entry.committedAt}>{formatLogDate(entry.committedAt)}</time>
+                    </button>
                   </li>
                 ))}
               </ol>
@@ -267,6 +279,33 @@ export function VersionUpdateTab() {
           </div>
         </CardContent>
       </Card>
+
+      <Modal
+        isOpen={Boolean(selectedLog)}
+        onClose={() => setSelectedLog(null)}
+        title="完整更新内容"
+        size="lg"
+      >
+        {selectedLog && (
+          <article className="space-y-4">
+            <div>
+              <h3 className="break-words text-lg font-semibold text-slate-900 dark:text-white">
+                {selectedLog.message.split(/\r?\n/, 1)[0]}
+              </h3>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+                <span>提交：{selectedLog.shortCommit}</span>
+                <span>作者：{selectedLog.author}</span>
+                <time dateTime={selectedLog.committedAt}>时间：{formatDate(selectedLog.committedAt)}</time>
+              </div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950/50">
+              <div className="whitespace-pre-wrap break-words text-sm leading-7 text-slate-700 dark:text-slate-200">
+                {selectedLog.message}
+              </div>
+            </div>
+          </article>
+        )}
+      </Modal>
 
       <ConfirmDialog
         isOpen={confirmOpen}

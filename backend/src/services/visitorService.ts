@@ -343,7 +343,7 @@ class VisitorService {
     sortBy?: 'uv' | 'pv';
     limit?: number;
   } = {}): Promise<CountryStats[]> {
-    const { includeInvalid = false, sortBy = 'uv', limit = 50 } = options;
+    const { includeInvalid = false, sortBy = 'uv', limit } = options;
 
     try {
       const matchStage: any = {};
@@ -355,20 +355,30 @@ class VisitorService {
         { $match: matchStage },
         {
           $group: {
-            _id: { country: '$country', countryCode: '$countryCode' },
+            // Geo providers can return different country names for the same
+            // ISO code. Group by the normalized code so one country is never
+            // split into several rows (and then lost from the map lookup).
+            _id: {
+              countryCode: {
+                $toUpper: {
+                  $trim: { input: { $ifNull: ['$countryCode', 'XX'] } }
+                }
+              }
+            },
+            country: { $first: '$country' },
             uv: { $sum: 1 },
             pv: { $sum: '$visitCount' }
           }
         },
         { $sort: sortBy === 'uv' ? { uv: -1 } : { pv: -1 } },
-        { $limit: limit }
+        ...(typeof limit === 'number' && limit > 0 ? [{ $limit: limit }] : [])
       ]);
 
       // 计算总数用于百分比
       const totalUV = result.reduce((sum, item) => sum + item.uv, 0);
 
       return result.map(item => ({
-        country: item._id.country,
+        country: item.country || item._id.countryCode,
         countryCode: item._id.countryCode,
         uv: item.uv,
         pv: item.pv,

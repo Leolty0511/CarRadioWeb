@@ -434,8 +434,9 @@ export const VisitorStatsManagement: React.FC = () => {
 
   const loadCountries = useCallback(async () => {
     try {
-      // Load the full country set for the map; the compact list below still shows only the top entries.
-      const data = await visitorService.getCountryStats({ includeInvalid: true, limit: 250 })
+      // Load every country for the map; the compact list below still shows
+      // only the top entries. A limit of 0 means "no limit" on the API.
+      const data = await visitorService.getCountryStats({ includeInvalid: true, limit: 0 })
       setCountries(data)
     } catch (err) {
       console.error('加载国家列表失败:', err)
