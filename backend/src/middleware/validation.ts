@@ -562,6 +562,15 @@ export const validateDocument = (documentType: string) => {
     const data = req.body;
     const isCreate = req.method === 'POST';
     const requireGeneralFields = isCreate && documentType === 'general';
+
+    if (documentType === 'general' && data.type === 'enhanced-article') {
+      data.type = 'article';
+    }
+    if (documentType === 'general' && !data.content && Array.isArray(data.sections)) {
+      data.content = data.sections
+        .map((section: any) => `<h2>${String(section.heading || '')}</h2>${String(section.content || '')}`)
+        .join('\n');
+    }
     
     // Fields required by every persisted document schema.
     validator

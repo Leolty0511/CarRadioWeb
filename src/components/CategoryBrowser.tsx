@@ -424,10 +424,10 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
                         } ${t('category.documents')}`}
                     </span>
                     <div className="flex items-center space-x-1">
-                      {category.documentTypes.includes('general') && (
+                      {Array.isArray(category.documentTypes) && category.documentTypes.includes('general') && (
                         <FileText className="h-3 w-3 text-slate-400 dark:text-gray-500" />
                       )}
-                      {category.documentTypes.includes('video') && (
+                      {Array.isArray(category.documentTypes) && category.documentTypes.includes('video') && (
                         <Video className="h-3 w-3 text-slate-400 dark:text-gray-500" />
                       )}
                     </div>

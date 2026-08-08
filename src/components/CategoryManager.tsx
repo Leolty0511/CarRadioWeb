@@ -274,17 +274,17 @@ const CategoryManager: React.FC = () => {
                       </span>
                       <span className="text-xs text-slate-500 dark:text-gray-500">•</span>
                       <div className="flex space-x-1">
-                        {category.documentTypes.includes('general') && (
+                        {Array.isArray(category.documentTypes) && category.documentTypes.includes('general') && (
                           <span title={t('category.generalTutorials')}>
                             <FileText className="h-3 w-3 text-slate-500 dark:text-gray-500" />
                           </span>
                         )}
-                        {category.documentTypes.includes('video') && (
+                        {Array.isArray(category.documentTypes) && category.documentTypes.includes('video') && (
                           <span title={t('category.videoTutorials')}>
                             <Video className="h-3 w-3 text-slate-500 dark:text-gray-500" />
                           </span>
                         )}
-                        {category.documentTypes.includes('product') && (
+                        {Array.isArray(category.documentTypes) && category.documentTypes.includes('product') && (
                           <span title="产品分类">
                             <Tag className="h-3 w-3 text-slate-500 dark:text-gray-500" />
                           </span>

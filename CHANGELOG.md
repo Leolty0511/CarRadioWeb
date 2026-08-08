@@ -6,6 +6,11 @@
 
 - Fixed the image-and-text tutorial category selector so existing categories are loaded and searchable.
 - Kept legacy categories visible when older records do not contain document type metadata.
+- Kept legacy categories visible when older records do not contain a language field.
+- Showed configured video categories before their first published video, so navigation does not depend on content already existing.
+- Prevented category browsing and management from crashing on legacy category records with missing metadata.
+- Normalized legacy `enhanced-article` drafts and reconstructed HTML content from image-text sections before validation and persistence.
+- Fixed global knowledge-base search fields and result links to match the current document schema and routes.
 - Added a loading state while categories are being fetched.
 
 ## [1.2.3] - 2026-08-08

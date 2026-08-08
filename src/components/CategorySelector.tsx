@@ -46,12 +46,11 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
       try {
         const data = await getActiveCategories();
         if (cancelled) {return;}
-        const filtered = documentType
-          ? data.filter(category =>
-            !Array.isArray(category.documentTypes) ||
-            category.documentTypes.length === 0 ||
-            category.documentTypes.includes(documentType)
-          )
+        const filtered = documentType === 'structured' || documentType === 'product'
+          ? data.filter(category => {
+            const types = Array.isArray(category.documentTypes) ? category.documentTypes : [];
+            return types.length === 0 || types.includes(documentType);
+          })
           : data;
         const selected = selectedCategory
           ? data.find(category => category.name === selectedCategory)

@@ -17,7 +17,7 @@ export class CategoryService {
    */
   async getActiveCategories(language?: string): Promise<ICategory[]> {
     const query: any = { isActive: true };
-    if (language) query.language = language;
+    if (language) query.language = { $in: [language, null] };
     return await Category.find(query).sort({ order: 1, name: 1 });
   }
 
@@ -27,9 +27,14 @@ export class CategoryService {
   async getCategoriesByDocumentType(documentType: 'general' | 'video' | 'structured' | 'product', language?: string): Promise<ICategory[]> {
     const query: any = {
       isActive: true,
-      documentTypes: documentType
+      $or: [
+        { documentTypes: documentType },
+        { documentTypes: { $exists: false } },
+        { documentTypes: { $size: 0 } },
+        { documentTypes: null },
+      ],
     };
-    if (language) query.language = language;
+    if (language) query.language = { $in: [language, null] };
     return await Category.find(query).sort({ order: 1, name: 1 });
   }
 
@@ -37,25 +42,20 @@ export class CategoryService {
     tutorialType: 'installation' | 'device-operation',
     language?: string
   ): Promise<ICategory[]> {
-    const videoQuery: any = { status: 'published' };
-    if (language) {videoQuery.language = language;}
-    if (tutorialType === 'installation') {
-      videoQuery.$or = [
-        { tutorialType: 'installation' },
-        { tutorialType: { $exists: false } },
-        { tutorialType: null }
-      ];
-    } else {
-      videoQuery.tutorialType = 'device-operation';
-    }
+    // Categories are navigation data. Show enabled categories even before the
+    // first video is published so the front end does not hide configured tags.
+    void tutorialType;
 
-    const categoryNames = await VideoTutorial.distinct('category', videoQuery);
     const categoryQuery: any = {
       isActive: true,
-      documentTypes: 'video',
-      name: { $in: categoryNames.filter(Boolean) }
+      $or: [
+        { documentTypes: 'video' },
+        { documentTypes: { $exists: false } },
+        { documentTypes: { $size: 0 } },
+        { documentTypes: null },
+      ],
     };
-    if (language) {categoryQuery.language = language;}
+    if (language) {categoryQuery.language = { $in: [language, null] };}
     return Category.find(categoryQuery).sort({ order: 1, name: 1 });
   }
 

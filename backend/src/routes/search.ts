@@ -123,90 +123,101 @@ router.get('/', optionalContentAccess, async (req: Request, res: Response) => {
     // Search documents (general and video tutorials)
     const documents = await Document.find({
       $or: [
-        { [`title.${lang}`]: searchRegex },
-        { [`content.${lang}`]: searchRegex }
+        { title: searchRegex },
+        { content: searchRegex },
+        { summary: searchRegex },
+        { description: searchRegex },
+        { category: searchRegex },
       ],
       status: 'published',
       documentType: { $in: ['general', 'video'] }
     })
       .limit(MAX_RESULTS_PER_TYPE)
-      .select('title documentType slug heroImage')
+      .select('title documentType slug thumbnail vehicleImage basicInfo')
       .lean()
 
     documents.forEach((doc) => {
       const typedDoc = doc as unknown as {
         _id: unknown
-        title?: Record<string, string>
+        title?: string | Record<string, string>
         documentType?: string
         slug?: string
-        heroImage?: string
+        thumbnail?: string
+        vehicleImage?: string
+        basicInfo?: { vehicleImage?: string }
       }
       results.push({
         type: 'document',
         id: String(typedDoc._id),
-        title: typedDoc.title?.[lang] || typedDoc.title?.en || '',
-        url: `/knowledge/document/${typedDoc.slug || typedDoc._id}`,
-        image: typedDoc.heroImage
+        title: typeof typedDoc.title === 'string' ? typedDoc.title : typedDoc.title?.[lang] || typedDoc.title?.en || '',
+        url: `/knowledge/${typedDoc.documentType === 'video' ? 'video' : 'article'}/${typedDoc.slug || typedDoc._id}`,
+        image: typedDoc.thumbnail || typedDoc.vehicleImage
       })
     })
 
     // Search structured documents (title match)
     const structuredDocs = await Document.find({
-      [`title.${lang}`]: searchRegex,
+      $or: [
+        { 'basicInfo.brand': searchRegex },
+        { 'basicInfo.model': searchRegex },
+        { 'basicInfo.yearRange': searchRegex },
+        { title: searchRegex },
+      ],
       status: 'published',
       documentType: 'structured'
     })
       .limit(MAX_RESULTS_PER_TYPE)
-      .select('title slug heroImage')
+      .select('title slug vehicleImage basicInfo')
       .lean()
 
     structuredDocs.forEach((doc) => {
       const typedDoc = doc as unknown as {
         _id: unknown
-        title?: Record<string, string>
+        title?: string | Record<string, string>
         slug?: string
-        heroImage?: string
+        vehicleImage?: string
+        basicInfo?: { vehicleImage?: string }
       }
       results.push({
         type: 'document',
         id: String(typedDoc._id),
-        title: typedDoc.title?.[lang] || typedDoc.title?.en || '',
-        url: `/knowledge/document/${typedDoc.slug || typedDoc._id}`,
-        image: typedDoc.heroImage
+        title: typeof typedDoc.title === 'string' ? typedDoc.title : typedDoc.title?.[lang] || typedDoc.title?.en || '',
+        url: `/knowledge/vehicle/${typedDoc.slug || typedDoc._id}`,
+        image: typedDoc.vehicleImage || typedDoc.basicInfo?.vehicleImage
       })
     })
 
     // Search FAQ (structured documents with FAQ sections)
     const faqDocs = await Document.find({
       documentType: 'structured',
-      'structuredContent.faqs': { $exists: true, $ne: [] },
+      faqs: { $exists: true, $ne: [] },
+      $or: [{ 'faqs.title': searchRegex }, { 'faqs.description': searchRegex }],
       status: 'published'
     })
       .limit(MAX_RESULTS_PER_TYPE * 2)
-      .select('title structuredContent slug')
+      .select('title faqs slug')
       .lean()
 
     faqDocs.forEach((doc) => {
       const typedDoc = doc as unknown as {
         _id: unknown
-        title?: Record<string, string>
-        structuredContent?: {
-          faqs?: Array<{
-            question?: Record<string, string>
-            answer?: Record<string, string>
+        title?: string | Record<string, string>
+        faqs?: Array<{
+            id?: string
+            title?: string
+            description?: string
           }>
-        }
         slug?: string
       }
-      const faqs = typedDoc.structuredContent?.faqs || []
+      const faqs = typedDoc.faqs || []
       faqs.forEach((faq, idx) => {
-        const question = faq.question?.[lang] || faq.question?.en || ''
-        if (searchRegex.test(question)) {
+        const question = faq.title || ''
+        if (searchRegex.test(question) || searchRegex.test(faq.description || '')) {
           results.push({
             type: 'faq',
             id: `${typedDoc._id}-faq-${idx}`,
             title: question,
-            url: `/knowledge/document/${typedDoc.slug || typedDoc._id}#faq-${idx}`
+            url: `/knowledge/vehicle/${typedDoc.slug || typedDoc._id}#faq-${idx}`
           })
         }
       })

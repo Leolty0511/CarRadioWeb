@@ -29,8 +29,15 @@ export class DocumentService {
     author: IUser
   ): Promise<IGeneralDocument> {
     try {
+      const normalizedData: any = { ...documentData };
+      if (normalizedData.type === 'enhanced-article') normalizedData.type = 'article';
+      if (!normalizedData.content && Array.isArray(normalizedData.sections)) {
+        normalizedData.content = normalizedData.sections
+          .map((section: any) => `<h2>${String(section.heading || '')}</h2>${String(section.content || '')}`)
+          .join('\n');
+      }
       const document = new GeneralDocument({
-        ...documentData,
+        ...normalizedData,
         author: documentData.author || author.nickname, // Use nickname as fallback author
         authorId: author._id,
         status: documentData.status || 'published', // 默认为已发布，方便管理员使用
@@ -41,8 +48,8 @@ export class DocumentService {
       const savedDocument = await document.save();
       
       // 处理图片引用
-      if (documentData.images && documentData.images.length > 0) {
-        await this.processImageReferences((savedDocument._id as any).toString(), documentData.images, 'general');
+      if (normalizedData.images && normalizedData.images.length > 0) {
+        await this.processImageReferences((savedDocument._id as any).toString(), normalizedData.images, 'general');
       }
 
       // 更新分类统计
@@ -145,23 +152,31 @@ export class DocumentService {
       const document = await GeneralDocument.findById(id);
       if (!document) return null;
 
+      const normalizedUpdates: any = { ...updates };
+      if (normalizedUpdates.type === 'enhanced-article') normalizedUpdates.type = 'article';
+      if (!normalizedUpdates.content && Array.isArray(normalizedUpdates.sections)) {
+        normalizedUpdates.content = normalizedUpdates.sections
+          .map((section: any) => `<h2>${String(section.heading || '')}</h2>${String(section.content || '')}`)
+          .join('\n');
+      }
+
       // 记录旧分类，用于后续更新统计
       const oldCategory = document.category;
 
       // 处理图片更新
-      if (updates.images) {
-        await this.updateDocumentImages(id, document.images, updates.images, 'general');
+      if (normalizedUpdates.images) {
+        await this.updateDocumentImages(id, document.images, normalizedUpdates.images, 'general');
       }
 
       const updatedDocument = await GeneralDocument.findByIdAndUpdate(
         id,
-        { ...updates, updatedAt: new Date() },
+        { ...normalizedUpdates, updatedAt: new Date() },
         { new: true, runValidators: true }
       );
 
       // 如果分类或状态发生变化，更新相关分类的文档统计
-      const newCategory = updates.category || oldCategory;
-      if (oldCategory !== newCategory || updates.status) {
+      const newCategory = normalizedUpdates.category || oldCategory;
+      if (oldCategory !== newCategory || normalizedUpdates.status) {
         const catSvc = await getCategoryService();
         
         // 更新旧分类的统计
