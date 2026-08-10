@@ -1771,7 +1771,15 @@
     "openInNewTab": "新窗口打开",
     "noManuals": "暂无用户手册",
     "noManualsDesc": "目前还没有上传用户手册",
-    "previewNotSupported": "您的浏览器不支持 PDF 预览"
+    "previewNotSupported": "您的浏览器不支持 PDF 预览",
+    "categoryDescription": "查看该产品分类下的用户手册",
+    "manualCount": "{{count}} 份手册",
+    "backToCategories": "返回分类",
+    "backToManuals": "返回手册列表",
+    "noCategoryManuals": "暂无手册",
+    "noCategoryManualsDesc": "该分类还没有已发布的用户手册",
+    "model": "型号",
+    "version": "版本"
   },
   "vehicleSelector": {
     "title": "车辆选择",

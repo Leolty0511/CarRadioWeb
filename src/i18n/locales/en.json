@@ -850,7 +850,15 @@
     "openInNewTab": "Open in New Tab",
     "noManuals": "No User Manuals",
     "noManualsDesc": "No user manuals have been uploaded yet",
-    "previewNotSupported": "Your browser does not support PDF preview"
+    "previewNotSupported": "Your browser does not support PDF preview",
+    "categoryDescription": "Browse the user manuals in this product category",
+    "manualCount": "{{count}} manuals",
+    "backToCategories": "Back to categories",
+    "backToManuals": "Back to manual list",
+    "noCategoryManuals": "No manuals in this category",
+    "noCategoryManualsDesc": "No published user manuals are available in this category yet",
+    "model": "Model",
+    "version": "Version"
   },
   "vehicleSelector": {
     "title": "Vehicle Selection",

@@ -34,12 +34,6 @@ function slugify(value: string) {
   return slug || `manual-category-${Date.now()}`
 }
 
-async function getUncategorizedCategory() {
-  let category = await ManualCategory.findOne({ slug: 'uncategorized' })
-  if (!category) category = await ManualCategory.create({ name: '未分类', slug: 'uncategorized', order: 9999, isActive: true })
-  return category
-}
-
 /** Register PDF files that pre-date the metadata model without changing their URLs. */
 async function syncLegacyFiles() {
   if (fs.existsSync(LEGACY_PDF_DIR) && path.resolve(LEGACY_PDF_DIR) !== path.resolve(PDF_DIR)) {
@@ -50,14 +44,13 @@ async function syncLegacyFiles() {
       if (!fs.existsSync(target)) await fsp.rename(source, target).catch(() => undefined)
     }
   }
-  const category = await getUncategorizedCategory()
   const files = (await fsp.readdir(PDF_DIR)).filter(file => path.extname(file).toLowerCase() === '.pdf')
   for (const filename of files) {
     const exists = await UserManual.exists({ filename })
     if (exists) continue
     const stats = await fsp.stat(path.join(PDF_DIR, filename))
     const base = filename.replace(/\.pdf$/i, '')
-    await UserManual.create({ filename, title: base, productModel: base, categoryId: category._id, size: stats.size })
+    await UserManual.create({ filename, title: base, productModel: base, size: stats.size })
   }
 }
 
@@ -77,10 +70,10 @@ function serializeManual(manual: any) {
 
 async function listCategories(includeEmpty = false) {
   const categories = await ManualCategory.find({ ...(includeEmpty ? {} : { isActive: true }) }).sort({ order: 1, name: 1 }).lean()
-  if (includeEmpty) return categories
   const counts = await UserManual.aggregate([{ $match: { isPublished: true } }, { $group: { _id: '$categoryId', count: { $sum: 1 } } }])
   const countMap = new Map(counts.map(item => [String(item._id), item.count]))
-  return categories.map(category => ({ ...category, manualCount: countMap.get(String(category._id)) || 0 })).filter(category => category.manualCount > 0)
+  const categoriesWithCounts = categories.map(category => ({ ...category, manualCount: countMap.get(String(category._id)) || 0 }))
+  return includeEmpty ? categoriesWithCounts : categoriesWithCounts.filter(category => category.manualCount > 0)
 }
 
 router.get('/categories', async (_req, res) => {
@@ -151,11 +144,10 @@ router.put('/categories/:id', authenticateUser, requireAnyPermission(PERMISSIONS
 router.delete('/categories/:id', authenticateUser, requirePermission(PERMISSIONS.resources.delete), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: '无效的分类 ID' })
-    const fallback = await getUncategorizedCategory()
-    if (String(fallback._id) === req.params.id) return res.status(400).json({ success: false, message: '未分类不能删除' })
-    const category = await ManualCategory.findByIdAndDelete(req.params.id)
+    const category = await ManualCategory.findById(req.params.id)
     if (!category) return res.status(404).json({ success: false, message: '分类不存在' })
-    await UserManual.updateMany({ categoryId: category._id }, { categoryId: fallback._id })
+    await UserManual.updateMany({ categoryId: category._id }, { $unset: { categoryId: 1 } })
+    await ManualCategory.deleteOne({ _id: category._id })
     res.json({ success: true })
   } catch (error) {
     res.status(500).json({ success: false, message: '删除分类失败' })
@@ -171,7 +163,7 @@ router.post('/upload', authenticateUser, requireAnyPermission(PERMISSIONS.resour
       await fsp.unlink(req.file.path).catch(() => undefined)
       return res.status(400).json({ success: false, message: '请填写手册标题和产品型号' })
     }
-    const categoryId = req.body.categoryId && mongoose.isValidObjectId(req.body.categoryId) ? req.body.categoryId : (await getUncategorizedCategory())._id
+    const categoryId = req.body.categoryId && mongoose.isValidObjectId(req.body.categoryId) ? req.body.categoryId : undefined
     const existing = await UserManual.findOne({ filename: req.file.filename })
     if (existing) await UserManual.deleteOne({ _id: existing._id })
     const manual = await UserManual.create({ filename: req.file.filename, title, productModel, categoryId, description: String(req.body.description || ''), version: String(req.body.version || ''), sortOrder: Number(req.body.sortOrder) || 0, isPublished: req.body.isPublished !== 'false', size: req.file.size })
@@ -188,7 +180,7 @@ router.put('/:id', authenticateUser, requireAnyPermission(PERMISSIONS.resources.
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: '无效的手册 ID' })
     const updates: Record<string, any> = {}
     for (const key of ['title', 'productModel', 'description', 'version']) if (req.body[key] !== undefined) updates[key] = String(req.body[key]).trim()
-    if (req.body.categoryId !== undefined) updates.categoryId = mongoose.isValidObjectId(req.body.categoryId) ? req.body.categoryId : (await getUncategorizedCategory())._id
+    if (req.body.categoryId !== undefined) updates.categoryId = mongoose.isValidObjectId(req.body.categoryId) ? req.body.categoryId : null
     if (req.body.sortOrder !== undefined) updates.sortOrder = Number(req.body.sortOrder) || 0
     if (req.body.isPublished !== undefined) updates.isPublished = Boolean(req.body.isPublished)
     const manual = await UserManual.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true }).populate('categoryId', 'name slug description')
