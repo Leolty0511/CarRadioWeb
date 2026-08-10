@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/readme/hero.svg" width="100%" alt="CarRadioWeb — Automotive Electronics Knowledge Base & Product Showcase Platform">
+  <img src="./assets/readme/hero.svg" width="100%" alt="CarRadioWeb — 汽车电子知识库与产品展示平台">
 </p>
 
 <p align="center">
@@ -18,257 +18,217 @@
 
 <br>
 
-**CarRadioWeb** is a full-featured knowledge base and product showcase platform for automotive electronics aftermarket brands. Manage product documentation, vehicle compatibility, AI-powered support, and a community forum — all from a unified admin panel.
+**CarRadioWeb** is a knowledge-base and product showcase platform for automotive-electronics aftermarket brands (frontend React + TypeScript, backend Node.js + TypeScript). It supports product documentation, vehicle compatibility, AI assistant integration and an admin CMS with multilanguage support.
 
-**Target products:** Car head units, CarPlay / Android Auto adapters, dash cameras, and related aftermarket infotainment electronics.
-
----
-
-## Features
-
-<p align="center">
-  <img src="./assets/readme/section-features.svg" width="100%" alt="CarRadioWeb capabilities: product catalog, knowledge base, AI assistant, admin dashboard, Flarum forum">
-</p>
-
-### Public Site
-
-| Feature | Details |
-|---------|---------|
-| 🌐 **Multi-language** | English, Chinese, Russian — full i18n |
-| 📦 **Product Catalog** | Vehicle compatibility matrix, rich media, categories |
-| 📚 **Knowledge Base** | Structured documents, rich text editor, video tutorials, search |
-| 🤖 **AI Assistant** | 18+ providers, knowledge-indexed Q&A, custom model |
-| 🎨 **Theme** | Dark/light toggle, responsive design |
-| 🛠 **Tools** | Audio EQ reference, audio file generator |
-
-### Admin Panel (`/admin`)
-
-| Module | Description |
-|--------|-------------|
-| Document Management | Rich text editor, video, drafts, structured articles |
-| Product Management | CRUD + vehicle compatibility matrix |
-| Category Management | Hierarchical with sorting |
-| AI Configuration | 18+ providers, custom model, usage tracking |
-| Hero Banners | Homepage carousel configuration |
-| Visitor Analytics | Geo-location, device stats, page views |
-| User Management | Invite by email, RBAC permissions |
-| Audit Log | Operation history (30-day retention, super_admin) |
-| Site Settings | Name, description, copyright, social links, default map |
-| SEO Settings | Per-page meta tags, keywords, Open Graph |
-| Module Settings | Toggle frontend modules, Flarum forum management |
-| Storage Settings | Alibaba Cloud OSS configuration |
-| CAN Bus Settings | Vehicle CAN bus parameter management |
-| Flarum Forum | One-click Docker deploy, plugin install/uninstall, self-hosted extensions |
-| Compliance & Leads | Cookie banner, legal pages, newsletter, email campaigns |
-
-### Public API (no auth)
-
-| Endpoint | Purpose |
-|----------|---------|
-| `GET /api/legal-versions/public?docType=privacy\|terms\|disclaimer` | Latest legal version |
-| `GET /api/legal-versions/content/public?docType=…&locale=en\|zh` | Legal content by locale |
-| `POST /api/newsletter/subscribe` | Email newsletter signup |
-| `POST /api/newsletter/unsubscribe` | Body: `{ "token": "…" }` |
+> Note: This README was updated (2026-08-10) to reflect recent codebase additions — security hardening, monitoring, rate limiting, automatic update service and additional API routes. Please read the "运维与安全注意" section below.
 
 ---
 
-## Quick Start
+## Features (high level)
 
-### Prerequisites
+- Multi-language site (i18n: en / zh / ru)
+- Product catalog with vehicle compatibility matrix
+- Knowledge base: structured documents, rich editor, video tutorials
+- AI Assistant (multiple providers support)
+- Admin Panel (content, products, categories, AI configuration, hero banners, analytics, audit logs)
+- Forum integration (Flarum)
+- Public API for documents, products, search and more
+
+---
+
+## 最近代码更新与重要改动（2026-08-10）
+
+以下为代码中已添加或强化但 README 旧版本可能未详细说明的要点（建议运维人员与管理员重点阅读）：
+
+- 安全性与监控
+  - Sentry 已集成并在启动时初始化（错误追踪与请求追踪）。
+  - CSRF 防护中间件已启用（双提交 Cookie 模式）。
+  - Helmet 与自定义安全头、全局输入清洗（express-mongo-sanitize / securityFilters）。
+  - JWT_SECRET / SESSION_SECRET 在生产环境有严格校验（长度与弱字符串检查）。
+
+- 限流与防滥用
+  - 全局与局部限流策略（publicApiLimiter、trackVisitRateLimit 等），防止爬虫滥用或 DoS。
+
+- 缓存与性能
+  - Redis 支持（initRedis），当 REDIS_URL 配置后会启用缓存/会话改进。
+  - 启用了 gzip/brotli 压缩（compression），并使用 Pino 结构化日志。
+
+- 路由与功能扩展
+  - 新增 /api/v1 版本化路由和 /api/forum（Flarum 管理）接口。
+  - 新增/明确的路由：products、heroBanners、seo、faq、search、userManual、pageContent、resourceLinks、siteImages、visitors、canbusSettings 等。
+
+- 运维自动化与自更新
+  - 后端包含自动更新检查与触发逻辑（backend/src/services/projectUpdateService.ts）。
+  - 自动检查默认每 72 小时执行一次，管理员可通过后台触发更新任务，更新进度写入状态文件（可配置 UPDATE_STATUS_FILE）。
+  - 自更新依赖 runner 脚本（scripts/projectUpdateRunner.js），部署时需包含该 runner 并确保 PM2 配置（pm2 重启支持）。
+
+- 其它改进
+  - 健康与就绪探针支持（isSystemReady、/health/ready）。
+  - 动态本地上传路径以数据库中 StorageSettings 为准（提高灵活性）。
+  - 启动时会确保 admin 索引并创建默认管理员（ensureAdminIndexes, ensureDefaultAdmin）。
+
+---
+
+## 快速开始（开发）
+
+### 前置条件
 
 - Node.js >= 18
 - MongoDB >= 6
-- Redis (optional — falls back to memory cache)
+- Redis（可选，但推荐）
 
-### Install
+### 安装
 
 ```bash
 npm install
 cd backend && npm install && cd ..
 ```
 
-### Configure
+### 配置（示例）
 
 ```bash
 cp .env.example .env.local
 cp backend/config.env.example backend/config.env
 ```
 
-**Backend** (`backend/config.env`):
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `MONGODB_URI` | Yes | MongoDB connection string |
-| `JWT_SECRET` | Yes | Strong random string for auth |
-| `SESSION_SECRET` | Yes | Express session secret |
-| `SMTP_HOST` / `SMTP_PORT` | For email | Mailpit locally (`127.0.0.1:1025`) |
-| `OSS_*` | For uploads | Alibaba Cloud OSS credentials |
-| `OPENAI_API_KEY` | For AI | OpenAI / DeepSeek API key |
-| `CORS_ORIGIN` | Yes | Allowed origins (comma-separated) |
-
-**Frontend** (`.env.local`):
-
-| Variable | Description |
-|----------|-------------|
-| `VITE_API_BASE_URL` | API base path (default `/api`) |
-| `VITE_SITE_URL` | Site URL for SEO structured data |
-| `VITE_ENABLE_AI_ASSISTANT` | Enable AI chat (`true`/`false`) |
-
-### Development
+### 开发运行
 
 ```bash
-# Start both backend + frontend (backend first, waits for port 3000)
+# 启动前后端（backend 会等待端口）
 npm run dev:all
 
-# Or separately:
-npm run dev:backend   # Backend on :3000
-npm run dev           # Frontend on :3001
+# 或分别启动：
+npm run dev:backend   # 后端（默认 :3000）
+npm run dev           # 前端（Vite，默认 :3001）
 ```
 
-Vite proxy routes `/api` → `localhost:3000`.
+Vite 的开发代理会把 `/api` 转发到 `localhost:3000`。
 
-### Build
+### 构建（生产）
 
 ```bash
-npm run build         # Frontend + backend TypeScript
-npm run lint          # ESLint check
-npm run format        # Prettier
-npm run type-check    # TypeScript check
-npm run test:run      # Vitest
+npm run build
 ```
 
 ---
 
-## Tech Stack
+## 必要的环境变量（重点，需在生产环境确认）
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | React 19 + TypeScript, Vite 7, Tailwind CSS 3.4, PrimeReact 10, Framer Motion |
-| **State & Data** | TanStack Query, React Context, i18next (en / zh / ru) |
-| **Backend** | Node.js + Express 4 + TypeScript |
-| **Database** | MongoDB + Mongoose 8 |
-| **Cache** | Redis (ioredis) |
-| **Storage** | Alibaba Cloud OSS |
-| **AI** | OpenAI SDK / DeepSeek (18+ providers) |
-| **Monitoring** | Sentry, Pino logging |
-| **Infra** | Docker, PM2, Nginx |
+后端（backend/config.env 或在部署环境中设置）：
+
+- MONGODB_URI (必须) — MongoDB 连接字符串
+- JWT_SECRET (必须，生产) — 用于 JWT 签名，建议最少 32 字符并避免常见弱字符串
+- SESSION_SECRET (必须，生产) — Express 会话签名
+- SMTP_HOST / SMTP_PORT — 邮件（本地开发可用 Mailpit）
+- OSS_* — 阿里云 OSS / 对象存储相关配置（若使用对象存储）
+- CORS_ORIGIN (生产必须) — 允许的前端域名（逗号分隔）
+
+新增/与自更新相关的环境变量：
+
+- SELF_UPDATE_ENABLED — 是否允许自更新（默认在 production 下启用，设置为 'false' 可禁用）
+- UPDATE_BRANCH — 要检查/更新的分支（默认 `main`）
+- UPDATE_GITHUB_TOKEN — 用于访问 GitHub API / 下载私有 release 的 token（建议最小权限）
+- UPDATE_ARTIFACT_URL — 可覆盖的发布 artifact 下载地址（可选）
+- UPDATE_STATUS_FILE — 自更新状态文件路径（建议在持久化目录下）
+- PM2_PROCESS_NAME — PM2 进程名，用于自动重启（若使用 pm2）
+- FRONTEND_PM2_PROCESS_NAME — 前端 PM2 进程名（可选）
+- UPDATE_HEALTH_URL — 更新后探测健康的 URL（默认 http://127.0.0.1:<PORT>/health/ready）
+
+前端（.env.local）：
+
+- VITE_API_BASE_URL — API 根路径（默认 `/api`）
+- VITE_SITE_URL — 站点 URL（用于 SEO）
+- VITE_ENABLE_AI_ASSISTANT — 是否启用 AI 聊天（true/false）
+
+安全建议：在生产环境请把所有敏感信息（如 API key/GitHub token）通过部署系统的 secrets 管理，不要直接写入仓库。
 
 ---
 
-## Authentication
+## 部署建议与自更新注意事项
 
-Admin login uses email verification code + password (no OAuth). 
+项目支持两种更新检测模式：
 
-- **First user** registers at `/admin` and becomes `super_admin` (cannot be deleted)
-- **super_admin** has full access + can manage other admins + view audit logs
-- **admin** has granular permissions (page visibility + resource operations like `documents:read`, `products:update`)
-- API returns **403** when JWT lacks required permissions
+1. 有 `.git` 的部署（开发、git checkout 部署）：使用 git 比较 HEAD 与 origin/<branch>，在可 fast-forward 的情况下自动或手动触发更新；
+2. 无 `.git` 的生产构建（artifact 部署）：通过发布的 release 元数据（release.json）和 GitHub API 检查远端是否有新版本，并可下载 release artifact 完成替换。
 
-**SMTP for local development:** Mailpit is included (UI at `http://127.0.0.1:8025`). No real mailbox needed.
+重要安全/运维建议：
+
+- UPDATE_GITHUB_TOKEN 只授予必要最小权限（建议 read-only，例如 repo:public_repo 或更细分的权限），并使用部署环境的 secret 存储。
+- 下载 artifact 后应校验完整性（建议在 CI 中生成并提供校验和或签名），避免中间人注入被替换的包。
+- 在触发更新前务必做好备份（可备份 release.json、dist、uploads 及数据库快照），并在 README 中记录回滚步骤。
+- Runner（scripts/projectUpdateRunner.js）必须被包含在部署包中，否则触发更新会失败（会返回 update_runner_not_built）。
+- 默认状态文件写到系统临时目录（/tmp），建议在生产中把 UPDATE_STATUS_FILE 指向持久化目录并保证进程权限可写。
+- 自更新重启依赖 PM2（或设置 PM2_PROCESS_NAME），请确保进程管理器配置正确。
 
 ---
 
-## Deployment
+## API 路由 （摘录 — 以代码为准）
 
-### Docker (recommended)
+- /api/auth — 认证（邮箱验证码 + 密码）
+- /api/users — 管理员用户（受保护）
+- /api/documents — 文档 CRUD / 前端只读（权限控制）
+- /api/products — 产品管理
+- /api/categories — 分类管理
+- /api/upload — 上传接口（受保护）
+- /api/ai — AI 聊天与配置
+- /api/feedback、/api/document-feedback — 反馈系统
+- /api/visitors — 访客统计（部分接口公开）
+- /api/hero-banners、/api/seo、/api/faq、/api/search 等 — 前端展示与管理
+- /api/forum — Flarum 一键部署与管理接口
+- /api/v1/* — 版本化的 API 路由（推荐新客户端使用）
+
+---
+
+## 运行与运维快速命令
+
+开发环境：
+
+```bash
+npm run dev:all
+# or
+export PORT=3000
+cd backend && npm run dev
+```
+
+生产构建与 PM2：
+
+```bash
+npm run build
+cd backend && pm2 start dist/index.js --name your-backend
+```
+
+Docker（推荐）:
 
 ```bash
 cp .env.docker.example .env
 docker-compose up -d
 ```
 
-| Service | Image | Port |
-|---------|-------|------|
-| `web` | Custom | 3000 |
-| `mongo` | mongo:6 | 27017 |
-| `redis` | redis:7-alpine | 6379 |
-| `nginx` | nginx:alpine | 80/443 |
-
-### PM2
+一键拉取并更新（示例，取决于自更新配置）：
 
 ```bash
-npm run build
-cd backend && pm2 start dist/index.js --name your-app
-```
-
-### Server update (one-liner)
-
-```bash
+# 在服务器上：
 cd /var/www/your-project && git stash && git pull origin main && \
-npm install && cd backend && npm install && cd .. && \
-npm run build && pm2 restart your-app
+  npm install && cd backend && npm install && cd .. && \
+  npm run build && pm2 restart your-backend
 ```
-
-### Admin one-click updates
-
-Super administrators can check and install updates from **Admin > System Settings > Version Update**.
-The updater only runs when all of the following are true:
-
-- the deployment is a clean Git checkout of `Leolty0511/CarRadioWeb`;
-- the backend runs in production mode under PM2;
-- the local branch can fast-forward to the configured remote branch;
-- dependency installation and the production build succeed.
-
-Optional environment variables:
-
-```bash
-SELF_UPDATE_ENABLED=true
-UPDATE_BRANCH=main
-PM2_PROCESS_NAME=official-backend
-# Optional when the frontend runs as a separate PM2 app.
-FRONTEND_PM2_PROCESS_NAME=official-frontend
-```
-
-The updater downloads the prebuilt GitHub release package, refreshes the frontend
-(separate PM2 app or nginx when available), restarts the backend, and checks its
-health. Docker deployments should expose the PM2/nginx commands to the updater;
-otherwise the backend restart reloads the bundled frontend assets.
-
-### Flarum Forum (optional)
-
-One-click Docker deploy from the admin panel. Supports plugin install/uninstall, one-click fix (permissions + cache + boot), log viewer, and self-hosted extensions from GitHub (e.g. [Notify Push](https://github.com/Leo-ttt/Notify-Push)).
 
 ---
 
-## API Routes
+## 运维与安全检查清单（建议）
 
-| Route | Description |
-|-------|-------------|
-| `/api/auth` | Login, register, verification, password reset |
-| `/api/users` | Admin users (super_admin only) |
-| `/api/documents` | Document CRUD + search |
-| `/api/products` | Product management |
-| `/api/categories` | Category CRUD |
-| `/api/upload` | File upload (OSS) |
-| `/api/ai` | AI chat (18+ providers) |
-| `/api/feedback` | Feedback system |
-| `/api/document-feedback` | Document-level feedback with admin replies |
-| `/api/visitors` | Visitor analytics |
-| `/api/site-settings` | Site configuration |
-| `/api/seo-settings` | SEO configuration |
-| `/api/audit-logs` | Operations audit (super_admin) |
-| `/api/announcements` | Site-wide announcements |
-| `/api/hero-banners` | Homepage carousel |
-| `/api/v1/forum/*` | Forum deploy, extensions, logs (super_admin) |
-| `/sitemap.xml` | Dynamic sitemap |
-
-## SEO
-
-| Feature | Details |
-|---------|---------|
-| `robots.txt` | Blocks `/admin`, `/api` |
-| `sitemap.xml` | Dynamic — all published docs + static pages |
-| `hreflang` | Alternate links (en + x-default) |
-| Open Graph | Per-page OG tags + default 1200×630 image |
-| JSON-LD | Organization / Product / FAQ / Breadcrumb / Article structured data |
+- 确保生产环境设置 JWT_SECRET 与 SESSION_SECRET（长度 >= 32 且不是常用词）。
+- 在生产环境设置 CORS_ORIGIN（只允许可信域名）。
+- 使用 UPDATE_STATUS_FILE 指向可持久化路径并限制写权限。
+- 用最小权限的 GitHub token（UPDATE_GITHUB_TOKEN），并通过部署系统的 secrets 注入。
+- 在 CI 中为发布 artifact 生成校验和并在更新时校验。
+- 配置 Sentry、日志轮转与集中日志（便于追踪 updater 异常）。
 
 ---
 
-## License
+## 许可
 
-This repository is public for transparency and learning. **Making source code public does not grant any license** to use, copy, modify, distribute, or create derivative works without written permission from the copyright holder.
-
-See the [`LICENSE`](LICENSE) file in the repository root.
+本仓库公开以便学习与参考。请参阅根目录 LICENSE 文件了解许可细节。
 
 ---
 
@@ -280,68 +240,25 @@ See the [`LICENSE`](LICENSE) file in the repository root.
 
 <br>
 
-<p align="center">
-  <img src="./public/images/default-hero.png" width="100%" alt="CarRadioWeb 前台预览">
-</p>
+## 简体中文（精简版）
 
-<br>
+CarRadioWeb 是面向汽车电子售后市场的知识库与产品展示平台，包含前台展示、文档知识库、AI 助手与后台 CMS，用于产品经理、技术支持与站点管理员。
 
-## 简介
+### 主要功能
 
-**CarRadioWeb** 是为汽车电子售后市场品牌打造的知识库与产品展示平台。统一管理产品文档、车辆兼容性、AI 智能客服与社区论坛。
+- 多语言站点（i18n）
+- 产品目录与车辆兼容性矩阵
+- 文档管理（富文本、视频、草稿、版本）
+- AI 聊天与知识索引
+- 管理后台（权限、审计日志、站点配置、轮播图等）
+- 社区论坛（Flarum）集成
 
-**适用产品：** 车载主机、CarPlay/Android Auto 适配器、行车记录仪等汽车电子设备。
+### 部署要点（中文）
 
-### 核心技术栈
-
-| 层 | 技术 |
-|----|------|
-| **前端** | React 19 + TypeScript / Vite 7 / Tailwind 3.4 / PrimeReact 10 |
-| **后端** | Node.js + Express 4 + TypeScript |
-| **数据库** | MongoDB + Mongoose 8 / Redis |
-| **AI** | 18+ 供应商（OpenAI / DeepSeek 等） |
-| **运维** | Docker / PM2 / Nginx / 阿里云 OSS |
-
-### 快速开始
-
-```bash
-npm install && cd backend && npm install && cd ..
-cp .env.example .env.local
-cp backend/config.env.example backend/config.env
-# 配置 MongoDB 连接字符串等必要变量
-npm run dev:all
-```
-
-### 部署
-
-```bash
-# Docker（推荐）
-cp .env.docker.example .env && docker-compose up -d
-
-# PM2
-npm run build && cd backend && pm2 start dist/index.js --name your-app
-```
-
-### 认证
-
-管理后台使用**邮箱验证码 + 密码**登录。本地开发内置 Mailpit 模拟邮箱（`http://127.0.0.1:8025`）。
-
-- **首个注册用户**自动成为 `super_admin`（不可删除）
-- 权限细粒度控制：页面可见性 + `documents:read` / `products:update` 等资源操作
-- 权限不足时 API 返回 **403**
+- Node 18+, MongoDB 6+。Redis 推荐用于缓存与会话。
+- 生产环境强制配置 JWT_SECRET 与 SESSION_SECRET、CORS_ORIGIN。
+- 若启用自更新（SELF_UPDATE_ENABLED），请配置 UPDATE_GITHUB_TOKEN 并保证 runner 脚本在部署包中。
 
 ---
 
-### 许可
-
-本仓库以公开形式托管以便查阅与学习。**公开源代码本身不自动授予任何许可**，包括使用、复制、修改、分发或创作衍生作品。
-
-详见根目录 [`LICENSE`](LICENSE) 文件。
-
----
-
-<p align="center">
-  <a href="https://github.com/oil-oil/beautify-github-readme">
-    <img src="./assets/readme/made-with-beautify.svg" width="300" alt="README made with beautify-github-readme">
-  </a>
-</p>
+如需我代为提交一个 PR 更新 README（包含更完整的环境变量表、运维步骤与自更新安全策略），我可以直接把上面的改动提交到仓库（或者先把改动做成一个 Draft PR 供你审阅）。你希望我直接提交更新并创建 PR，还是先把 README 内容在这里再调整一次？
