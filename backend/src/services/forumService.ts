@@ -522,7 +522,7 @@ export async function getForumExtensions(): Promise<{ list: Array<ForumExtension
     return { list: FORUM_EXTENSIONS.map(ext => ({ ...ext, installed: false })), available: false };
   }
   const [enabledIds, composerPackages] = await Promise.all([getEnabledExtensionIds(), getInstalledComposerPackages()]);
-  const installedByComposer = new Set(FORUM_EXTENSIONS.filter(ext => composerPackages.includes(ext.composerPackage)).map(ext => ext.id));
+  const installedByComposer = new Set(FORUM_EXTENSIONS.filter(ext => [ext.composerPackage, ...(ext.legacyComposerPackages ?? [])].some(pkg => composerPackages.includes(pkg))).map(ext => ext.id));
   const enabledSet = new Set(enabledIds);
   const list = FORUM_EXTENSIONS.map(ext => ({
     ...ext,

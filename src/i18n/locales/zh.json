@@ -3034,6 +3034,7 @@
     "processing": "处理中...",
     "codeSent": "验证码已发送，请检查邮箱",
     "passwordReset": "密码已重置，请重新登录",
+    "resetPassword": "重置密码",
     "passwordHint": "至少 10 位，包含大小写字母和数字",
     "tabs": {
       "login": "登录",

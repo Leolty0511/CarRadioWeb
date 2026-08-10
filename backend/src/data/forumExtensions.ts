@@ -10,6 +10,8 @@ export interface ForumExtensionMeta {
   descriptionZh: string;
   developer: string;
   composerPackage: string;
+  /** Composer package names used by older releases, retained for migration detection. */
+  legacyComposerPackages?: string[];
   logNameVariants?: string[];
   vcsUrl?: string;
 }
@@ -32,7 +34,7 @@ export const FORUM_EXTENSIONS: ForumExtensionMeta[] = [
   { id: 'flarum-lang-english', name: 'English', nameZh: '英语语言包', description: 'English language pack.', descriptionZh: '英语语言包。', developer: 'Flarum', composerPackage: 'flarum/lang-english' },
   { id: 'flarum-emoji', name: 'Emoji', nameZh: '表情', description: 'Add emoji support to posts.', descriptionZh: '在帖子中支持表情。', developer: 'Flarum', composerPackage: 'flarum/emoji' },
   { id: 'flarum-bbcode', name: 'BBCode', nameZh: 'BBCode', description: 'Support BBCode in posts.', descriptionZh: '在帖子中支持 BBCode。', developer: 'Flarum', composerPackage: 'flarum/bbcode' },
-  { id: 'v17development-seo', name: 'SEO', nameZh: 'SEO', description: 'Improve forum SEO with meta tags and structured data.', descriptionZh: '通过 meta 与结构化数据优化论坛 SEO。', developer: 'v17development', composerPackage: 'v17development/flarum-seo' },
+  { id: 'fof-seo', name: 'SEO', nameZh: 'SEO', description: 'Improve forum SEO with meta tags and structured data.', descriptionZh: '通过 meta 与结构化数据优化论坛 SEO。', developer: 'Friends of Flarum', composerPackage: 'fof/seo', legacyComposerPackages: ['v17development/flarum-seo'], logNameVariants: ['v17development-seo'] },
   { id: 'fof-follow-tags', name: 'Follow Tags', nameZh: '关注标签', description: 'Follow tags and get notified of new discussions and replies.', descriptionZh: '关注标签并接收新讨论与回复通知。', developer: 'Friends of Flarum', composerPackage: 'fof/follow-tags' },
   { id: 'fof-user-bio', name: 'User Bio', nameZh: '用户简介', description: 'Allow users to add a short bio to their profile.', descriptionZh: '允许用户在个人资料中添加简短简介。', developer: 'Friends of Flarum', composerPackage: 'fof/user-bio' },
   { id: 'fof-upload', name: 'Upload', nameZh: '上传', description: 'Upload images and files to posts (Imgur, local, S3, etc.).', descriptionZh: '在帖子中上传图片与文件（Imgur、本地、S3 等）。', developer: 'Friends of Flarum', composerPackage: 'fof/upload' },
@@ -48,7 +50,7 @@ export const FORUM_EXTENSIONS: ForumExtensionMeta[] = [
   { id: 'fof-byobu', name: 'Byobu', nameZh: '私信', description: 'Private discussions between users.', descriptionZh: '用户之间的私密讨论。', developer: 'Friends of Flarum', composerPackage: 'fof/byobu' },
   { id: 'fof-best-answer', name: 'Best Answer', nameZh: '最佳答案', description: 'Mark a post as the best answer in discussions.', descriptionZh: '将帖子标记为讨论的最佳答案。', developer: 'Friends of Flarum', composerPackage: 'fof/best-answer' },
   { id: 'fof-ban-ips', name: 'Ban IPs', nameZh: 'IP 封禁', description: 'Ban users by IP address.', descriptionZh: '按 IP 封禁用户。', developer: 'Friends of Flarum', composerPackage: 'fof/ban-ips' },
-  { id: 'afrux-forum-widgets-core', name: 'Forum Widgets Core', nameZh: '论坛小部件核心', description: 'Core for forum sidebar widgets.', descriptionZh: '论坛侧边栏小部件核心。', developer: 'Afrux', composerPackage: 'afrux/forum-widgets-core' },
+  { id: 'fof-forum-widgets-core', name: 'Forum Widgets Core', nameZh: '论坛小部件核心', description: 'Core for forum sidebar widgets.', descriptionZh: '论坛侧边栏小部件核心。', developer: 'Friends of Flarum', composerPackage: 'fof/forum-widgets-core', legacyComposerPackages: ['afrux/forum-widgets-core'], logNameVariants: ['afrux-forum-widgets-core'] },
   { id: 'afrux-online-users-widget', name: 'Online Users Widget', nameZh: '在线用户小部件', description: 'Show online users in the sidebar.', descriptionZh: '在侧边栏显示在线用户。', developer: 'Afrux', composerPackage: 'afrux/online-users-widget', logNameVariants: ['afrux-onlineusers'] },
   { id: 'ziiven-post-number', name: 'Post Number', nameZh: '帖子编号', description: 'Display post numbers in discussions.', descriptionZh: '在讨论中显示帖子编号。', developer: 'Ziiven', composerPackage: 'ziiven/flarum-post-number' },
   { id: 'michaelbelgium-discussion-views', name: 'Discussion Views', nameZh: '讨论浏览量', description: 'Track and display discussion view counts.', descriptionZh: '统计并显示讨论浏览量。', developer: 'Michael Belgium', composerPackage: 'michaelbelgium/flarum-discussion-views' },
@@ -61,5 +63,5 @@ export const FORUM_EXTENSIONS: ForumExtensionMeta[] = [
   { id: 'datlechin-link-preview', name: 'Link Preview', nameZh: '链接预览', description: 'Show link previews (title, image) in posts.', descriptionZh: '在帖子中显示链接预览（标题、图片）。', developer: 'Datlechin', composerPackage: 'datlechin/flarum-link-preview' },
   { id: 'clarkwinkelmann-shadow-ban', name: 'Shadow Ban', nameZh: '影子封禁', description: 'Hide content from specific users without them knowing.', descriptionZh: '对特定用户隐藏内容而不被察觉。', developer: 'Clark Winkelmann', composerPackage: 'clarkwinkelmann/flarum-ext-shadow-ban' },
   { id: 'clarkwinkelmann-emojionearea', name: 'Emoji One Area', nameZh: '表情选择器', description: 'Emoji picker for the composer.', descriptionZh: '发帖框表情选择器。', developer: 'Clark Winkelmann', composerPackage: 'clarkwinkelmann/flarum-ext-emojionearea' },
-  { id: 'askvortsov-rich-text', name: 'Rich Text', nameZh: '富文本编辑器', description: 'Rich text editor for posts.', descriptionZh: '帖子富文本编辑器。', developer: 'Askvortsov', composerPackage: 'askvortsov/flarum-rich-text' },
+  { id: 'fof-rich-text', name: 'Rich Text', nameZh: '富文本编辑器', description: 'Rich text editor for posts.', descriptionZh: '帖子富文本编辑器。', developer: 'Friends of Flarum', composerPackage: 'fof/rich-text', legacyComposerPackages: ['askvortsov/flarum-rich-text'], logNameVariants: ['askvortsov-rich-text'] },
 ];

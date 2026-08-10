@@ -1867,6 +1867,7 @@
     "processing": "Processing...",
     "codeSent": "Verification code sent. Check your email.",
     "passwordReset": "Password reset. Please sign in again.",
+    "resetPassword": "Reset password",
     "passwordHint": "At least 10 characters, including uppercase, lowercase, and numbers",
     "tabs": {
       "login": "Sign in",
