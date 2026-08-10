@@ -1849,6 +1849,42 @@
     "categories": "Categories",
     "disclaimer": "These are third-party resources for reference only. We are not affiliated with any of these websites."
   },
+  "memberAccess": {
+    "title": "Member Access",
+    "memberAccount": "Member account",
+    "adminAccount": "Administrator account",
+    "profile": "Profile",
+    "continue": "Continue",
+    "logout": "Log out",
+    "loggedOut": "You have been logged out",
+    "memberEmail": "Member email",
+    "email": "Email",
+    "nickname": "Nickname",
+    "password": "Password",
+    "newPassword": "New password",
+    "emailCode": "Email verification code",
+    "sendCode": "Send code",
+    "processing": "Processing...",
+    "codeSent": "Verification code sent. Check your email.",
+    "passwordReset": "Password reset. Please sign in again.",
+    "passwordHint": "At least 10 characters, including uppercase, lowercase, and numbers",
+    "tabs": {
+      "login": "Sign in",
+      "register": "Register",
+      "reset": "Reset password"
+    },
+    "errors": {
+      "invalid_credentials": "The email or password is incorrect",
+      "account_suspended": "This account has been suspended",
+      "email_already_exists": "This email is already registered",
+      "invalid_code": "The verification code is incorrect",
+      "code_not_found_or_expired": "The verification code is invalid or has expired",
+      "password_too_weak": "Use at least 10 characters with uppercase, lowercase, and numbers",
+      "smtp_not_configured": "Verification email service is not configured",
+      "rate_limit": "Too many attempts. Please try again later",
+      "generic": "Something went wrong. Please try again later"
+    }
+  },
   "canbus": {
     "title": "CANBus Settings",
     "description": "Select your vehicle to view CANBus settings",

@@ -3016,6 +3016,42 @@
     "categories": "分类",
     "disclaimer": "以上均为第三方资源，仅供参考。我们与这些网站无任何关联。"
   },
+  "memberAccess": {
+    "title": "会员登录",
+    "memberAccount": "会员账号",
+    "adminAccount": "管理员账号",
+    "profile": "个人中心",
+    "continue": "继续访问",
+    "logout": "退出",
+    "loggedOut": "已退出登录",
+    "memberEmail": "会员邮箱",
+    "email": "邮箱",
+    "nickname": "昵称",
+    "password": "密码",
+    "newPassword": "新密码",
+    "emailCode": "邮箱验证码",
+    "sendCode": "发送验证码",
+    "processing": "处理中...",
+    "codeSent": "验证码已发送，请检查邮箱",
+    "passwordReset": "密码已重置，请重新登录",
+    "passwordHint": "至少 10 位，包含大小写字母和数字",
+    "tabs": {
+      "login": "登录",
+      "register": "注册",
+      "reset": "找回密码"
+    },
+    "errors": {
+      "invalid_credentials": "邮箱或密码不正确",
+      "account_suspended": "账号已被停用",
+      "email_already_exists": "该邮箱已经注册",
+      "invalid_code": "验证码不正确",
+      "code_not_found_or_expired": "验证码不存在或已过期",
+      "password_too_weak": "密码至少 10 位，并包含大小写字母和数字",
+      "smtp_not_configured": "系统尚未配置验证邮件服务",
+      "rate_limit": "操作过于频繁，请稍后再试",
+      "generic": "操作失败，请稍后再试"
+    }
+  },
   "canbus": {
     "title": "CANBus设置",
     "description": "选择您的车型查看CANBus设置",

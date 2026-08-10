@@ -6,10 +6,23 @@ export interface ContentPrincipal {
   roles: string[]
 }
 
-export interface MemberRegistrationSettings {
-  registrationEnabled: boolean
-  approvalRequired: boolean
-  invitationRequired: boolean
+export interface MemberProfile {
+  id: string
+  email: string
+  nickname: string
+  avatar: string
+  createdAt?: string
+}
+
+export interface MemberFavorite {
+  id: string
+  documentId: string
+  documentType: 'general' | 'video' | 'structured'
+  title: string
+  summary: string
+  updatedAt: string
+  createdAt: string
+  url: string
 }
 
 function csrfHeader(): Record<string, string> {
@@ -26,11 +39,6 @@ async function request(path: string, method = 'GET', body?: unknown) {
   })
   const data = await response.json().catch(() => ({ success: false, error: `http_${response.status}` }))
   return { ...data, ok: response.ok }
-}
-
-export async function getMemberSettings(): Promise<MemberRegistrationSettings> {
-  const result = await request('/settings')
-  return result.data
 }
 
 export async function getContentSession(): Promise<ContentPrincipal | null> {
@@ -52,6 +60,23 @@ export async function refreshMemberSession(): Promise<boolean> {
 
 export const memberLogin = (login: string, password: string) => request('/login', 'POST', { login, password })
 export const sendMemberCode = (email: string, purpose: 'register' | 'reset_password') => request('/send-code', 'POST', { email, purpose })
-export const registerMember = (data: { email: string; nickname: string; password: string; code: string; invitationCode?: string }) => request('/register', 'POST', data)
+export const registerMember = (data: { email: string; nickname: string; password: string; code: string }) => request('/register', 'POST', data)
 export const resetMemberPassword = (email: string, code: string, password: string) => request('/reset-password', 'POST', { email, code, password })
 export const logoutContentSession = () => request('/logout', 'POST')
+export const getMemberProfile = () => request('/profile')
+export const updateMemberProfile = (data: { nickname: string }) => request('/profile', 'PUT', data)
+export const updateMemberPassword = (currentPassword: string, newPassword: string) => request('/profile/password', 'PUT', { currentPassword, newPassword })
+export const getMemberFavorites = () => request('/favorites')
+export const getFavoriteStatus = (documentId: string) => request(`/favorites/status/${encodeURIComponent(documentId)}`)
+export const addMemberFavorite = (documentId: string) => request(`/favorites/${encodeURIComponent(documentId)}`, 'POST')
+export const removeMemberFavorite = (documentId: string) => request(`/favorites/${encodeURIComponent(documentId)}`, 'DELETE')
+
+export async function uploadMemberAvatar(file: File) {
+  const form = new FormData()
+  form.append('avatar', file)
+  const response = await fetch('/api/member-auth/profile/avatar', {
+    method: 'POST', credentials: 'include', body: form, headers: csrfHeader(),
+  })
+  const data = await response.json().catch(() => ({ success: false, error: `http_${response.status}` }))
+  return { ...data, ok: response.ok }
+}

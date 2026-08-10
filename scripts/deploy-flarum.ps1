@@ -54,11 +54,25 @@ try {
   exit 1
 }
 
-# 仅用字母数字，避免 + / = 在表单提交时被误解析导致 Access denied
-$chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-$sb = New-Object System.Text.StringBuilder 24
-for ($i = 0; $i -lt 24; $i++) { [void]$sb.Append($chars[(Get-Random -Maximum $chars.Length)]) }
-$dbPassword = $sb.ToString()
+# Keep credentials across redeployments. MariaDB only applies MYSQL_PASSWORD on
+# first initialization; changing it on every run can disconnect Flarum from an
+# existing database.
+function Read-EnvValue([string]$Path, [string]$Key) {
+  if (-not (Test-Path $Path)) { return $null }
+  $line = Get-Content $Path | Where-Object { $_ -match ("^" + [regex]::Escape($Key) + "=") } | Select-Object -First 1
+  if ($line) { return (($line -split '=',2)[1]).Trim().Trim('"').Trim("'") }
+  return $null
+}
+
+$dbPassword = Read-EnvValue ".\.env.flarum" "DB_PASSWORD"
+if (-not $dbPassword) { $dbPassword = Read-EnvValue ".\backend\config.env" "FLARUM_DB_PASSWORD" }
+if (-not $dbPassword) {
+  # 仅用字母数字，避免 + / = 在表单提交时被误解析导致 Access denied
+  $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+  $sb = New-Object System.Text.StringBuilder 24
+  for ($i = 0; $i -lt 24; $i++) { [void]$sb.Append($chars[(Get-Random -Maximum $chars.Length)]) }
+  $dbPassword = $sb.ToString()
+}
 
 @"
 FLARUM_BASE_URL=$finalFlarumUrl

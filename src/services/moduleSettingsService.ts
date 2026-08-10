@@ -48,7 +48,6 @@ export interface ModuleSettings {
   // 系统设置
   siteSettings: {
     maintenanceMode: boolean;
-    registrationEnabled: boolean;
     guestAccess: boolean;
   };
 

@@ -29,6 +29,7 @@ const Terms = lazy(() => import('@/pages/Terms'));
 const Disclaimer = lazy(() => import('@/pages/Disclaimer'));
 const NewsletterUnsubscribe = lazy(() => import('@/pages/NewsletterUnsubscribe'));
 const MemberAccess = lazy(() => import('@/pages/MemberAccess'));
+const MemberProfile = lazy(() => import('@/pages/MemberProfile'));
 
 // 企业官网页面
 const Products = lazy(() => import('@/pages/Products'));
@@ -85,6 +86,7 @@ export const commonRoutes: RouteConfig[] = [
   { path: 'disclaimer', component: Disclaimer },
   { path: 'newsletter/unsubscribe', component: NewsletterUnsubscribe },
   { path: 'login', component: MemberAccess },
+  { path: 'profile', component: MemberProfile, protected: true },
 ];
 
 /**

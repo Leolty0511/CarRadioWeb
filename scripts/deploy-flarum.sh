@@ -17,7 +17,7 @@ if [[ "$AUTO_INSTALL_DOCKER" = "1" ]]; then
   fi
 fi
 
-# Step 1: Generate URL and password
+# Step 1: Generate URL and preserve credentials
 update_status "deploying_pull" "Preparing environment..."
 
 # 获取前端访问地址（用于推导论坛域名）
@@ -61,8 +61,25 @@ else
   FINAL_FLARUM_URL="https://forum.${MAIN_DOMAIN}"
 fi
 
-# 仅用字母数字，避免 + / = 在表单提交时被误解析导致 Access denied
-DB_PASSWORD=$(openssl rand -base64 18 | tr -d '+/=' | head -c 24)
+# Keep credentials across redeployments. MariaDB only applies MYSQL_PASSWORD on
+# first initialization; changing it on every run can disconnect Flarum from an
+# existing database. Prefer the existing .env.flarum value, then backend config.
+read_env_value() {
+  local file="$1"
+  local key="$2"
+  if [[ -f "$file" ]]; then
+    grep -E "^${key}=" "$file" | head -n 1 | cut -d '=' -f2-
+  fi
+}
+
+DB_PASSWORD="$(read_env_value .env.flarum DB_PASSWORD)"
+if [[ -z "$DB_PASSWORD" && -f backend/config.env ]]; then
+  DB_PASSWORD="$(read_env_value backend/config.env FLARUM_DB_PASSWORD)"
+fi
+if [[ -z "$DB_PASSWORD" ]]; then
+  # 仅用字母数字，避免 + / = 在表单提交时被误解析导致 Access denied
+  DB_PASSWORD=$(openssl rand -base64 18 | tr -d '+/=' | head -c 24)
+fi
 
 cat > .env.flarum << EOL
 FLARUM_BASE_URL=${FINAL_FLARUM_URL}

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { getForumBaseUrl } from '@/utils/forumUrl'
 import { MessageCircle } from 'lucide-react'
 
@@ -11,7 +13,9 @@ import { MessageCircle } from 'lucide-react'
 
 const Forum = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { siteSettings, loading } = useSiteSettings()
+  const { user, loading: authLoading } = useAuth()
   const forumEnabled = siteSettings?.externalLinks?.forum?.enabled ?? false
   const [deployed, setDeployed] = useState<boolean | null>(null)
   const forumUrl = getForumBaseUrl()
@@ -35,10 +39,14 @@ const Forum = () => {
   }, [forumEnabled])
 
   useEffect(() => {
-    if (forumEnabled && deployed === true && forumUrl) {
-      window.location.replace(forumUrl)
+    if (!forumEnabled || deployed !== true || !forumUrl || authLoading) return
+    if (!user) {
+      navigate('/login?returnTo=/forum', { replace: true })
+      return
     }
-  }, [forumEnabled, deployed, forumUrl])
+    const destination = user.type === 'member' ? `${forumUrl}/auth/passport` : forumUrl
+    window.location.replace(destination)
+  }, [authLoading, deployed, forumEnabled, forumUrl, navigate, user])
 
   if (loading) {
     return (
@@ -90,7 +98,7 @@ const Forum = () => {
   return (
     <div className="page-container-deep flex flex-col items-center justify-center gap-3">
       <p className="text-lg text-slate-600 dark:text-gray-400">{t('common.redirecting')}</p>
-      <p className="text-sm text-slate-500 dark:text-gray-500">{t('forum.redirectingHint')}</p>
+      <p className="text-sm text-slate-500 dark:text-gray-500">{user?.type === 'member' ? t('forum.oauthRedirecting', '正在使用会员账号登录论坛') : t('forum.redirectingHint')}</p>
     </div>
   )
 }

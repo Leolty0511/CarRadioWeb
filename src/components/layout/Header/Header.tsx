@@ -160,7 +160,7 @@ export const Header: React.FC<HeaderProps> = ({ navigationItems, shouldTranspare
 
               <button
                 type="button"
-                onClick={() => navigate(getLocalizedPath('/login'))}
+                onClick={() => navigate(getLocalizedPath(isAuthenticated && user?.type === 'member' ? '/profile' : '/login'))}
                 className="rounded-lg p-2 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
                 title={isAuthenticated ? user?.nickname : '登录 / 注册'}
                 aria-label={isAuthenticated ? user?.nickname : '登录 / 注册'}

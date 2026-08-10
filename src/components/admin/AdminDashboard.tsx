@@ -22,7 +22,10 @@ import {
   Activity,
   CheckCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Brain,
+  Search,
+  Users
 } from 'lucide-react';
 
 interface AdminDashboardProps {
@@ -52,6 +55,13 @@ interface DashboardStats {
   }>;
 }
 
+interface ContentAnalytics {
+  popularDocuments: Array<{ documentId: string; title: string; views: number; uniqueViewers: number }>;
+  ai: { total: number; successful: number; tokens: number };
+  memberGrowth: Array<{ _id: string; count: number }>;
+  noResultSearches: Array<{ query: string; count: number; lastAt: string }>;
+}
+
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
   const { t } = useTranslation();
 
@@ -69,6 +79,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
       return null;
     },
     staleTime: 60 * 1000, // 管理后台数据 1 分钟内视为新鲜
+  });
+
+  const { data: analytics = null } = useQuery<ContentAnalytics | null>({
+    queryKey: ['admin-content-analytics'],
+    queryFn: async () => {
+      const response = await apiClient.get<ContentAnalytics>('/admin/analytics/content');
+      return response.success ? response.data || null : null;
+    },
+    staleTime: 60 * 1000,
+    retry: false,
   });
 
   if (loading) {
@@ -156,6 +176,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate }) => {
           </div>
         </div>
       </div>
+
+      {analytics && (
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-6 bg-gradient-to-b from-cyan-500 to-blue-500 rounded-full"></div>
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-white">内容分析</h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-gray-700/50 dark:bg-gray-800/50">
+              <div className="flex items-center gap-3 mb-4"><Brain className="w-5 h-5 text-cyan-500" /><h3 className="font-semibold text-slate-800 dark:text-white">AI 使用</h3></div>
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div><p className="text-2xl font-bold text-slate-800 dark:text-white">{analytics.ai.total}</p><p className="text-xs text-slate-500">请求</p></div>
+                <div><p className="text-2xl font-bold text-emerald-500">{analytics.ai.successful}</p><p className="text-xs text-slate-500">成功</p></div>
+                <div><p className="text-2xl font-bold text-blue-500">{analytics.ai.tokens}</p><p className="text-xs text-slate-500">Tokens</p></div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-gray-700/50 dark:bg-gray-800/50">
+              <div className="flex items-center gap-3 mb-4"><Users className="w-5 h-5 text-violet-500" /><h3 className="font-semibold text-slate-800 dark:text-white">会员增长</h3></div>
+              <div className="space-y-2 max-h-32 overflow-auto">
+                {analytics.memberGrowth.slice(-7).map(item => <div key={item._id} className="flex items-center justify-between text-sm"><span className="text-slate-500">{item._id}</span><span className="font-semibold text-slate-800 dark:text-white">{item.count}</span></div>)}
+                {analytics.memberGrowth.length === 0 && <p className="text-sm text-slate-500">暂无数据</p>}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-gray-700/50 dark:bg-gray-800/50">
+              <div className="flex items-center gap-3 mb-4"><Search className="w-5 h-5 text-amber-500" /><h3 className="font-semibold text-slate-800 dark:text-white">搜索缺口</h3></div>
+              <div className="space-y-2 max-h-32 overflow-auto">
+                {analytics.noResultSearches.slice(0, 6).map(item => <div key={item.query} className="flex items-center justify-between gap-3 text-sm"><span className="truncate text-slate-600 dark:text-slate-300">{item.query}</span><span className="shrink-0 font-semibold text-amber-600">{item.count}</span></div>)}
+                {analytics.noResultSearches.length === 0 && <p className="text-sm text-slate-500">暂无数据</p>}
+              </div>
+            </div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl dark:border-gray-700/50 dark:bg-gray-800/50">
+            <div className="flex items-center gap-3 mb-4"><TrendingUp className="w-5 h-5 text-emerald-500" /><h3 className="font-semibold text-slate-800 dark:text-white">热门文档</h3></div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {analytics.popularDocuments.map((item, index) => <div key={item.documentId} className="flex items-center justify-between gap-4 rounded-lg bg-slate-50 px-4 py-3 dark:bg-gray-700/30"><span className="min-w-0 truncate text-sm text-slate-700 dark:text-slate-200">{index + 1}. {item.title}</span><span className="shrink-0 text-sm font-semibold text-emerald-600">{item.views} 次浏览</span></div>)}
+              {analytics.popularDocuments.length === 0 && <p className="text-sm text-slate-500">暂无浏览数据</p>}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 图表区域 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

@@ -1966,8 +1966,8 @@ Examples:
         }
       }
 
-      // 数据库查询：不设置固定limit，而是获取所有匹配的文档
-      // 然后通过语义评分进行智能过滤
+      // 限制候选数量，避免文档增长后每次 AI 查询都扫描全集。
+      // 后续接入向量召回时，这里仍可作为关键词检索的降级路径。
       const allDocs = await require('mongoose').connection.db.collection('documents').find(searchConditions, {
         projection: {
           title: 1,
@@ -1983,7 +1983,7 @@ Examples:
           documentType: 1,
           __t: 1
         }
-      }).toArray();  // ⚡ 不设置limit，获取所有匹配的文档
+      }).limit(200).toArray();
 
       const results: any[] = [];
 

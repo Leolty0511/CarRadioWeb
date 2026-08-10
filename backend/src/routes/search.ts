@@ -4,11 +4,11 @@
  */
 
 import { Router, Request, Response } from 'express'
-import fsp from 'fs/promises'
-import path from 'path'
 import Product from '../models/Product'
 import Document from '../models/Document'
 import Software from '../models/Software'
+import UserManual from '../models/UserManual'
+import SearchEvent from '../models/SearchEvent'
 import logger from '../utils/logger'
 import { optionalContentAccess } from '../middleware/contentAccess'
 
@@ -16,11 +16,6 @@ const router = Router()
 
 const MAX_RESULTS_PER_TYPE = 5
 const MIN_QUERY_LENGTH = 2
-
-// PDF directory for user manuals
-const PDF_DIR = process.env.MANUAL_STORAGE_DIR
-  ? path.resolve(process.env.MANUAL_STORAGE_DIR)
-  : path.join(process.cwd(), 'private', 'user-manuals')
 
 type SearchResultType = 'product' | 'document' | 'faq' | 'software' | 'manual'
 
@@ -43,30 +38,29 @@ interface SearchResponse {
  * Search user manual PDF files
  */
 async function searchUserManuals(searchRegex: RegExp): Promise<SearchResult[]> {
-  const results: SearchResult[] = []
-
   try {
-    const files = await fsp.readdir(PDF_DIR)
-    const pdfFiles = files.filter(file =>
-      path.extname(file).toLowerCase() === '.pdf' &&
-      searchRegex.test(file)
-    )
-
-    pdfFiles.slice(0, MAX_RESULTS_PER_TYPE).forEach(file => {
-      results.push({
-        type: 'manual',
-        id: `manual-${file}`,
-        title: file.replace('.pdf', ''),
-        description: 'PDF User Manual',
-        url: '/user-manual'
-      })
-    })
+    const manuals = await UserManual.find({
+      isPublished: true,
+      $or: [
+        { title: searchRegex },
+        { productModel: searchRegex },
+        { description: searchRegex },
+        { filename: searchRegex },
+      ],
+    }).limit(MAX_RESULTS_PER_TYPE).lean()
+    return manuals.map(manual => ({
+      type: 'manual',
+      id: String(manual._id),
+      title: manual.title,
+      description: manual.description || `产品型号：${manual.productModel}`,
+      url: '/user-manual'
+    }))
   } catch (error) {
     // 目录不存在或不可读时静默返回空结果
     logger.warn({ error }, 'Failed to search user manuals')
   }
 
-  return results
+  return []
 }
 
 /**
@@ -269,6 +263,14 @@ router.get('/', optionalContentAccess, async (req: Request, res: Response) => {
       total: limitedResults.length,
       query
     }
+
+    void SearchEvent.create({
+      query,
+      resultCount: limitedResults.length,
+      source: 'global',
+      language: lang,
+      principalType: req.contentPrincipal?.type || 'guest',
+    }).catch(() => undefined)
 
     res.json(response)
   } catch (error: unknown) {

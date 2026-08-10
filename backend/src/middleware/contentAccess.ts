@@ -83,3 +83,19 @@ export async function authenticateContentAccess(req: Request, res: Response, nex
   }
   next()
 }
+
+/** Member-only endpoints must never accept an administrator session. */
+export async function authenticateMember(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const member = await resolveMember(req)
+    if (!member) {
+      res.status(401).json({ success: false, error: 'member_login_required' })
+      return
+    }
+    req.member = member
+    req.contentPrincipal = { type: 'member', id: String(member._id), nickname: member.nickname, avatar: member.avatar, roles: ['member'] }
+    next()
+  } catch {
+    res.status(500).json({ success: false, error: 'member_auth_error' })
+  }
+}

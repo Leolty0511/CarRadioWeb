@@ -2,6 +2,7 @@ import express from 'express';
 import { aiService } from '../services/aiService';
 import type { AIMessage, AIProvider } from '../services/aiService';
 import AIUsage from '../models/AIUsage';
+import SearchEvent from '../models/SearchEvent';
 import BaseDocument from '../models/Document';
 import { createRateLimit } from '../middleware/errorHandler';
 import { authenticateUser, requirePermission } from '../middleware/auth';
@@ -47,6 +48,8 @@ router.post('/chat', authenticateContentAccess, aiChatRateLimit, async (req, res
 
     // 调用AI服务
     const response = await aiService.sendMessage(messages as AIMessage[], language);
+    const latestQuery = [...(messages as AIMessage[])].reverse().find(message => message.role === 'user')?.content?.trim();
+    if (latestQuery) void SearchEvent.create({ query: latestQuery, resultCount: Array.isArray((response as any).sources) ? (response as any).sources.length : 0, source: 'ai', language: language || '', principalType: req.contentPrincipal?.type || 'guest' }).catch(() => undefined);
 
     // 记录使用统计
     try {
@@ -354,6 +357,7 @@ router.post('/search', authenticateContentAccess, aiChatRateLimit, async (req, r
     }
 
     const results = await aiService.searchKnowledgeBase(query);
+    void SearchEvent.create({ query: query.trim(), resultCount: results.length, source: 'ai', principalType: req.contentPrincipal?.type || 'guest' }).catch(() => undefined);
 
     res.json({
       success: true,
