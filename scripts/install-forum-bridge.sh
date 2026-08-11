@@ -74,11 +74,25 @@ restore_forum_composer_state() {
 # dependency files before Compose has any chance to recreate that container.
 save_forum_composer_state
 
+# Older artifact updates replaced the bind-mounted directory inode. Docker
+# keeps serving that detached (and now empty) inode until the container is
+# recreated, even though the current host directory contains the extension.
+FORUM_BRIDGE_MOUNT_STALE=0
+if [[ -f forum-extensions/carradioweb-forum-bridge/composer.json ]] && \
+   ! docker exec flarum_app test -f /extensions/carradioweb-forum-bridge/composer.json 2>/dev/null; then
+  FORUM_BRIDGE_MOUNT_STALE=1
+  echo "Forum extension mount is stale; recreating the container after saving its Composer state."
+fi
+
 # Keep the existing container when its configuration is unchanged. The update
 # runner preserves the mounted forum-extensions directory inode, so normal
 # application updates no longer need to recreate Flarum or reinstall plugins.
 CONTAINER_ID_BEFORE="$(docker inspect -f '{{.Id}}' flarum_app 2>/dev/null || true)"
-docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d --no-deps flarum
+COMPOSE_UP_ARGS=(-d --no-deps)
+if [[ "$FORUM_BRIDGE_MOUNT_STALE" == "1" ]]; then
+  COMPOSE_UP_ARGS+=(--force-recreate)
+fi
+docker compose -f docker-compose.flarum.yml --env-file .env.flarum up "${COMPOSE_UP_ARGS[@]}" flarum
 CONTAINER_ID_AFTER="$(docker inspect -f '{{.Id}}' flarum_app 2>/dev/null || true)"
 CONTAINER_RECREATED=0
 if [[ -n "$CONTAINER_ID_BEFORE" && "$CONTAINER_ID_BEFORE" != "$CONTAINER_ID_AFTER" ]]; then
