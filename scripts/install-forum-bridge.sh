@@ -46,10 +46,44 @@ grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN)=' .env.fla
 } > .env.flarum
 rm -f .env.flarum.tmp
 
-# Deployment packages replace the project directory atomically. Recreate the
-# container so Docker binds the new forum-extensions directory inode instead
-# of keeping the now-detached directory from the previous release.
-docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d --force-recreate --no-deps flarum
+FORUM_STATE_DIR="${FORUM_STATE_DIR:-.forum-state}"
+
+save_forum_composer_state() {
+  mkdir -p "$FORUM_STATE_DIR"
+  if docker cp flarum_app:/opt/flarum/composer.json "$FORUM_STATE_DIR/composer.json.tmp" >/dev/null 2>&1; then
+    mv "$FORUM_STATE_DIR/composer.json.tmp" "$FORUM_STATE_DIR/composer.json"
+  fi
+  if docker cp flarum_app:/opt/flarum/composer.lock "$FORUM_STATE_DIR/composer.lock.tmp" >/dev/null 2>&1; then
+    mv "$FORUM_STATE_DIR/composer.lock.tmp" "$FORUM_STATE_DIR/composer.lock"
+  fi
+}
+
+restore_forum_composer_state() {
+  if [[ ! -s "$FORUM_STATE_DIR/composer.json" || ! -s "$FORUM_STATE_DIR/composer.lock" ]]; then
+    return 1
+  fi
+
+  echo "Restoring the saved forum extension set..."
+  docker cp "$FORUM_STATE_DIR/composer.json" flarum_app:/opt/flarum/composer.json
+  docker cp "$FORUM_STATE_DIR/composer.lock" flarum_app:/opt/flarum/composer.lock
+  docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer install \
+    --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+}
+
+# The image keeps Composer packages inside the container. Save the exact
+# dependency files before Compose has any chance to recreate that container.
+save_forum_composer_state
+
+# Keep the existing container when its configuration is unchanged. The update
+# runner preserves the mounted forum-extensions directory inode, so normal
+# application updates no longer need to recreate Flarum or reinstall plugins.
+CONTAINER_ID_BEFORE="$(docker inspect -f '{{.Id}}' flarum_app 2>/dev/null || true)"
+docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d --no-deps flarum
+CONTAINER_ID_AFTER="$(docker inspect -f '{{.Id}}' flarum_app 2>/dev/null || true)"
+CONTAINER_RECREATED=0
+if [[ -n "$CONTAINER_ID_BEFORE" && "$CONTAINER_ID_BEFORE" != "$CONTAINER_ID_AFTER" ]]; then
+  CONTAINER_RECREATED=1
+fi
 
 for _ in $(seq 1 30); do
   if docker exec flarum_app php flarum info >/dev/null 2>&1; then
@@ -58,73 +92,113 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 
-docker exec flarum_app composer config repositories.carradioweb-forum-bridge path /extensions/carradioweb-forum-bridge
-if ! docker exec flarum_app composer show fof/passport >/dev/null 2>&1; then
-  docker exec flarum_app composer require fof/passport:1.1.1 --with-all-dependencies --no-interaction --no-progress
+COMPOSER_STATE_RESTORED=0
+if [[ "$CONTAINER_RECREATED" == "1" ]] && restore_forum_composer_state; then
+  COMPOSER_STATE_RESTORED=1
 fi
-if ! docker exec flarum_app composer show carradioweb/forum-bridge >/dev/null 2>&1; then
-  docker exec flarum_app composer require carradioweb/forum-bridge:1.0.0 --with-dependencies --no-interaction --no-progress
+
+docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer config repositories.carradioweb-forum-bridge path /extensions/carradioweb-forum-bridge
+if ! docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show fof/passport >/dev/null 2>&1; then
+  docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require fof/passport:1.1.1 --with-all-dependencies --no-interaction --no-progress
+fi
+if ! docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show carradioweb/forum-bridge >/dev/null 2>&1; then
+  docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require carradioweb/forum-bridge:1.0.0 --with-dependencies --no-interaction --no-progress
 fi
 docker exec flarum_app php flarum extension:enable fof-passport
 docker exec flarum_app php flarum extension:enable carradioweb-forum-bridge
 docker exec flarum_app php flarum migrate --no-interaction
 docker exec flarum_app php flarum cache:clear
 
-# The Flarum application directory is recreated when the forum container is
-# updated; only the database and /data volume are persistent. Restore every
-# extension declared by the project after each deployment so installed
-# extensions do not disappear while their settings remain in the database.
+# First-install fallback and explicit repair mode. Normal container recreation
+# uses the exact saved Composer state above so intentionally removed plugins
+# are not brought back by a later main-site update.
 restore_project_extensions() {
-  local manifest_script
-  manifest_script='const { FORUM_EXTENSIONS = [] } = require("./backend/dist/data/forumExtensions.js"); for (const e of FORUM_EXTENSIONS) console.log([e.id, e.composerPackage, e.vcsUrl || ""].join("\t"));'
-
   if [[ ! -f backend/dist/data/forumExtensions.js ]] || ! command -v node >/dev/null 2>&1; then
     echo "Forum extension metadata is unavailable; skipping extension restore."
-    return 0
+    return 1
   fi
+
+  local manifest_file
+  manifest_file="$(mktemp)"
+  if ! node --input-type=module -e '
+    const { FORUM_EXTENSIONS = [] } = await import("./backend/dist/data/forumExtensions.js");
+    for (const extension of FORUM_EXTENSIONS) {
+      console.log([extension.id, extension.composerPackage, extension.vcsUrl || ""].join("\t"));
+    }
+  ' > "$manifest_file"; then
+    rm -f "$manifest_file"
+    echo "Forum extension metadata could not be read."
+    return 1
+  fi
+
+  local composer_backup_dir
+  composer_backup_dir="$(mktemp -d)"
+  docker cp flarum_app:/opt/flarum/composer.json "$composer_backup_dir/composer.json"
+  docker cp flarum_app:/opt/flarum/composer.lock "$composer_backup_dir/composer.lock"
 
   local pending=0
   while IFS=$'\t' read -r extension_id composer_package vcs_url; do
     [[ -z "$extension_id" || -z "$composer_package" ]] && continue
-    if docker exec flarum_app composer show "$composer_package" >/dev/null 2>&1; then
+    if docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show "$composer_package" >/dev/null 2>&1; then
       docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
       continue
     fi
 
     if [[ -n "$vcs_url" ]]; then
-      docker exec flarum_app composer config "repositories.carradioweb-${extension_id}" vcs "$vcs_url" --no-interaction >/dev/null 2>&1 || true
-      docker exec flarum_app composer require "${composer_package}:dev-main" --no-update --no-interaction --no-progress || true
+      docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer config "repositories.carradioweb-${extension_id}" vcs "$vcs_url" --no-interaction >/dev/null 2>&1 || true
+      docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require "${composer_package}:dev-main" --no-update --no-interaction --no-progress || true
     else
-      docker exec flarum_app composer require "${composer_package}:*" --no-update --no-interaction --no-progress || true
+      docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require "${composer_package}:*" --no-update --no-interaction --no-progress || true
     fi
     pending=$((pending + 1))
-  done < <(node -e "$manifest_script")
+  done < "$manifest_file"
 
   if [[ "$pending" -gt 0 ]]; then
     echo "Restoring $pending forum extensions..."
-    if ! docker exec flarum_app composer update --no-interaction --no-progress; then
+    if ! docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer update --prefer-dist --no-interaction --no-progress; then
       echo "Bulk forum extension restore failed; retrying packages individually."
+      docker cp "$composer_backup_dir/composer.json" flarum_app:/opt/flarum/composer.json
+      docker cp "$composer_backup_dir/composer.lock" flarum_app:/opt/flarum/composer.lock
+      docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer install --no-dev --prefer-dist --no-interaction --no-progress
+
       while IFS=$'\t' read -r extension_id composer_package vcs_url; do
         [[ -z "$extension_id" || -z "$composer_package" ]] && continue
-        docker exec flarum_app composer show "$composer_package" >/dev/null 2>&1 || continue
-        docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
-      done < <(node -e "$manifest_script")
+        if docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show "$composer_package" >/dev/null 2>&1; then
+          continue
+        fi
+        if [[ -n "$vcs_url" ]]; then
+          docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer config "repositories.carradioweb-${extension_id}" vcs "$vcs_url" --no-interaction >/dev/null 2>&1 || true
+          docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require "${composer_package}:dev-main" --with-all-dependencies --prefer-dist --no-interaction --no-progress || true
+        else
+          docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require "${composer_package}:*" --with-all-dependencies --prefer-dist --no-interaction --no-progress || true
+        fi
+      done < "$manifest_file"
     fi
   fi
 
   while IFS=$'\t' read -r extension_id composer_package vcs_url; do
     [[ -z "$extension_id" || -z "$composer_package" ]] && continue
-    if docker exec flarum_app composer show "$composer_package" >/dev/null 2>&1; then
+    if docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show "$composer_package" >/dev/null 2>&1; then
       docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
     fi
-  done < <(node -e "$manifest_script")
+  done < "$manifest_file"
 
   docker exec flarum_app php flarum migrate --no-interaction >/dev/null 2>&1 || true
   docker exec flarum_app php flarum cache:clear >/dev/null 2>&1 || true
   docker exec flarum_app php flarum assets:publish >/dev/null 2>&1 || true
   docker exec flarum_app sh -lc 'chown -R 1000:1000 /data/storage /data/extensions /data/assets /opt/flarum/storage /opt/flarum/vendor /opt/flarum/public 2>/dev/null || true'
+  rm -f "$manifest_file"
+  rm -rf "$composer_backup_dir"
 }
 
-restore_project_extensions
+if [[ "${FORUM_RESTORE_ALL:-0}" == "1" ]]; then
+  restore_project_extensions
+elif [[ "$CONTAINER_RECREATED" == "1" && "$COMPOSER_STATE_RESTORED" != "1" ]]; then
+  restore_project_extensions
+else
+  docker exec flarum_app php flarum cache:clear >/dev/null 2>&1 || true
+fi
+
+save_forum_composer_state
 
 echo "Forum bridge extension is installed and enabled."

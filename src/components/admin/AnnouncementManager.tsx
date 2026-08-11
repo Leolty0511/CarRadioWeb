@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bell, Info, AlertTriangle, CheckCircle, Download, X, FileText, Palette, Settings } from 'lucide-react'
+import { Bell, Info, AlertTriangle, CheckCircle, ChevronRight, Download, FileText, Palette } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import ImagePicker from '@/components/ImagePicker'
@@ -11,6 +11,8 @@ import { getAnnouncementHtml } from '@/utils/announcementContent'
 const MAX_ANNOUNCEMENT_LENGTH = 5000
 
 interface AnnouncementManagerProps {
+  announcementTitle: string
+  setAnnouncementTitle: (title: string) => void
   announcementContent: string
   announcementContentHtml: string
   setAnnouncementContentHtml: (content: string) => void
@@ -28,12 +30,6 @@ interface AnnouncementManagerProps {
   /** 公告详情弹窗卡片风格：玻璃拟态 / 古风卷轴 / 火漆封信 */
   noticeCardStyle: NoticeCardStyle
   setNoticeCardStyle: (style: NoticeCardStyle) => void
-  announcementScrolling: boolean
-  setAnnouncementScrolling: (scrolling: boolean) => void
-  announcementCloseable: boolean
-  setAnnouncementCloseable: (closeable: boolean) => void
-  announcementRememberDays: number
-  setAnnouncementRememberDays: (days: number) => void
   announcementImageUrl: string
   setAnnouncementImageUrl: (url: string) => void
   handleToggleAnnouncement: () => void
@@ -41,6 +37,8 @@ interface AnnouncementManagerProps {
 }
 
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
+  announcementTitle,
+  setAnnouncementTitle,
   announcementContent,
   announcementContentHtml,
   setAnnouncementContentHtml,
@@ -57,25 +55,18 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
   setAnnouncementTextColor,
   noticeCardStyle,
   setNoticeCardStyle,
-  announcementScrolling,
-  setAnnouncementScrolling,
-  announcementCloseable,
-  setAnnouncementCloseable,
-  announcementRememberDays,
-  setAnnouncementRememberDays,
   announcementImageUrl,
   setAnnouncementImageUrl,
   handleToggleAnnouncement,
   handleSaveAnnouncement
 }) => {
   const { t } = useTranslation()
-  type TabKey = 'content' | 'style' | 'behavior'
+  type TabKey = 'content' | 'style'
   const [activeTab, setActiveTab] = useState<TabKey>('content')
 
   const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: 'content', label: t('admin.announcement.sectionContent', '公告内容与图片'), icon: FileText },
-    { key: 'style', label: t('admin.announcement.sectionStyle', '横幅样式与预览'), icon: Palette },
-    { key: 'behavior', label: t('admin.announcement.sectionBehavior', '行为配置'), icon: Settings },
+    { key: 'style', label: t('admin.announcement.sectionStyle', '显示样式与预览'), icon: Palette },
   ]
 
   return (
@@ -139,6 +130,17 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
+            <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-2">{t('admin.announcement.titleLabel', '公告标题')}</label>
+            <input
+              type="text"
+              value={announcementTitle}
+              maxLength={160}
+              onChange={(event) => setAnnouncementTitle(event.target.value)}
+              placeholder={t('admin.announcement.titlePlaceholder', '输入便于在历史记录中识别的标题')}
+              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-800 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            />
+          </div>
+          <div>
             <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-2">{t('admin.announcement.contentTitle')}</label>
             <LazyRichTextEditor
               value={announcementContentHtml || getAnnouncementHtml(announcementContent)}
@@ -163,11 +165,11 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
       </Card>
       )}
 
-      {/* Tab 2：横幅样式设置 + 预览 */}
+      {/* Tab 2：显示样式设置 + 预览 */}
       {activeTab === 'style' && (
       <Card className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
         <CardHeader>
-          <CardTitle className="text-slate-800 dark:text-white">{t('admin.announcement.sectionStyle', '横幅样式与预览')}</CardTitle>
+          <CardTitle className="text-slate-800 dark:text-white">{t('admin.announcement.sectionStyle', '显示样式与预览')}</CardTitle>
           <CardDescription className="text-slate-600 dark:text-gray-400">
             {t('admin.announcement.previewDesc')}
           </CardDescription>
@@ -291,55 +293,26 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
             <div className="lg:sticky lg:top-6 self-start">
               <p className="text-sm font-medium text-slate-600 dark:text-gray-300 mb-3">{t('admin.announcement.preview')}</p>
               {announcementContent ? (
-                <div className="rounded-lg overflow-hidden border-2 border-slate-300 dark:border-gray-600">
-                  <div className={`bg-gradient-to-b from-slate-100 dark:from-gray-900 via-slate-50 dark:via-gray-800 to-slate-100 dark:to-gray-900 border-b-2 ${
-                    announcementType === 'info' ? 'border-blue-500' :
-                    announcementType === 'warning' ? 'border-orange-500' :
-                    announcementType === 'danger' ? 'border-red-500' :
-                    'border-green-500'
-                  } py-3 px-4`}>
-                    <div className="flex items-center space-x-3">
-                      <div className={`${
-                        announcementType === 'info' ? 'text-blue-500' :
-                        announcementType === 'warning' ? 'text-orange-500' :
-                        announcementType === 'danger' ? 'text-red-500' :
-                        'text-green-500'
-                      }`}>
-                        {announcementType === 'info' && <Info className="h-4 w-4" />}
-                        {announcementType === 'warning' && <AlertTriangle className="h-4 w-4" />}
-                        {announcementType === 'danger' && <Bell className="h-4 w-4" />}
-                        {announcementType === 'success' && <CheckCircle className="h-4 w-4" />}
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <p
-                          className={`${
-                            announcementType === 'info' ? 'text-blue-600 dark:text-blue-400' :
-                            announcementType === 'warning' ? 'text-orange-600 dark:text-orange-400' :
-                            announcementType === 'danger' ? 'text-red-600 dark:text-red-400' :
-                            'text-green-600 dark:text-green-400'
-                          } ${
-                            announcementFontSize === 'sm' ? 'text-sm' :
-                            announcementFontSize === 'lg' ? 'text-lg' :
-                            'text-base'
-                          } ${announcementFontWeight === 'bold' ? 'font-bold' : 'font-normal'} ${
-                            announcementFontStyle === 'italic' ? 'italic' : 'not-italic'
-                          } ${announcementScrolling ? 'truncate' : 'line-clamp-2'}`}
-                          style={announcementTextColor ? { color: announcementTextColor } : undefined}
-                        >
-                          {announcementContent}
-                        </p>
-                      </div>
-                      {announcementCloseable && (
-                        <button type="button" className={`p-1 hover:bg-slate-200 dark:hover:bg-gray-700/50 rounded-full ${
-                          announcementType === 'info' ? 'text-blue-600 dark:text-blue-400' :
-                          announcementType === 'warning' ? 'text-orange-600 dark:text-orange-400' :
-                          announcementType === 'danger' ? 'text-red-600 dark:text-red-400' :
-                          'text-green-600 dark:text-green-400'
-                        }`}>
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
+                <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900 text-white shadow-xl">
+                  <div className="flex items-center gap-3 border-b border-slate-700 px-4 py-4">
+                    <span className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
+                      <Bell className="h-5 w-5" />
+                      <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-slate-900 bg-red-500" />
+                    </span>
+                    <span className="font-semibold">{t('announcement.historyTitle', '公告')}</span>
+                  </div>
+                  <div className="flex items-center gap-3 px-4 py-4">
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300"><Bell className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block truncate ${announcementFontSize === 'sm' ? 'text-sm' : announcementFontSize === 'lg' ? 'text-lg' : 'text-base'} ${announcementFontWeight === 'bold' ? 'font-bold' : 'font-normal'} ${announcementFontStyle === 'italic' ? 'italic' : 'not-italic'}`}
+                        style={announcementTextColor ? { color: announcementTextColor } : undefined}
+                      >
+                        {announcementTitle || announcementContent.split(/\r?\n/).find(Boolean) || t('announcement.defaultTitle', '公告')}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-400">{t('announcement.today', '今天')}</span>
+                    </span>
+                    <ChevronRight className="h-5 w-5 text-slate-500" />
                   </div>
                 </div>
               ) : (
@@ -350,72 +323,6 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
             </div>
           </div>
         </CardContent>
-      </Card>
-      )}
-
-      {/* Tab 3：行为配置 */}
-      {activeTab === 'behavior' && (
-      <Card className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-slate-800 dark:text-white">{t('admin.announcement.sectionBehavior', '行为配置')}</CardTitle>
-          <CardDescription className="text-slate-600 dark:text-gray-400">
-            {t('admin.announcement.sectionBehaviorDesc', '滚动、关闭与记忆天数')}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-gray-300">{t('admin.announcement.scrolling')}</label>
-                  <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">{t('admin.announcement.scrollingDesc')}</p>
-                </div>
-                <button
-                  onClick={() => setAnnouncementScrolling(!announcementScrolling)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    announcementScrolling ? 'bg-blue-600' : 'bg-slate-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      announcementScrolling ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <label className="text-sm font-medium text-slate-700 dark:text-gray-300">{t('admin.announcement.closeable')}</label>
-                  <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">{t('admin.announcement.closeableDesc')}</p>
-                </div>
-                <button
-                  onClick={() => setAnnouncementCloseable(!announcementCloseable)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    announcementCloseable ? 'bg-blue-600' : 'bg-slate-300 dark:bg-gray-600'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      announcementCloseable ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {announcementCloseable && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">{t('admin.announcement.rememberDays')}</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    value={announcementRememberDays}
-                    onChange={(e) => setAnnouncementRememberDays(parseInt(e.target.value) || 7)}
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-700 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-800 dark:text-white"
-                  />
-                  <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">{t('admin.announcement.rememberDaysDesc')}</p>
-                </div>
-              )}
-            </CardContent>
       </Card>
       )}
 

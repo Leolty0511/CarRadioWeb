@@ -8,12 +8,6 @@ export interface AnnouncementStyle {
   textColor?: string
 }
 
-export interface AnnouncementBehavior {
-  scrolling: boolean
-  closeable: boolean
-  closeRememberDays: number
-}
-
 /** 公告详情弹窗卡片风格 */
 export type NoticeCardStyle = 'glass' | 'scroll' | 'wax' | 'device'
 
@@ -21,17 +15,22 @@ export interface Announcement {
   _id?: string
   language: 'en' | 'ru'
   enabled: boolean
+  title?: string
   content: string
   contentHtml?: string
   imageUrl?: string
   style: AnnouncementStyle
-  behavior: AnnouncementBehavior
   /** 公告详情弹窗样式：玻璃拟态 / 古风卷轴 / 火漆封信 */
   noticeCardStyle?: NoticeCardStyle
   /** 服务端维护的「发布时间」，用于详情弹窗日期展示 */
   publishedAt?: string
   createdAt?: string
   updatedAt?: string
+}
+
+export interface AnnouncementHistoryItem extends Omit<Announcement, 'enabled'> {
+  _id: string
+  publishedAt: string
 }
 
 /**
@@ -46,6 +45,17 @@ export const getAnnouncement = async (language: 'en' | 'ru' = 'en'): Promise<Ann
     return null
   } catch {
     return null
+  }
+}
+
+export const getAnnouncementHistory = async (
+  language: 'en' | 'ru' = 'en',
+): Promise<AnnouncementHistoryItem[]> => {
+  try {
+    const result = await apiClient.get(`/announcement/history?language=${language}`)
+    return result.success && Array.isArray(result.announcements) ? result.announcements : []
+  } catch {
+    return []
   }
 }
 
@@ -71,66 +81,60 @@ export const toggleAnnouncement = async (language: 'en' | 'ru', enabled: boolean
   throw new Error(result.error || '切换失败')
 }
 
-// 版本化本地关闭记录 key，避免旧逻辑影响新行为
-const ANNOUNCEMENT_CLOSED_KEY = 'announcement_closed_v2'
-const HOURS_PER_DAY = 24
-const MINUTES_PER_HOUR = 60
-const SECONDS_PER_MINUTE = 60
-const MS_PER_SECOND = 1000
-const MS_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND
+const ANNOUNCEMENT_READ_KEY = 'announcement_read_v2'
+const READ_STATE_RETENTION_MS = 93 * 24 * 60 * 60 * 1000
 
-/**
- * 检查用户是否已关闭公告
- * - 增强：如果公告内容有更新（updatedAt 变化），则视为“未关闭”，重新显示
- */
-export const isAnnouncementClosed = (
-  language: 'en' | 'ru' = 'en',
-  currentUpdatedAt?: string
-): boolean => {
+type AnnouncementReadState = Record<string, number>
+
+function getReadState(language: 'en' | 'ru'): AnnouncementReadState {
   try {
-    const closedData = localStorage.getItem(`${ANNOUNCEMENT_CLOSED_KEY}_${language}`)
-    if (!closedData) {return false}
-
-    const { closedAt, rememberDays, announcementUpdatedAt } = JSON.parse(closedData)
-
-    // 如果当前公告有更新时间，但本地记录没有版本信息，说明是旧记录，直接视为“未关闭”
-    if (currentUpdatedAt && !announcementUpdatedAt) {
-      return false
+    const raw = localStorage.getItem(`${ANNOUNCEMENT_READ_KEY}_${language}`)
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const now = Date.now()
+        return Object.fromEntries(
+          Object.entries(parsed as Record<string, unknown>)
+            .filter(([, value]) => typeof value === 'number' && now - value <= READ_STATE_RETENTION_MS),
+        ) as AnnouncementReadState
+      }
     }
 
-    // 公告版本已变化，说明管理员修改过公告内容，应重新显示
-    if (currentUpdatedAt && announcementUpdatedAt && announcementUpdatedAt !== currentUpdatedAt) {
-      return false
+    // The previous implementation stored one raw version string rather than JSON.
+    const legacyVersion = localStorage.getItem(`announcement_read_v1_${language}`)
+    if (legacyVersion) {
+      return {[legacyVersion]: Date.now()}
     }
-
-    const daysSinceClosed = (Date.now() - closedAt) / MS_PER_DAY
-
-    return daysSinceClosed < rememberDays
   } catch {
-    return false
+    // Ignore malformed or unavailable browser storage.
+  }
+  return {}
+}
+
+function saveReadState(language: 'en' | 'ru', state: AnnouncementReadState): void {
+  try {
+    localStorage.setItem(`${ANNOUNCEMENT_READ_KEY}_${language}`, JSON.stringify(state))
+  } catch {
+    // Ignore unavailable browser storage.
   }
 }
 
-const DEFAULT_REMEMBER_DAYS = 7
-
-/**
- * 记录用户关闭公告
- * - 额外记录当前公告的更新时间，用于后续判断“内容是否已更新”
- */
-export const closeAnnouncement = (
+export const isAnnouncementRead = (
   language: 'en' | 'ru' = 'en',
-  rememberDays: number = DEFAULT_REMEMBER_DAYS,
+  currentUpdatedAt?: string
+): boolean => {
+  if (!currentUpdatedAt) {return false}
+  return Object.prototype.hasOwnProperty.call(getReadState(language), currentUpdatedAt)
+}
+
+export const markAnnouncementRead = (
+  language: 'en' | 'ru' = 'en',
   announcementUpdatedAt?: string
 ): void => {
-  try {
-    localStorage.setItem(`${ANNOUNCEMENT_CLOSED_KEY}_${language}`, JSON.stringify({
-      closedAt: Date.now(),
-      rememberDays,
-      announcementUpdatedAt: announcementUpdatedAt || null
-    }))
-  } catch {
-    // ignore
-  }
+  if (!announcementUpdatedAt) {return}
+  const state = getReadState(language)
+  state[announcementUpdatedAt] = Date.now()
+  saveReadState(language, state)
 }
 
 /**
@@ -138,7 +142,11 @@ export const closeAnnouncement = (
  */
 export const clearAnnouncementClosed = (): void => {
   try {
-    localStorage.removeItem(ANNOUNCEMENT_CLOSED_KEY)
+    localStorage.removeItem(`${ANNOUNCEMENT_READ_KEY}_en`)
+    localStorage.removeItem(`${ANNOUNCEMENT_READ_KEY}_ru`)
+    // Remove the marker used by the previous implementation as well.
+    localStorage.removeItem('announcement_read_v1_en')
+    localStorage.removeItem('announcement_read_v1_ru')
   } catch {
     // ignore
   }

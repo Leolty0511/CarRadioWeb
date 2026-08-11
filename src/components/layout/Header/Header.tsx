@@ -27,9 +27,10 @@ interface HeaderProps {
   navigationItems: NavItem[]
   /** 页面是否使用透明背景（沉浸式页面），Header 需要强制不透明 */
   shouldTransparentBg?: boolean
+  announcementControl?: React.ReactNode
 }
 
-export const Header: React.FC<HeaderProps> = ({ navigationItems, shouldTransparentBg = false }) => {
+export const Header: React.FC<HeaderProps> = ({ navigationItems, shouldTransparentBg = false, announcementControl }) => {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { getLocalizedPath } = useLanguage()
@@ -150,6 +151,8 @@ export const Header: React.FC<HeaderProps> = ({ navigationItems, shouldTranspare
               >
                 <Search className="h-5 w-5" />
               </button>
+
+              {announcementControl}
 
               {/* 主题切换器 */}
               <ThemeSwitcher />

@@ -3,6 +3,7 @@ import mongoose, { Schema, Document } from 'mongoose'
 export interface IAnnouncement extends Document {
   language: 'en' | 'ru'
   enabled: boolean
+  title?: string
   content: string
   /** 富文本正文，保留 content 作为横幅纯文本和旧数据兼容字段 */
   contentHtml?: string
@@ -13,11 +14,6 @@ export interface IAnnouncement extends Document {
     fontWeight: 'normal' | 'bold'
     fontStyle: 'normal' | 'italic'
     textColor?: string
-  }
-  behavior: {
-    scrolling: boolean
-    closeable: boolean
-    closeRememberDays: number
   }
   /** 公告详情弹窗卡片风格：glass 玻璃拟态 / scroll 古风卷轴 / wax 火漆封信 */
   noticeCardStyle?: 'glass' | 'scroll' | 'wax' | 'device'
@@ -37,6 +33,11 @@ const AnnouncementSchema: Schema = new Schema(
     enabled: {
       type: Boolean,
       default: false
+    },
+    title: {
+      type: String,
+      default: '',
+      maxlength: 160
     },
     content: {
       type: String,
@@ -76,22 +77,6 @@ const AnnouncementSchema: Schema = new Schema(
       textColor: {
         type: String,
         default: ''
-      }
-    },
-    behavior: {
-      scrolling: {
-        type: Boolean,
-        default: true
-      },
-      closeable: {
-        type: Boolean,
-        default: true
-      },
-      closeRememberDays: {
-        type: Number,
-        default: 7,
-        min: 1,
-        max: 365
       }
     },
     noticeCardStyle: {

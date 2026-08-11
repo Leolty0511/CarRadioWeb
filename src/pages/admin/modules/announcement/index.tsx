@@ -20,6 +20,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
   const { showToast } = useToast()
 
   // 公告状态
+  const [announcementTitle, setAnnouncementTitle] = useState('')
   const [announcementContent, setAnnouncementContent] = useState('')
   const [announcementContentHtml, setAnnouncementContentHtml] = useState('')
   const [announcementEnabled, setAnnouncementEnabled] = useState(false)
@@ -29,9 +30,6 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
   const [announcementFontStyle, setAnnouncementFontStyle] = useState<'normal' | 'italic'>('normal')
   const [announcementTextColor, setAnnouncementTextColor] = useState('')
   const [noticeCardStyle, setNoticeCardStyle] = useState<NoticeCardStyle>('glass')
-  const [announcementScrolling, setAnnouncementScrolling] = useState(true)
-  const [announcementCloseable, setAnnouncementCloseable] = useState(true)
-  const [announcementRememberDays, setAnnouncementRememberDays] = useState(7)
   const [announcementImageUrl, setAnnouncementImageUrl] = useState('')
 
   // 加载公告
@@ -40,6 +38,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       try {
         const data = await getAnnouncement(dataLanguage)
         if (data) {
+          setAnnouncementTitle(data.title || '')
           setAnnouncementContent(data.content)
           setAnnouncementContentHtml(getAnnouncementHtml(data.content, data.contentHtml))
           setAnnouncementEnabled(data.enabled)
@@ -49,9 +48,6 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
           setAnnouncementFontStyle(data.style.fontStyle)
           setAnnouncementTextColor(data.style.textColor || '')
           setNoticeCardStyle(data.noticeCardStyle || 'glass')
-          setAnnouncementScrolling(data.behavior.scrolling)
-          setAnnouncementCloseable(data.behavior.closeable)
-          setAnnouncementRememberDays(data.behavior.closeRememberDays)
           setAnnouncementImageUrl(data.imageUrl || '')
         }
       } catch (error) {
@@ -66,6 +62,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
     try {
       await updateAnnouncement(dataLanguage, {
         enabled: announcementEnabled,
+        title: announcementTitle,
         content: announcementContent,
         contentHtml: announcementContentHtml,
         imageUrl: announcementImageUrl,
@@ -77,11 +74,6 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
           fontStyle: announcementFontStyle,
           textColor: announcementTextColor
         },
-        behavior: {
-          scrolling: announcementScrolling,
-          closeable: announcementCloseable,
-          closeRememberDays: announcementRememberDays
-        }
       })
       showToast({
         type: 'success',
@@ -119,6 +111,8 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
 
   return (
     <AnnouncementManager
+      announcementTitle={announcementTitle}
+      setAnnouncementTitle={setAnnouncementTitle}
       announcementContent={announcementContent}
       announcementContentHtml={announcementContentHtml}
       setAnnouncementContentHtml={(html) => {
@@ -138,12 +132,6 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       setAnnouncementTextColor={setAnnouncementTextColor}
       noticeCardStyle={noticeCardStyle}
       setNoticeCardStyle={setNoticeCardStyle}
-      announcementScrolling={announcementScrolling}
-      setAnnouncementScrolling={setAnnouncementScrolling}
-      announcementCloseable={announcementCloseable}
-      setAnnouncementCloseable={setAnnouncementCloseable}
-      announcementRememberDays={announcementRememberDays}
-      setAnnouncementRememberDays={setAnnouncementRememberDays}
       announcementImageUrl={announcementImageUrl}
       setAnnouncementImageUrl={setAnnouncementImageUrl}
       handleToggleAnnouncement={handleToggleAnnouncement}

@@ -60,6 +60,7 @@ const artifactPaths = [
   path.join('scripts', 'ensure-docker.sh'),
   path.join('scripts', 'install-forum-bridge.sh'),
 ]
+const stableDirectoryPaths = new Set(['forum-extensions'])
 
 function getCommandEnvironment(command: string): NodeJS.ProcessEnv {
   const token = payload.githubToken?.trim()
@@ -217,6 +218,32 @@ async function moveIntoBackup(relativePath: string): Promise<void> {
   }
 }
 
+async function clearDirectory(directory: string): Promise<void> {
+  await fs.mkdir(directory, { recursive: true })
+  const entries = await fs.readdir(directory)
+  await Promise.all(entries.map(entry => fs.rm(path.join(directory, entry), { recursive: true, force: true })))
+}
+
+async function replaceStableDirectory(relativePath: string, sourceRoot: string, backupCurrent: boolean): Promise<void> {
+  if (!artifactBackupDir) throw new Error('artifact backup directory is not initialized')
+  const current = path.join(payload.repoRoot, relativePath)
+  const source = path.join(sourceRoot, relativePath)
+  const backup = path.join(artifactBackupDir, relativePath)
+
+  if (backupCurrent) {
+    await fs.rm(backup, { recursive: true, force: true })
+    try {
+      await fs.cp(current, backup, { recursive: true })
+    } catch (error: any) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+  }
+
+  await clearDirectory(current)
+  await fs.cp(source, current, { recursive: true })
+  await fs.rm(source, { recursive: true, force: true })
+}
+
 async function applyArtifact(): Promise<void> {
   if (!payload.artifactUrl) throw new Error('deployment package URL is not configured')
   const stagingDir = path.join(payload.repoRoot, `.update-staging-${payload.jobId}`)
@@ -256,6 +283,10 @@ async function applyArtifact(): Promise<void> {
   }
 
   for (const relative of artifactPaths) {
+    if (stableDirectoryPaths.has(relative)) {
+      await replaceStableDirectory(relative, stagingDir, true)
+      continue
+    }
     await moveIntoBackup(relative)
     const staged = path.join(stagingDir, relative)
     const current = path.join(payload.repoRoot, relative)
@@ -276,6 +307,11 @@ async function rollbackArtifact(reason: string): Promise<boolean> {
       const backup = path.join(artifactBackupDir, relative)
       const current = path.join(payload.repoRoot, relative)
       try { await fs.access(backup) } catch { continue }
+      if (stableDirectoryPaths.has(relative)) {
+        await clearDirectory(current)
+        await fs.cp(backup, current, { recursive: true })
+        continue
+      }
       await fs.rm(current, { recursive: true, force: true })
       await fs.rename(backup, current)
     }

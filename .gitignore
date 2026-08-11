@@ -72,6 +72,7 @@ coverage/
 *.temp
 .update-staging-*/
 .update-backup-*/
+.forum-state/
 backend/dist.backup-*/
 release.json
 

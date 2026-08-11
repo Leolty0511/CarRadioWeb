@@ -1,5 +1,5 @@
 import express from 'express'
-import { getAnnouncement, updateAnnouncement, toggleAnnouncement } from '../services/announcementService'
+import { getAnnouncement, getAnnouncementHistory, updateAnnouncement, toggleAnnouncement } from '../services/announcementService'
 import { authenticateUser, requirePermission } from '../middleware/auth'
 import { PERMISSIONS } from '../config/permissions'
 import { createLogger } from '../utils/logger'
@@ -12,7 +12,7 @@ const router = express.Router()
  */
 router.get('/', async (req, res) => {
   try {
-    const language = 'en'
+    const language = req.query.language === 'ru' ? 'ru' : 'en'
     const announcement = await getAnnouncement(language)
     
     res.json({
@@ -28,10 +28,22 @@ router.get('/', async (req, res) => {
   }
 })
 
+router.get('/history', async (req, res) => {
+  try {
+    const language = req.query.language === 'ru' ? 'ru' : 'en'
+    const limit = Number.parseInt(String(req.query.limit || '50'), 10)
+    const announcements = await getAnnouncementHistory(language, Number.isFinite(limit) ? limit : 50)
+    res.json({ success: true, announcements })
+  } catch (error) {
+    logger.error({ error }, '获取历史公告失败')
+    res.status(500).json({ success: false, error: '获取历史公告失败' })
+  }
+})
+
 /**
  * 更新公告设置 - 需要认证
  */
-router.put('/', authenticateUser, async (req, res) => {
+router.put('/', authenticateUser, requirePermission(PERMISSIONS.announcements.update), async (req, res) => {
   try {
     const { language = 'en', ...data } = req.body
     const announcement = await updateAnnouncement(language, data)

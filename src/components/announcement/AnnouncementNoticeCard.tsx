@@ -2,7 +2,7 @@
  * 公告详情弹窗卡片 — 三种风格：玻璃拟态 / 古风卷轴 / 火漆封信
  */
 
-import React from 'react'
+import React, { useEffect, useRef } from 'react'
 import { Home, Mail, Power, Radio, Undo2, Volume1, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { NoticeCardStyle } from '@/services/announcementService'
@@ -29,6 +29,8 @@ export interface AnnouncementNoticeCardProps {
   deviceBrandLabel?: string
   micLabel?: string
   resetLabel?: string
+  contentStyle?: React.CSSProperties
+  accentColor?: string
 }
 
 const DEFAULT_IMPORTANT_NOTICE = '— Important Notice —'
@@ -57,8 +59,59 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
   newLabel = DEFAULT_NEW_LABEL,
   deviceBrandLabel = DEFAULT_DEVICE_BRAND,
   micLabel = DEFAULT_MIC_LABEL,
-  resetLabel = DEFAULT_RESET_LABEL
+  resetLabel = DEFAULT_RESET_LABEL,
+  contentStyle,
+  accentColor
 }) => {
+  const cardStyle = accentColor
+    ? ({ '--notice-accent': accentColor } as React.CSSProperties)
+    : undefined
+  const deviceContentRef = useRef<HTMLDivElement>(null)
+  const deviceScrollPausedUntilRef = useRef(0)
+
+  const pauseDeviceAutoScroll = () => {
+    deviceScrollPausedUntilRef.current = performance.now() + 5000
+  }
+
+  useEffect(() => {
+    if (style !== 'device') {return}
+    const viewport = deviceContentRef.current
+    if (!viewport || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {return}
+
+    let animationFrame = 0
+    let startTimer = 0
+    let previousTime = performance.now()
+    let bottomPauseUntil = 0
+
+    const scroll = (time: number) => {
+      const elapsed = Math.min(time - previousTime, 50)
+      previousTime = time
+      const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight)
+
+      if (maxScrollTop > 1 && time >= deviceScrollPausedUntilRef.current && time >= bottomPauseUntil) {
+        if (viewport.scrollTop >= maxScrollTop - 1) {
+          bottomPauseUntil = time + 2200
+          deviceScrollPausedUntilRef.current = time + 900
+          viewport.scrollTo({ top: 0, behavior: 'smooth' })
+        } else {
+          viewport.scrollTop = Math.min(maxScrollTop, viewport.scrollTop + elapsed * 0.016)
+        }
+      }
+
+      animationFrame = window.requestAnimationFrame(scroll)
+    }
+
+    startTimer = window.setTimeout(() => {
+      previousTime = performance.now()
+      animationFrame = window.requestAnimationFrame(scroll)
+    }, 1400)
+
+    return () => {
+      window.clearTimeout(startTimer)
+      window.cancelAnimationFrame(animationFrame)
+    }
+  }, [content, contentHtml, imageUrl, style])
+
   const bodyContent = (
     <>
       {imageUrl && (
@@ -70,6 +123,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
       )}
       <div
         className="notice-card-body-text announcement-rich-content"
+        style={contentStyle}
         dangerouslySetInnerHTML={sanitizeHTMLForReact(getAnnouncementHtml(content, contentHtml))}
       />
     </>
@@ -77,7 +131,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
 
   if (style === 'glass') {
     return (
-      <div className="notice-card notice-card--glass">
+      <div className="notice-card notice-card--glass" style={cardStyle}>
         <div className="notice-card__glow" aria-hidden />
         <div className="notice-card__glow-2" aria-hidden />
         <div className="notice-card__top-section">
@@ -102,7 +156,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
 
   if (style === 'scroll') {
     return (
-      <div className="notice-card notice-card--scroll">
+      <div className="notice-card notice-card--scroll" style={cardStyle}>
         <div className="notice-card__rod notice-card__rod--top" aria-hidden />
         <div className="notice-card__scroll-body">
           <div className="notice-card__scroll-header">{title}</div>
@@ -122,7 +176,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
 
   if (style === 'wax') {
     return (
-      <div className="notice-card notice-card--wax">
+      <div className="notice-card notice-card--wax" style={cardStyle}>
         <div className="notice-card__flap" aria-hidden />
         <div className="notice-card__wax-seal" aria-hidden>
           <span>{waxSealChar}</span>
@@ -144,7 +198,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
 
   if (style === 'device') {
     return (
-      <div className="notice-card notice-card--device">
+      <div className="notice-card notice-card--device" style={cardStyle}>
         <div className="cr-device">
           <div className="cr-controls" aria-hidden="true">
             <div className="cr-ind"><span className="cr-ind__dot" />{micLabel}</div>
@@ -164,7 +218,16 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
               <span className="cr-signal" aria-hidden="true"><i /><i /><i /><i /></span>
               <span className="cr-screen__clock">{dateText}</span>
             </div>
-            <div className="cr-screen__content">
+            <div
+              ref={deviceContentRef}
+              className="cr-screen__content"
+              onWheel={pauseDeviceAutoScroll}
+              onTouchStart={pauseDeviceAutoScroll}
+              onTouchMove={pauseDeviceAutoScroll}
+              onPointerDown={pauseDeviceAutoScroll}
+              onKeyDown={pauseDeviceAutoScroll}
+              tabIndex={0}
+            >
               <h3 className="cr-title">
                 {title}
                 <span className="cr-title__pill">{newLabel}</span>

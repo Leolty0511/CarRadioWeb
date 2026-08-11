@@ -1,199 +1,187 @@
-import React, { useState } from 'react'
-import { X, Info, AlertTriangle, Bell, CheckCircle } from 'lucide-react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { Bell, Check, ChevronRight, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Announcement, closeAnnouncement } from '@/services/announcementService'
+import {
+  Announcement,
+  AnnouncementHistoryItem,
+  isAnnouncementRead,
+  markAnnouncementRead,
+} from '@/services/announcementService'
 import { AnnouncementNoticeCard } from '@/components/announcement/AnnouncementNoticeCard'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 
 interface AnnouncementBannerProps {
-  announcement: Announcement
-  onClose: () => void
+  announcement: Announcement | null
+  history: AnnouncementHistoryItem[]
 }
 
-const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, onClose }) => {
+type AnnouncementItem = Announcement | AnnouncementHistoryItem
+
+const ACCENT_COLORS = {
+  info: '#38bdf8',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+  success: '#22c55e',
+} as const
+
+const FONT_SIZES = {
+  sm: '0.875rem',
+  md: '1rem',
+  lg: '1.125rem',
+} as const
+
+function getItemVersion(item: AnnouncementItem): string {
+  return item.publishedAt || item.updatedAt || item.createdAt || item._id || ''
+}
+
+function getItemTitle(item: AnnouncementItem, fallback: string): string {
+  const configured = String(item.title || '').trim()
+  if (configured) {return configured}
+  return String(item.content || '').split(/\r?\n/).find(Boolean)?.trim().slice(0, 90) || fallback
+}
+
+function formatRelativeDate(value: string | undefined, language: string, fallback: string): string {
+  if (!value) {return fallback}
+  const timestamp = new Date(value).getTime()
+  if (!Number.isFinite(timestamp)) {return fallback}
+  const days = Math.max(0, Math.floor((Date.now() - timestamp) / 86400000))
+  if (language.startsWith('zh')) {return days === 0 ? '今天' : `${days}天前`}
+  if (days === 0) {return 'Today'}
+  return `${days} ${days === 1 ? 'day' : 'days'} ago`
+}
+
+function formatDate(value: string | undefined, language: string): string {
+  if (!value) {return ''}
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {return ''}
+  return date.toLocaleString(language.startsWith('zh') ? 'zh-CN' : 'en-US', {
+    year: 'numeric', month: 'long', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  })
+}
+
+const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, history }) => {
   const { t, i18n } = useTranslation()
-  const [showModal, setShowModal] = useState(false)
   const { siteSettings } = useSiteSettings()
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [selected, setSelected] = useState<AnnouncementItem | null>(null)
 
-  // 根据类型获取样式
-  const getStyleConfig = () => {
-    const { type } = announcement.style
-
-    const configs = {
-      info: {
-        borderColor: 'border-blue-500',
-        textColor: 'text-blue-400',
-        icon: Info,
-        iconColor: 'text-blue-500'
-      },
-      warning: {
-        borderColor: 'border-orange-500',
-        textColor: 'text-orange-400',
-        icon: AlertTriangle,
-        iconColor: 'text-orange-500'
-      },
-      danger: {
-        borderColor: 'border-red-500',
-        textColor: 'text-red-400',
-        icon: Bell,
-        iconColor: 'text-red-500'
-      },
-      success: {
-        borderColor: 'border-green-500',
-        textColor: 'text-green-400',
-        icon: CheckCircle,
-        iconColor: 'text-green-500'
-      }
+  useEffect(() => {
+    if (!panelOpen && !selected) {return}
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {return}
+      if (selected) {setSelected(null)}
+      else {setPanelOpen(false)}
     }
-
-    return configs[type] || configs.info
-  }
-
-  // 获取字体大小类名
-  const getFontSizeClass = () => {
-    const sizeMap = {
-      sm: 'text-sm',
-      md: 'text-base',
-      lg: 'text-lg'
+    window.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', closeOnEscape)
     }
-    return sizeMap[announcement.style.fontSize] || 'text-base'
-  }
+  }, [panelOpen, selected])
 
-  // 获取字体粗细类名
-  const getFontWeightClass = () => {
-    return announcement.style.fontWeight === 'bold' ? 'font-bold' : 'font-normal'
-  }
-
-  // 获取字体样式类名
-  const getFontStyleClass = () => {
-    return announcement.style.fontStyle === 'italic' ? 'italic' : 'not-italic'
-  }
-
-  const styleConfig = getStyleConfig()
-  const Icon = styleConfig.icon
-
-  const handleClose = () => {
-    closeAnnouncement(
-      announcement.language,
-      announcement.behavior.closeRememberDays,
-      announcement.updatedAt
-    )
-    onClose()
-  }
-
-  const handleBannerClick = () => {
-    setShowModal(true)
-  }
-
-  const customTextColor = announcement.style.textColor || undefined
-  const teamName = `${(siteSettings.siteName || siteSettings.logoText || 'Team').trim()} Team`
-  const noticeDate = announcement.publishedAt || announcement.updatedAt || announcement.createdAt
-
-  const formatNoticeDate = (iso?: string) => {
-    if (!iso) {return ''}
-    const date = new Date(iso)
-    if (Number.isNaN(date.getTime())) {return ''}
-    if (i18n.language?.startsWith('zh')) {
-      const pad = (n: number) => String(n).padStart(2, '0')
-      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日 ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  const items = useMemo<AnnouncementItem[]>(() => {
+    const existing = new Set<string>()
+    const result: AnnouncementItem[] = []
+    for (const item of history) {
+      const key = getItemVersion(item)
+      if (!key || existing.has(key)) {continue}
+      existing.add(key)
+      result.push(item)
     }
-    return date.toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
+    if (announcement?.enabled) {
+      const key = getItemVersion(announcement)
+      if (!existing.has(key)) {result.unshift(announcement)}
+    }
+    return result.sort((left, right) => {
+      const leftTime = new Date(left.publishedAt || left.updatedAt || left.createdAt || 0).getTime()
+      const rightTime = new Date(right.publishedAt || right.updatedAt || right.createdAt || 0).getTime()
+      return rightTime - leftTime
     })
+  }, [announcement, history])
+
+  const latest = items[0]
+  const unread = Boolean(latest && !isAnnouncementRead(latest.language, getItemVersion(latest)))
+  const teamName = `${(siteSettings.siteName || siteSettings.logoText || 'Team').trim()} Team`
+  const defaultTitle = t('announcement.defaultTitle', 'Announcement')
+
+  const openItem = (item: AnnouncementItem) => {
+    markAnnouncementRead(item.language, getItemVersion(item))
+    setSelected(item)
+    setPanelOpen(false)
   }
 
-  return (
+  if (!latest) {return null}
+
+  const selectedStyle = selected?.style || latest.style
+  const selectedTextStyle: React.CSSProperties = {
+    fontSize: FONT_SIZES[selectedStyle.fontSize] || FONT_SIZES.md,
+    fontWeight: selectedStyle.fontWeight === 'bold' ? 700 : 400,
+    fontStyle: selectedStyle.fontStyle === 'italic' ? 'italic' : 'normal',
+    ...(selectedStyle.textColor ? { color: selectedStyle.textColor } : {}),
+  }
+  const selectedAccent = ACCENT_COLORS[selectedStyle.type] || ACCENT_COLORS.info
+  const selectedDate = selected?.publishedAt || selected?.updatedAt || selected?.createdAt
+
+  const overlay = typeof document === 'undefined' ? null : createPortal(
     <>
-      {/* 横幅 */}
-      <div
-        className={`sticky top-16 z-40 bg-gradient-to-b from-gray-50 via-white to-gray-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 border-b ${styleConfig.borderColor} shadow-lg transition-all duration-300`}
-      >
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between py-3">
-            {/* 横幅仅显示简短文字；图片在点击后「公告详情」弹窗中展示 */}
-            <div className={`flex-shrink-0 ${styleConfig.iconColor} mr-3`}>
-              <Icon className="h-5 w-5" />
-            </div>
-
-            {/* 内容区域 - 可点击 */}
-            <div
-              className="flex-1 overflow-hidden cursor-pointer"
-              onClick={handleBannerClick}
-            >
-              {announcement.behavior.scrolling ? (
-                // 滚动文字
-                <div className="relative">
-                  <div className="animate-scroll whitespace-nowrap inline-block">
-                    <span
-                      className={`${styleConfig.textColor} ${getFontSizeClass()} ${getFontWeightClass()} ${getFontStyleClass()}`}
-                      style={customTextColor ? { color: customTextColor } : undefined}
-                    >
-                      {announcement.content}
-                    </span>
-                    {/* 重复内容以实现无缝滚动 */}
-                    <span
-                      className={`ml-20 ${styleConfig.textColor} ${getFontSizeClass()} ${getFontWeightClass()} ${getFontStyleClass()}`}
-                      style={customTextColor ? { color: customTextColor } : undefined}
-                    >
-                      {announcement.content}
-                    </span>
-                  </div>
-                </div>
-              ) : (
-                // 静态文字
-                <p
-                  className={`truncate ${styleConfig.textColor} ${getFontSizeClass()} ${getFontWeightClass()} ${getFontStyleClass()}`}
-                  style={customTextColor ? { color: customTextColor } : undefined}
-                >
-                  {announcement.content}
-                </p>
-              )}
-            </div>
-
-            {/* 关闭按钮 */}
-            {announcement.behavior.closeable && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleClose()
-                }}
-                className={`flex-shrink-0 ml-3 p-1 hover:bg-gray-700/50 rounded-full transition-colors ${styleConfig.textColor}`}
-                aria-label={t('common.close') || 'Close'}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* 详情弹窗：按 noticeCardStyle 展示玻璃拟态 / 古风卷轴 / 火漆封信 */}
-      {showModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4"
-          onClick={() => setShowModal(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="announcement-modal-title"
+      {panelOpen && (
+        <div className="fixed inset-0 z-[90] bg-slate-950/35" onClick={() => setPanelOpen(false)} aria-hidden="true" />
+      )}
+      {panelOpen && (
+        <aside
+          className="announcement-center-panel fixed right-0 top-0 z-[100] flex h-full w-full max-w-[520px] flex-col border-l border-slate-700 bg-slate-900 text-white shadow-2xl"
+          aria-label={t('announcement.historyTitle', 'Announcements')}
         >
-          <div
-            className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto relative"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="flex items-center justify-between border-b border-slate-700 px-6 py-5">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-900/30"><Bell className="h-5 w-5" /></span>
+              <h2 className="text-xl font-semibold">{t('announcement.historyTitle', 'Announcements')}</h2>
+            </div>
+            <button type="button" onClick={() => setPanelOpen(false)} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white" aria-label={t('common.close', 'Close')}>
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {items.map((item, index) => {
+              const itemVersion = getItemVersion(item)
+              const itemUnread = !isAnnouncementRead(item.language, itemVersion)
+              return (
+                <button
+                  type="button"
+                  key={`${itemVersion}-${index}`}
+                  onClick={() => openItem(item)}
+                  className="flex w-full items-center gap-4 border-b border-slate-700 px-6 py-5 text-left transition hover:bg-slate-800"
+                >
+                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${itemUnread ? 'bg-blue-500/25 text-blue-300' : 'bg-slate-700 text-slate-400'}`}>
+                    {itemUnread ? <Bell className="h-4 w-4" /> : <Check className="h-4 w-4" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-slate-100">{getItemTitle(item, defaultTitle)}</span>
+                    <span className="mt-1 block text-xs text-slate-400">{formatRelativeDate(item.publishedAt || item.updatedAt || item.createdAt, i18n.language, t('common.unknown', 'Unknown'))}</span>
+                  </span>
+                  <ChevronRight className="h-5 w-5 flex-shrink-0 text-slate-500" />
+                </button>
+              )
+            })}
+          </div>
+        </aside>
+      )}
+      {selected && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4" onClick={() => setSelected(null)} role="dialog" aria-modal="true" aria-label={getItemTitle(selected, defaultTitle)}>
+          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto relative" onClick={(event) => event.stopPropagation()}>
             <AnnouncementNoticeCard
-              style={announcement.noticeCardStyle || 'glass'}
-              title={t('announcement.details') || 'Announcement Details'}
-              content={announcement.content}
-              contentHtml={announcement.contentHtml}
-              imageUrl={announcement.imageUrl}
+              style={selected.noticeCardStyle || 'glass'}
+              title={getItemTitle(selected, defaultTitle)}
+              content={selected.content}
+              contentHtml={selected.contentHtml}
+              imageUrl={selected.imageUrl}
               teamName={teamName}
-              dateText={formatNoticeDate(noticeDate)}
-              onClose={() => setShowModal(false)}
-              gotItLabel={t('announcement.gotIt') || 'Got it'}
+              dateText={formatDate(selectedDate, i18n.language)}
+              onClose={() => setSelected(null)}
+              gotItLabel={t('announcement.gotIt', 'Got it')}
               importantNoticeLabel={t('announcement.importantNotice')}
               sincerelyLabel={t('announcement.sincerely')}
               sealMarkLabel={t('announcement.sealMark')}
@@ -202,29 +190,30 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, o
               deviceBrandLabel={t('announcement.deviceBrand')}
               micLabel={t('announcement.mic')}
               resetLabel={t('announcement.reset')}
+              contentStyle={selectedTextStyle}
+              accentColor={selectedAccent}
             />
           </div>
         </div>
       )}
+    </>,
+    document.body,
+  )
 
-      <style>{`
-        @keyframes scroll {
-          0% {
-            transform: translateX(0);
-          }
-          100% {
-            transform: translateX(-50%);
-          }
-        }
-        
-        .animate-scroll {
-          animation: scroll 60s linear infinite;
-        }
-        
-        .animate-scroll:hover {
-          animation-play-state: paused;
-        }
-      `}</style>
+  return (
+    <>
+      <button
+        type="button"
+        className="relative rounded-lg p-2 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+        onClick={() => setPanelOpen(true)}
+        aria-label={t('announcement.open', 'Open announcements')}
+        aria-expanded={panelOpen}
+        title={t('announcement.open', 'Open announcements')}
+      >
+        <Bell className="h-5 w-5" />
+        {unread && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500 dark:border-slate-900" aria-label={t('announcement.unread', 'Unread')} />}
+      </button>
+      {overlay}
     </>
   )
 }

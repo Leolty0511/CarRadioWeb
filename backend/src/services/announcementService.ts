@@ -1,8 +1,45 @@
 import { Announcement, IAnnouncement } from '../models/Announcement'
+import { AnnouncementHistory, IAnnouncementHistory } from '../models/AnnouncementHistory'
 import { createLogger } from '../utils/logger'
 import { plainTextToAnnouncementHtml, sanitizeAnnouncementHtml } from '../utils/announcementHtml'
 
 const logger = createLogger('announcement-service')
+const HISTORY_MONTHS = 3
+
+function historyExpiry(publishedAt: Date): Date {
+  const expiresAt = new Date(publishedAt)
+  expiresAt.setMonth(expiresAt.getMonth() + HISTORY_MONTHS)
+  return expiresAt
+}
+
+function announcementTitle(announcement: IAnnouncement): string {
+  const configured = String(announcement.title || '').trim()
+  if (configured) return configured.slice(0, 160)
+  return String(announcement.content || '').split(/\r?\n/).find(Boolean)?.trim().slice(0, 160) || 'Announcement'
+}
+
+async function recordPublishedAnnouncement(announcement: IAnnouncement): Promise<void> {
+  if (!announcement.enabled || !announcement.content.trim()) return
+  const publishedAt = announcement.publishedAt || announcement.updatedAt || new Date()
+  await AnnouncementHistory.updateOne(
+    { sourceAnnouncementId: announcement._id, publishedAt },
+    {
+      $setOnInsert: {
+        sourceAnnouncementId: announcement._id,
+        language: announcement.language,
+        title: announcementTitle(announcement),
+        content: announcement.content,
+        contentHtml: announcement.contentHtml || '',
+        imageUrl: announcement.imageUrl || '',
+        style: announcement.style,
+        noticeCardStyle: announcement.noticeCardStyle || 'glass',
+        publishedAt,
+        expiresAt: historyExpiry(publishedAt),
+      },
+    },
+    { upsert: true },
+  )
+}
 
 /**
  * 获取公告设置
@@ -19,6 +56,7 @@ export const getAnnouncement = async (language: 'en' | 'ru'): Promise<IAnnouncem
       announcement = await Announcement.create({
         language,
         enabled: false,
+        title: '',
         content: defaultContent,
         contentHtml: plainTextToAnnouncementHtml(defaultContent),
         style: {
@@ -28,11 +66,6 @@ export const getAnnouncement = async (language: 'en' | 'ru'): Promise<IAnnouncem
           fontStyle: 'normal',
           textColor: ''
         },
-        behavior: {
-          scrolling: true,
-          closeable: true,
-          closeRememberDays: 7
-        }
       })
     }
     
@@ -67,6 +100,8 @@ export const updateAnnouncement = async (language: 'en' | 'ru', data: Partial<IA
       await announcement.save()
     }
 
+    await recordPublishedAnnouncement(announcement)
+
     return announcement
   } catch (error) {
     logger.error({ error }, '更新公告失败')
@@ -91,10 +126,26 @@ export const toggleAnnouncement = async (language: 'en' | 'ru', enabled: boolean
       announcement.publishedAt = new Date()
     }
     await announcement.save()
+    if (enabled) await recordPublishedAnnouncement(announcement)
     
     return announcement
   } catch (error) {
     logger.error({ error }, '切换公告状态失败')
     throw error
   }
+}
+
+export const getAnnouncementHistory = async (
+  language: 'en' | 'ru',
+  limit = 50,
+): Promise<IAnnouncementHistory[]> => {
+  const current = await Announcement.findOne({ language })
+  if (current?.enabled) await recordPublishedAnnouncement(current)
+
+  return AnnouncementHistory.find({
+    language,
+    expiresAt: { $gt: new Date() },
+  })
+    .sort({ publishedAt: -1 })
+    .limit(Math.min(Math.max(limit, 1), 100))
 }

@@ -11,7 +11,7 @@ import AnnouncementBanner from '@/components/AnnouncementBanner'
 import { useAuth } from '@/contexts/AuthContext'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 import { getNavigationConfig, filterNavigationByRoles } from '@/config/navigation'
-import { getAnnouncement, isAnnouncementClosed, Announcement } from '@/services/announcementService'
+import { getAnnouncement, getAnnouncementHistory, Announcement, AnnouncementHistoryItem } from '@/services/announcementService'
 import { trackPageVisit } from '@/services/visitorService'
 import { CookieConsentBanner } from '@/components/compliance/CookieConsentBanner'
 import OnlineMembersBubble from '@/components/knowledge/OnlineMembersBubble'
@@ -41,7 +41,7 @@ const Layout: React.FC = () => {
 
   // 公告状态
   const [announcement, setAnnouncement] = useState<Announcement | null>(null)
-  const [showAnnouncement, setShowAnnouncement] = useState(false)
+  const [announcementHistory, setAnnouncementHistory] = useState<AnnouncementHistoryItem[]>([])
 
   // 根据用户角色、外部链接配置和页面启用状态过滤导航
   const userRoles = useMemo(() => user?.roles || [], [user?.roles])
@@ -90,33 +90,33 @@ const Layout: React.FC = () => {
     }
   }, [location.pathname])
 
-  // 加载公告 - 根据当前语言（增加兜底：若当前语言无内容，尝试另一语言作为回退）
+  // 加载当前公告和最近三个月的发布记录
   useEffect(() => {
     const loadAnnouncement = async () => {
       try {
         const contentLanguage = 'en'
         const otherLanguage = 'ru'
 
-        // 首选当前语言
-        const data = await getAnnouncement(contentLanguage)
-        if (data && data.enabled && !isAnnouncementClosed(contentLanguage, data.updatedAt)) {
+        const [data, history] = await Promise.all([
+          getAnnouncement(contentLanguage),
+          getAnnouncementHistory(contentLanguage),
+        ])
+        if (data?.enabled || history.length > 0) {
           setAnnouncement(data)
-          setShowAnnouncement(true)
+          setAnnouncementHistory(history)
           return
         }
 
-        // 回退到另一语言
-        const otherData = await getAnnouncement(otherLanguage)
-        if (otherData && otherData.enabled && !isAnnouncementClosed(otherLanguage, otherData.updatedAt)) {
-          setAnnouncement(otherData)
-          setShowAnnouncement(true)
-          return
-        }
-
-        setShowAnnouncement(false)
+        const [otherData, otherHistory] = await Promise.all([
+          getAnnouncement(otherLanguage),
+          getAnnouncementHistory(otherLanguage),
+        ])
+        setAnnouncement(otherData)
+        setAnnouncementHistory(otherHistory)
       } catch (error) {
         console.error('Failed to load announcement:', error)
-        setShowAnnouncement(false)
+        setAnnouncement(null)
+        setAnnouncementHistory([])
       }
     }
     loadAnnouncement()
@@ -159,15 +159,13 @@ const Layout: React.FC = () => {
     >
       <CookieConsentBanner />
       {/* 顶部导航 */}
-      <Header navigationItems={navigationItems} shouldTransparentBg={shouldTransparentBg} />
-
-      {/* 公告横幅 - 在导航栏下方 */}
-      {showAnnouncement && announcement && (
-        <AnnouncementBanner
-          announcement={announcement}
-          onClose={() => setShowAnnouncement(false)}
-        />
-      )}
+      <Header
+        navigationItems={navigationItems}
+        shouldTransparentBg={shouldTransparentBg}
+        announcementControl={(announcement || announcementHistory.length > 0) ? (
+          <AnnouncementBanner announcement={announcement} history={announcementHistory} />
+        ) : undefined}
+      />
 
       {/* 主内容区域 - pt-16 补偿 fixed header 高度 */}
       <main className={`flex-1 relative transition-colors duration-300 pt-16 ${shouldTransparentBg || shouldTransparentMain ? '' : 'bg-white dark:bg-slate-950'}`}>
