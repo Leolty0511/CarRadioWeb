@@ -210,13 +210,17 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
       <div className="notice-card notice-card--device" style={cardStyle}>
         <div className="cr-device">
           <div className="cr-controls" aria-hidden="true">
-            <div className="cr-ind"><span className="cr-ind__dot" />{micLabel}</div>
-            <div className="cr-ind"><span className="cr-ind__dot" />{resetLabel}</div>
-            <div className="cr-btn"><Power /></div>
-            <div className="cr-btn"><Home /></div>
-            <div className="cr-btn"><Undo2 /></div>
-            <div className="cr-btn"><Volume2 /></div>
-            <div className="cr-btn"><Volume1 /></div>
+            <div className="cr-indicators">
+              <div className="cr-ind"><span className="cr-ind__dot" />{micLabel}</div>
+              <div className="cr-ind"><span className="cr-ind__dot" />{resetLabel}</div>
+            </div>
+            <div className="cr-buttons">
+              <div className="cr-btn"><Power /></div>
+              <div className="cr-btn"><Home /></div>
+              <div className="cr-btn"><Undo2 /></div>
+              <div className="cr-btn"><span className="cr-volume-icon"><Volume2 /><b>+</b></span></div>
+              <div className="cr-btn"><span className="cr-volume-icon"><Volume1 /><b>-</b></span></div>
+            </div>
           </div>
           <div className="cr-screen">
             <div className="cr-screen__bar">
