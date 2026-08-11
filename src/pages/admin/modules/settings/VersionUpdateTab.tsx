@@ -64,7 +64,7 @@ export function VersionUpdateTab() {
   const [selectedLog, setSelectedLog] = useState<ProjectUpdateLogEntry | null>(null)
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
     try {
       const [nextInfo, nextStatus] = await Promise.all([
         getProjectUpdateInfo(),
@@ -73,11 +73,13 @@ export function VersionUpdateTab() {
       setInfo(nextInfo)
       setStatus(nextStatus)
     } catch (error) {
-      showToast({
-        type: 'error',
-        title: '版本信息加载失败',
-        description: error instanceof Error ? error.message : '',
-      })
+      if (!silent) {
+        showToast({
+          type: 'error',
+          title: '版本信息加载失败',
+          description: error instanceof Error ? error.message : '',
+        })
+      }
     } finally {
       setLoading(false)
     }
@@ -90,12 +92,14 @@ export function VersionUpdateTab() {
   const jobActive = status?.state === 'running' || status?.state === 'restarting'
   useEffect(() => {
     if (!jobActive) {return}
+    let refreshTimer: number | undefined
     const timer = window.setInterval(async () => {
       try {
         const next = await getProjectUpdateStatus()
         setStatus(next)
         if (next.state === 'completed') {
-          showToast({ type: 'success', title: '项目更新完成', description: '前后端服务已重启，请刷新页面。' })
+          showToast({ type: 'success', title: '项目更新完成', description: '前后端服务已重启，正在刷新版本信息。' })
+          refreshTimer = window.setTimeout(() => { void load(true) }, 3000)
           window.clearInterval(timer)
         } else if (next.state === 'failed') {
           showToast({ type: 'error', title: '项目更新失败', description: next.message })
@@ -105,8 +109,11 @@ export function VersionUpdateTab() {
         // A short connection loss is expected while PM2 restarts the backend.
       }
     }, 2500)
-    return () => window.clearInterval(timer)
-  }, [jobActive, showToast])
+    return () => {
+      window.clearInterval(timer)
+      if (refreshTimer) {window.clearTimeout(refreshTimer)}
+    }
+  }, [jobActive, load, showToast])
 
   const handleCheck = async () => {
     setChecking(true)
