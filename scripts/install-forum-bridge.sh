@@ -46,7 +46,10 @@ grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN)=' .env.fla
 } > .env.flarum
 rm -f .env.flarum.tmp
 
-docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d --no-deps flarum
+# Deployment packages replace the project directory atomically. Recreate the
+# container so Docker binds the new forum-extensions directory inode instead
+# of keeping the now-detached directory from the previous release.
+docker compose -f docker-compose.flarum.yml --env-file .env.flarum up -d --force-recreate --no-deps flarum
 
 for _ in $(seq 1 30); do
   if docker exec flarum_app php flarum info >/dev/null 2>&1; then
