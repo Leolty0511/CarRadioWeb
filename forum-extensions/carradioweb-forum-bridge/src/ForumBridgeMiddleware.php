@@ -3,6 +3,7 @@
 namespace CarRadioWeb\ForumBridge;
 
 use Flarum\User\User;
+use Laminas\Diactoros\Stream;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -16,6 +17,7 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         $response = $handler->handle($request);
+        $response = $this->normalizePassportResponse($request, $response);
         $secret = trim((string) getenv('CARRADIOWEB_FORUM_BRIDGE_SECRET'));
         $actor = $request->getAttribute('actor');
 
@@ -45,6 +47,41 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
         }
 
         return $response->withAddedHeader('Set-Cookie', $cookie);
+    }
+
+    /**
+     * FoF Passport renders a popup-only callback page. The main site starts
+     * the flow with a full-page redirect, so there is no Flarum opener to
+     * receive authenticationComplete(). Redirect to the forum instead.
+     */
+    private function normalizePassportResponse(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        if (strtoupper($request->getMethod()) !== 'GET' || $request->getUri()->getPath() !== '/auth/passport') {
+            return $response;
+        }
+
+        $contentType = strtolower($response->getHeaderLine('Content-Type'));
+        if ($contentType !== '' && strpos($contentType, 'text/html') === false) {
+            return $response;
+        }
+
+        $body = (string) $response->getBody();
+        $pattern = '~<script[^>]*>\s*window\.close\(\);\s*window\.opener\.app\.authenticationComplete\((.*?)\);\s*</script>~is';
+        if (!preg_match($pattern, $body, $matches)) {
+            return $response;
+        }
+
+        $payload = $matches[1];
+        $fallback = sprintf(
+            '<script>(function(){var payload=%s;if(window.opener&&window.opener.app&&typeof window.opener.app.authenticationComplete===\'function\'){window.opener.app.authenticationComplete(payload);window.close();return;}window.location.replace(\'/\');}());</script>',
+            $payload
+        );
+
+        $stream = new Stream('php://memory', 'wb+');
+        $stream->write(str_replace($matches[0], $fallback, $body));
+        $stream->rewind();
+
+        return $response->withBody($stream);
     }
 
     private function base64UrlEncode(string $value): string
