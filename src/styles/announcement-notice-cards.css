@@ -448,7 +448,7 @@
 
 /* Car head-unit screen style */
 .notice-card--device {
-  max-width: 760px;
+  max-width: 1040px;
   container-type: inline-size;
 }
 
@@ -626,8 +626,14 @@
   scrollbar-gutter: stable;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  padding: 20px 22px;
-  color: #c6d0da;
+  padding: 28px 32px;
+  color: #e2edf7;
+  background:
+    radial-gradient(ellipse at 50% 36%, color-mix(in srgb, var(--notice-accent) 13%, transparent), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0));
+  box-shadow:
+    inset 0 0 46px rgba(56, 189, 248, 0.07),
+    inset 0 0 90px rgba(255, 255, 255, 0.018);
 }
 
 .cr-screen__content:focus-visible {
@@ -661,7 +667,12 @@
   vertical-align: middle;
 }
 
-.notice-card--device .notice-card-body-text { color: #c6d0da; }
+.notice-card--device .notice-card-body-text {
+  color: #e2edf7 !important;
+  text-shadow:
+    0 0 8px rgba(226, 237, 247, 0.2),
+    0 0 20px color-mix(in srgb, var(--notice-accent) 22%, transparent);
+}
 .notice-card--device .notice-card-image { border: 1px solid rgba(148, 163, 184, 0.2); }
 .notice-card--device .announcement-rich-content a { color: var(--notice-accent); }
 .notice-card--device .announcement-rich-content h1,
@@ -721,7 +732,7 @@
   .cr-screen__bar-title { gap: 5px; font-size: 11px; }
   .cr-screen__bar-title svg { width: 13px; height: 13px; }
   .cr-signal { transform: scale(0.8); transform-origin: left center; }
-  .cr-screen__content { padding: 10px 11px; }
+  .cr-screen__content { padding: 14px 15px; }
   .cr-title { margin-bottom: 7px; font-size: 14px; }
   .cr-title__pill { margin-left: 5px; padding: 1px 5px; font-size: 8px; }
   .notice-card--device .notice-card-body-text { font-size: 12px; line-height: 1.6; }

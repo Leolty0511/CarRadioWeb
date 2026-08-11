@@ -78,37 +78,46 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
     const viewport = deviceContentRef.current
     if (!viewport || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {return}
 
-    let animationFrame = 0
     let startTimer = 0
+    let scrollTimer = 0
     let previousTime = performance.now()
-    let bottomPauseUntil = 0
+    let bottomReachedAt = 0
+    let resumeAt = 0
 
-    const scroll = (time: number) => {
-      const elapsed = Math.min(time - previousTime, 50)
-      previousTime = time
+    const scroll = () => {
+      const currentTime = performance.now()
+      const elapsed = Math.min(currentTime - previousTime, 80)
+      previousTime = currentTime
       const maxScrollTop = Math.max(0, viewport.scrollHeight - viewport.clientHeight)
 
-      if (maxScrollTop > 1 && time >= deviceScrollPausedUntilRef.current && time >= bottomPauseUntil) {
-        if (viewport.scrollTop >= maxScrollTop - 1) {
-          bottomPauseUntil = time + 2200
-          deviceScrollPausedUntilRef.current = time + 900
-          viewport.scrollTo({ top: 0, behavior: 'smooth' })
-        } else {
-          viewport.scrollTop = Math.min(maxScrollTop, viewport.scrollTop + elapsed * 0.016)
-        }
+      if (maxScrollTop <= 1 || currentTime < deviceScrollPausedUntilRef.current || currentTime < resumeAt) {
+        return
       }
 
-      animationFrame = window.requestAnimationFrame(scroll)
+      if (viewport.scrollTop >= maxScrollTop - 1) {
+        if (!bottomReachedAt) {
+          bottomReachedAt = currentTime
+          return
+        }
+        if (currentTime - bottomReachedAt < 1800) {return}
+        viewport.scrollTop = 0
+        bottomReachedAt = 0
+        resumeAt = currentTime + 1000
+        return
+      }
+
+      bottomReachedAt = 0
+      viewport.scrollTop = Math.min(maxScrollTop, viewport.scrollTop + elapsed * 0.026)
     }
 
     startTimer = window.setTimeout(() => {
       previousTime = performance.now()
-      animationFrame = window.requestAnimationFrame(scroll)
-    }, 1400)
+      scrollTimer = window.setInterval(scroll, 40)
+    }, 1000)
 
     return () => {
       window.clearTimeout(startTimer)
-      window.cancelAnimationFrame(animationFrame)
+      window.clearInterval(scrollTimer)
     }
   }, [content, contentHtml, imageUrl, style])
 
@@ -228,10 +237,6 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
               onKeyDown={pauseDeviceAutoScroll}
               tabIndex={0}
             >
-              <h3 className="cr-title">
-                {title}
-                <span className="cr-title__pill">{newLabel}</span>
-              </h3>
               {bodyContent}
             </div>
             <div className="cr-screen__footer">

@@ -171,7 +171,10 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, h
       )}
       {selected && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 p-4" onClick={() => setSelected(null)} role="dialog" aria-modal="true" aria-label={getItemTitle(selected, defaultTitle)}>
-          <div className="w-full max-w-4xl max-h-[calc(100vh-2rem)] overflow-y-auto relative" onClick={(event) => event.stopPropagation()}>
+          <div
+            className={`relative max-h-[calc(100vh-2rem)] w-full overflow-y-auto ${selected.noticeCardStyle === 'device' ? 'max-w-6xl' : 'max-w-4xl'}`}
+            onClick={(event) => event.stopPropagation()}
+          >
             <AnnouncementNoticeCard
               style={selected.noticeCardStyle || 'glass'}
               title={getItemTitle(selected, defaultTitle)}
