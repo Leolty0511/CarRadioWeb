@@ -122,6 +122,7 @@ restore_project_extensions() {
   docker exec flarum_app php flarum migrate --no-interaction >/dev/null 2>&1 || true
   docker exec flarum_app php flarum cache:clear >/dev/null 2>&1 || true
   docker exec flarum_app php flarum assets:publish >/dev/null 2>&1 || true
+  docker exec flarum_app sh -lc 'chown -R 1000:1000 /data/storage /data/extensions /data/assets /opt/flarum/storage /opt/flarum/vendor /opt/flarum/public 2>/dev/null || true'
 }
 
 restore_project_extensions
