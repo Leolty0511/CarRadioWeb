@@ -107,7 +107,11 @@
     "importantNotice": "— 重要通知 —",
     "sincerely": "敬上",
     "sealMark": "印",
-    "waxSealChar": "通"
+    "waxSealChar": "通",
+    "new": "新",
+    "deviceBrand": "CarRadio OS",
+    "mic": "麦克风",
+    "reset": "复位"
   },
   "dashboard": {
     "title": "车型技术知识库",
@@ -809,6 +813,7 @@
       "noticeStyleGlass": "玻璃拟态",
       "noticeStyleScroll": "古风卷轴",
       "noticeStyleWax": "火漆封信",
+      "noticeStyleDevice": "CarRadio 车机屏幕",
       "behaviorTitle": "行为设置",
       "scrolling": "滚动显示",
       "scrollingDesc": "文字横向滚动效果",

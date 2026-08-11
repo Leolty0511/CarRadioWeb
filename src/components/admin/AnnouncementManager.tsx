@@ -253,6 +253,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
                   <option value="glass">{t('admin.announcement.noticeStyleGlass') || '玻璃拟态'}</option>
                   <option value="scroll">{t('admin.announcement.noticeStyleScroll') || '古风卷轴'}</option>
                   <option value="wax">{t('admin.announcement.noticeStyleWax') || '火漆封信'}</option>
+                  <option value="device">{t('admin.announcement.noticeStyleDevice') || 'CarRadio 车机屏幕'}</option>
                 </select>
               </div>
 

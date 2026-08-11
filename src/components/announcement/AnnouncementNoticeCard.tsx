@@ -3,7 +3,7 @@
  */
 
 import React from 'react'
-import { Mail } from 'lucide-react'
+import { Home, Mail, Power, Radio, Undo2, Volume1, Volume2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { NoticeCardStyle } from '@/services/announcementService'
 import '@/styles/announcement-notice-cards.css'
@@ -25,12 +25,20 @@ export interface AnnouncementNoticeCardProps {
   sincerelyLabel?: string
   sealMarkLabel?: string
   waxSealChar?: string
+  newLabel?: string
+  deviceBrandLabel?: string
+  micLabel?: string
+  resetLabel?: string
 }
 
 const DEFAULT_IMPORTANT_NOTICE = '— Important Notice —'
 const DEFAULT_SINCERELY = 'Sincerely'
 const DEFAULT_SEAL_MARK = 'S'
 const DEFAULT_WAX_SEAL_CHAR = 'N'
+const DEFAULT_NEW_LABEL = 'NEW'
+const DEFAULT_DEVICE_BRAND = 'CarRadio OS'
+const DEFAULT_MIC_LABEL = 'MIC'
+const DEFAULT_RESET_LABEL = 'RST'
 
 export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
   style,
@@ -45,7 +53,11 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
   importantNoticeLabel = DEFAULT_IMPORTANT_NOTICE,
   sincerelyLabel = DEFAULT_SINCERELY,
   sealMarkLabel = DEFAULT_SEAL_MARK,
-  waxSealChar = DEFAULT_WAX_SEAL_CHAR
+  waxSealChar = DEFAULT_WAX_SEAL_CHAR,
+  newLabel = DEFAULT_NEW_LABEL,
+  deviceBrandLabel = DEFAULT_DEVICE_BRAND,
+  micLabel = DEFAULT_MIC_LABEL,
+  resetLabel = DEFAULT_RESET_LABEL
 }) => {
   const bodyContent = (
     <>
@@ -73,7 +85,7 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
             <Mail className="h-5 w-5" />
           </div>
           <h3 className="notice-card__top-title">{title}</h3>
-          <span className="notice-card__badge">NEW</span>
+          <span className="notice-card__badge">{newLabel}</span>
         </div>
         <div className="notice-card__inner">
           {bodyContent}
@@ -125,6 +137,47 @@ export const AnnouncementNoticeCard: React.FC<AnnouncementNoticeCardProps> = ({
         <div className="notice-card__bottom-stripe" aria-hidden />
         <div className="notice-card__wax-actions">
           <Button onClick={onClose}>{gotItLabel}</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (style === 'device') {
+    return (
+      <div className="notice-card notice-card--device">
+        <div className="cr-device">
+          <div className="cr-controls" aria-hidden="true">
+            <div className="cr-ind"><span className="cr-ind__dot" />{micLabel}</div>
+            <div className="cr-ind"><span className="cr-ind__dot" />{resetLabel}</div>
+            <div className="cr-btn"><Power /></div>
+            <div className="cr-btn"><Home /></div>
+            <div className="cr-btn"><Undo2 /></div>
+            <div className="cr-btn"><Volume2 /></div>
+            <div className="cr-btn"><Volume1 /></div>
+          </div>
+          <div className="cr-screen">
+            <div className="cr-screen__bar">
+              <span className="cr-screen__bar-title">
+                <Radio aria-hidden="true" />
+                {deviceBrandLabel}
+              </span>
+              <span className="cr-signal" aria-hidden="true"><i /><i /><i /><i /></span>
+              <span className="cr-screen__clock">{dateText}</span>
+            </div>
+            <div className="cr-screen__content">
+              <h3 className="cr-title">
+                {title}
+                <span className="cr-title__pill">{newLabel}</span>
+              </h3>
+              {bodyContent}
+            </div>
+            <div className="cr-screen__footer">
+              <span className="cr-screen__team">{teamName}</span>
+              <Button onClick={onClose} className="cr-btn-got">
+                {gotItLabel} <span aria-hidden="true">-&gt;</span>
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     )

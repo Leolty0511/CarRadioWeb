@@ -106,7 +106,11 @@
     "importantNotice": "— Important Notice —",
     "sincerely": "Sincerely",
     "sealMark": "S",
-    "waxSealChar": "N"
+    "waxSealChar": "N",
+    "new": "NEW",
+    "deviceBrand": "CarRadio OS",
+    "mic": "MIC",
+    "reset": "RST"
   },
   "dashboard": {
     "title": "Vehicle Technical Knowledge Base",
@@ -1806,6 +1810,7 @@
       "noticeStyleGlass": "Glass morphism",
       "noticeStyleScroll": "Scroll / Parchment",
       "noticeStyleWax": "Wax seal envelope",
+      "noticeStyleDevice": "CarRadio head unit",
       "sectionContent": "Content & Image",
       "sectionContentDesc": "Edit announcement text; image is optional and only shown in the detail modal.",
       "sectionStyle": "Banner Style & Preview",

@@ -442,3 +442,233 @@
   display: flex;
   justify-content: center;
 }
+
+/* Car head-unit screen style */
+.notice-card--device {
+  max-width: 760px;
+}
+
+.cr-device {
+  display: flex;
+  padding: 8px 9px 8px 6px;
+  border: 1px solid #000;
+  border-radius: 16px;
+  background: #0b0c0e;
+  box-shadow:
+    inset 0 2px 1px rgba(255, 255, 255, 0.1),
+    inset 0 -2px 3px rgba(0, 0, 0, 0.7),
+    inset 2px 0 3px rgba(0, 0, 0, 0.5),
+    inset -2px 0 3px rgba(0, 0, 0, 0.5),
+    0 26px 60px rgba(0, 0, 0, 0.5);
+}
+
+.cr-controls {
+  width: 44px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 8px;
+  color: #e5e7eb;
+}
+
+.cr-ind {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding-left: 6px;
+  color: #c7ccd1;
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.cr-ind__dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border: 1.5px solid #6b7076;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3a3d41, #0d0e0f);
+}
+
+.cr-btn {
+  width: 36px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d7dbdf;
+}
+
+.cr-btn svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+
+.cr-screen {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 384px;
+  display: flex;
+  flex-direction: column;
+  margin-left: 3px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: linear-gradient(160deg, #16181c 0%, #0a0b0d 60%, #08090a 100%);
+  box-shadow: inset 0 0 0 1px #000, inset 0 0 18px rgba(0, 0, 0, 0.85);
+}
+
+.cr-screen::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(120deg, rgba(255, 255, 255, 0.05) 0%, transparent 22%);
+}
+
+.cr-screen__bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(255, 255, 255, 0.02);
+  color: #7c8794;
+  font-size: 12px;
+}
+
+.cr-screen__bar-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cr-screen__bar-title svg {
+  width: 16px;
+  height: 16px;
+  color: #38bdf8;
+  stroke-width: 2;
+}
+
+.cr-screen__clock {
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.cr-signal {
+  height: 13px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cr-signal i {
+  width: 3px;
+  border-radius: 1px;
+  background: #4b5563;
+}
+
+.cr-signal i:nth-child(1) { height: 4px; background: #38bdf8; }
+.cr-signal i:nth-child(2) { height: 7px; background: #38bdf8; }
+.cr-signal i:nth-child(3) { height: 10px; background: #38bdf8; }
+.cr-signal i:nth-child(4) { height: 13px; }
+
+.cr-screen__content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 22px;
+  color: #c6d0da;
+}
+
+.cr-screen__content::-webkit-scrollbar { width: 6px; }
+.cr-screen__content::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.3);
+}
+
+.cr-title {
+  margin: 0 0 12px;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.cr-title__pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  border-radius: 999px;
+  color: #22c55e;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.notice-card--device .notice-card-body-text { color: #c6d0da; }
+.notice-card--device .notice-card-image { border: 1px solid rgba(148, 163, 184, 0.2); }
+.notice-card--device .announcement-rich-content a { color: #38bdf8; }
+.notice-card--device .announcement-rich-content h1,
+.notice-card--device .announcement-rich-content h2,
+.notice-card--device .announcement-rich-content h3,
+.notice-card--device .announcement-rich-content h4 { color: #fff; }
+.notice-card--device .announcement-rich-content blockquote { border-left-color: rgba(56, 189, 248, 0.5); }
+
+.cr-screen__footer {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(148, 163, 184, 0.14);
+  background: rgba(0, 0, 0, 0.35);
+  color: #7c8794;
+  font-size: 12px;
+}
+
+.cr-screen__team {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notice-card--device .cr-btn-got {
+  flex-shrink: 0;
+  margin-left: auto;
+  padding: 8px 20px !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: linear-gradient(180deg, #38bdf8, #0ea5e9) !important;
+  box-shadow: 0 6px 16px rgba(14, 165, 233, 0.4);
+  color: #04121c !important;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.notice-card--device .cr-btn-got:hover { filter: brightness(1.08); }
+
+@media (max-width: 520px) {
+  .cr-device { padding-left: 4px; }
+  .cr-controls { width: 38px; }
+  .cr-btn { width: 32px; height: 32px; }
+  .cr-screen { min-height: 320px; }
+  .cr-screen__bar { padding: 9px 12px; }
+  .cr-screen__content { padding: 18px 16px; }
+  .cr-title { font-size: 17px; }
+  .cr-screen__clock { display: none; }
+}

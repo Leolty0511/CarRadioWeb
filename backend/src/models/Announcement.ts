@@ -20,7 +20,7 @@ export interface IAnnouncement extends Document {
     closeRememberDays: number
   }
   /** 公告详情弹窗卡片风格：glass 玻璃拟态 / scroll 古风卷轴 / wax 火漆封信 */
-  noticeCardStyle?: 'glass' | 'scroll' | 'wax'
+  noticeCardStyle?: 'glass' | 'scroll' | 'wax' | 'device'
   /** 对外展示的「发布时间」：在保存公告或从关闭切到启用时由服务端写入 */
   publishedAt?: Date
   createdAt: Date
@@ -96,7 +96,7 @@ const AnnouncementSchema: Schema = new Schema(
     },
     noticeCardStyle: {
       type: String,
-      enum: ['glass', 'scroll', 'wax'],
+      enum: ['glass', 'scroll', 'wax', 'device'],
       default: 'glass'
     },
     publishedAt: {

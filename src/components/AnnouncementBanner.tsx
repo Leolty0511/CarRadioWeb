@@ -198,6 +198,10 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, o
               sincerelyLabel={t('announcement.sincerely')}
               sealMarkLabel={t('announcement.sealMark')}
               waxSealChar={t('announcement.waxSealChar')}
+              newLabel={t('announcement.new')}
+              deviceBrandLabel={t('announcement.deviceBrand')}
+              micLabel={t('announcement.mic')}
+              resetLabel={t('announcement.reset')}
             />
           </div>
         </div>

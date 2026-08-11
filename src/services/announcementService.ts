@@ -15,7 +15,7 @@ export interface AnnouncementBehavior {
 }
 
 /** 公告详情弹窗卡片风格 */
-export type NoticeCardStyle = 'glass' | 'scroll' | 'wax'
+export type NoticeCardStyle = 'glass' | 'scroll' | 'wax' | 'device'
 
 export interface Announcement {
   _id?: string
