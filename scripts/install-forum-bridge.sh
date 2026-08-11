@@ -21,8 +21,13 @@ if [[ -z "$BRIDGE_SECRET" ]]; then
   BRIDGE_SECRET="$(read_env_value backend/config.env FORUM_OAUTH_CLIENT_SECRET)"
 fi
 if [[ ${#BRIDGE_SECRET} -lt 32 ]]; then
-  echo "Forum bridge secret is missing or shorter than 32 characters; skipping setup."
-  exit 0
+  if command -v openssl >/dev/null 2>&1; then
+    BRIDGE_SECRET="$(openssl rand -hex 32)"
+  else
+    BRIDGE_SECRET="$(head -c 48 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 64)"
+  fi
+  printf '\nFORUM_SSO_BRIDGE_SECRET=%s\n' "$BRIDGE_SECRET" >> backend/config.env
+  echo "Generated and persisted a forum bridge secret."
 fi
 
 COOKIE_DOMAIN="$(read_env_value backend/config.env FORUM_SSO_BRIDGE_COOKIE_DOMAIN)"
