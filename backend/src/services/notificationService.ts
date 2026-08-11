@@ -16,6 +16,7 @@ import SystemConfig, {
   type WebhookConfig,
   type NotificationChannelType,
   type NotificationConfig,
+  type NotificationEventSettings,
 } from '../models/SystemConfig';
 import GlobalSiteSettings from '../models/GlobalSiteSettings';
 import { createLogger } from '../utils/logger';
@@ -34,6 +35,13 @@ interface SendResult {
   success: boolean;
   message: string;
 }
+
+export type NotificationEventType = keyof NotificationEventSettings;
+
+const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
+  memberRegistration: true,
+  knowledgeFeedback: true,
+};
 
 // ==================== Channel senders ====================
 
@@ -304,6 +312,42 @@ const ALL_CHANNELS: NotificationChannelType[] = ['dingtalk', 'wecom', 'feishu', 
 // ==================== Public API ====================
 
 class NotificationService {
+  async getEventSettings(): Promise<NotificationEventSettings> {
+    const stored = (await SystemConfig.getConfig('notification_events')) as Partial<NotificationEventSettings> | null;
+    return {
+      memberRegistration: stored?.memberRegistration !== false,
+      knowledgeFeedback: stored?.knowledgeFeedback !== false,
+    };
+  }
+
+  async updateEventSettings(
+    updates: Partial<NotificationEventSettings>,
+    updatedBy: string = 'admin'
+  ): Promise<NotificationEventSettings> {
+    const current = await this.getEventSettings();
+    const input = updates && typeof updates === 'object' ? updates : {};
+    const settings: NotificationEventSettings = {
+      memberRegistration: typeof input.memberRegistration === 'boolean'
+        ? input.memberRegistration
+        : current.memberRegistration,
+      knowledgeFeedback: typeof input.knowledgeFeedback === 'boolean'
+        ? input.knowledgeFeedback
+        : current.knowledgeFeedback,
+    };
+    const result = await SystemConfig.updateConfig('notification_events', settings, updatedBy);
+    return result.config as NotificationEventSettings;
+  }
+
+  async isEventEnabled(event: NotificationEventType): Promise<boolean> {
+    const settings = await this.getEventSettings();
+    return settings[event] ?? DEFAULT_EVENT_SETTINGS[event];
+  }
+
+  async notifyEvent(event: NotificationEventType, payload: NotificationPayload): Promise<SendResult[]> {
+    if (!(await this.isEventEnabled(event))) return [];
+    return this.notifyAll(payload);
+  }
+
   /**
    * Send notification to all enabled channels (parallel, non-blocking)
    */

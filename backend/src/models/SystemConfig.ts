@@ -8,8 +8,13 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 // Notification channel type union
 export type NotificationChannelType = 'dingtalk' | 'wecom' | 'feishu' | 'serverchan' | 'smtp' | 'webhook';
 
+export interface NotificationEventSettings {
+  memberRegistration: boolean;
+  knowledgeFeedback: boolean;
+}
+
 // All config types stored in system_configs collection
-export type SystemConfigType = NotificationChannelType | 'oss';
+export type SystemConfigType = NotificationChannelType | 'notification_events' | 'oss';
 
 // Dingtalk robot config
 export interface DingtalkConfig {
@@ -77,7 +82,7 @@ export type NotificationConfig = DingtalkConfig | WecomConfig | FeishuConfig | S
 // System config document interface
 export interface ISystemConfig extends Document {
   configType: SystemConfigType;
-  config: NotificationConfig | OSSConfig;
+  config: NotificationConfig | NotificationEventSettings | OSSConfig;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -86,15 +91,15 @@ export interface ISystemConfig extends Document {
 
 // Static methods interface
 export interface ISystemConfigModel extends Model<ISystemConfig> {
-  getConfig(configType: SystemConfigType): Promise<NotificationConfig | OSSConfig | null>;
+  getConfig(configType: SystemConfigType): Promise<NotificationConfig | NotificationEventSettings | OSSConfig | null>;
   updateConfig(
     configType: SystemConfigType,
-    newConfig: NotificationConfig | OSSConfig,
+    newConfig: NotificationConfig | NotificationEventSettings | OSSConfig,
     updatedBy?: string
   ): Promise<ISystemConfig>;
 }
 
-const VALID_CONFIG_TYPES: SystemConfigType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook', 'oss'];
+const VALID_CONFIG_TYPES: SystemConfigType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook', 'notification_events', 'oss'];
 
 const SystemConfigSchema = new Schema<ISystemConfig>({
   configType: {
@@ -132,7 +137,7 @@ SystemConfigSchema.statics.getConfig = async function(configType: SystemConfigTy
 // Static method: update config (upsert)
 SystemConfigSchema.statics.updateConfig = async function(
   configType: SystemConfigType,
-  newConfig: NotificationConfig | OSSConfig,
+  newConfig: NotificationConfig | NotificationEventSettings | OSSConfig,
   updatedBy: string = 'system'
 ) {
   const result = await this.findOneAndUpdate(

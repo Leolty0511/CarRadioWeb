@@ -22,6 +22,8 @@ import {
   Webhook,
   Bell,
   AlertCircle,
+  UserPlus,
+  MessageCircle,
 } from 'lucide-react'
 import { apiClient } from '@/services/apiClient'
 
@@ -51,6 +53,11 @@ interface TestResult {
   message: string
 }
 
+interface NotificationEventSettings {
+  memberRegistration: boolean
+  knowledgeFeedback: boolean
+}
+
 // ==================== Constants ====================
 
 const CHANNEL_LIST: ChannelMeta[] = [
@@ -73,16 +80,28 @@ const DEFAULT_CONFIGS: Record<ChannelType, Record<string, unknown>> = {
   webhook: { url: '', method: 'POST', headers: '', bodyTemplate: '{"title":"{{title}}","content":"{{content}}"}', enabled: false },
 }
 
+const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
+  memberRegistration: true,
+  knowledgeFeedback: true,
+}
+
 // ==================== Toggle component ====================
 
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({ checked, onChange, label, disabled = false }: {
+  checked: boolean
+  onChange: (v: boolean) => void
+  label?: string
+  disabled?: boolean
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
         checked ? 'bg-blue-500' : 'bg-slate-300 dark:bg-gray-600'
       }`}
     >
@@ -418,6 +437,7 @@ export function NotificationManagement() {
   const [channelStatus, setChannelStatus] = useState<ChannelStatus>({
     dingtalk: false, wecom: false, feishu: false, serverchan: false, smtp: false, webhook: false,
   })
+  const [eventSettings, setEventSettings] = useState<NotificationEventSettings>(DEFAULT_EVENT_SETTINGS)
   // Which channel is currently active (single select tab)
   const [activeChannel, setActiveChannel] = useState<ChannelType>('dingtalk')
   // Config data per channel
@@ -431,13 +451,17 @@ export function NotificationManagement() {
   })
   const [savingChannel, setSavingChannel] = useState<ChannelType | null>(null)
   const [testingChannel, setTestingChannel] = useState<ChannelType | null>(null)
+  const [savingEvents, setSavingEvents] = useState(false)
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({})
 
   // Load all channel status + configs for enabled/selected channels
   const loadData = useCallback(async () => {
     try {
       setLoading(true)
-      const statusRes = await apiClient.get('/system-config/notification/status')
+      const [statusRes, eventsRes] = await Promise.all([
+        apiClient.get('/system-config/notification/status'),
+        apiClient.get('/system-config/notification/events'),
+      ])
       if (statusRes.success && statusRes.data) {
         setChannelStatus(statusRes.data)
         // Auto-select first enabled channel
@@ -446,6 +470,9 @@ export function NotificationManagement() {
         if (firstEnabled) {
           setActiveChannel(firstEnabled[0])
         }
+      }
+      if (eventsRes.success && eventsRes.data) {
+        setEventSettings({ ...DEFAULT_EVENT_SETTINGS, ...eventsRes.data })
       }
 
       // Load configs for all channels in parallel
@@ -473,6 +500,22 @@ export function NotificationManagement() {
   const updateConfig = (ch: ChannelType, newConfig: Record<string, unknown>) => {
     setConfigs((prev) => ({ ...prev, [ch]: newConfig }))
     setTestResults((prev) => { const n = { ...prev }; delete n[ch]; return n })
+  }
+
+  const saveEventSettings = async () => {
+    try {
+      setSavingEvents(true)
+      const res = await apiClient.put('/system-config/notification/events', eventSettings)
+      if (!res.success) {
+        throw new Error(res.error || res.message || '保存失败')
+      }
+      setEventSettings({ ...DEFAULT_EVENT_SETTINGS, ...res.data })
+      showToast({ type: 'success', title: '通知事件设置已保存' })
+    } catch (err) {
+      showToast({ type: 'error', title: '保存失败', description: err instanceof Error ? err.message : '' })
+    } finally {
+      setSavingEvents(false)
+    }
   }
 
   // Save channel config
@@ -561,6 +604,50 @@ export function NotificationManagement() {
           </p>
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle className="text-lg">通知事件</CardTitle>
+            <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">选择哪些业务消息需要推送</p>
+          </div>
+          <Button size="sm" onClick={saveEventSettings} disabled={savingEvents}>
+            {savingEvents ? '保存中...' : '保存设置'}
+          </Button>
+        </CardHeader>
+        <CardContent className="divide-y divide-slate-200 dark:divide-gray-700">
+          <div className="flex items-center justify-between gap-4 py-4 first:pt-0">
+            <div className="flex min-w-0 items-start gap-3">
+              <UserPlus className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-white">会员注册通知</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">有新会员完成注册时推送</p>
+              </div>
+            </div>
+            <Toggle
+              checked={eventSettings.memberRegistration}
+              onChange={(memberRegistration) => setEventSettings((prev) => ({ ...prev, memberRegistration }))}
+              label="会员注册通知"
+              disabled={savingEvents}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4 last:pb-0">
+            <div className="flex min-w-0 items-start gap-3">
+              <MessageCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-white">知识库留言通知</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">会员在知识库文档下留言时推送</p>
+              </div>
+            </div>
+            <Toggle
+              checked={eventSettings.knowledgeFeedback}
+              onChange={(knowledgeFeedback) => setEventSettings((prev) => ({ ...prev, knowledgeFeedback }))}
+              label="知识库留言通知"
+              disabled={savingEvents}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Channel tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-gray-700 pb-0">

@@ -257,26 +257,28 @@ router.post('/', authenticateContentAccess, docFeedbackRateLimit, async (req, re
       ? `⏰ 北京时间: ${dt.beijing}\n🌍 用户当地: ${dt.local} (${dt.localTz})`
       : `⏰ 北京时间: ${dt.beijing}`;
 
-    // Send notification to all enabled channels (async, non-blocking)
-    notificationService.notifyAll({
-      title: `🔔 新的文档留言`,
-      content: `文档: ${docTitle}\n提交者: ${author}\n内容: ${content}\n所在地: ${geo.location}\n时间: ${timeDisplay}`,
-      markdown: `### 🔔 新的文档留言\n**文档**: ${docTitle}\n**提交者**: ${author || '匿名'}\n**所在地**: ${geo.location}\n**内容**:\n${content}\n---\n${mdTime}`,
-    }).catch(() => {
-      // Silent fail
-    })
+    // Event switches apply to both unified channels and the legacy DingTalk fallback.
+    notificationService.isEventEnabled('knowledgeFeedback').then((enabled) => {
+      if (!enabled) return
 
-    // Legacy DingTalk fallback (reads from env vars)
-    dingtalkService.notifyFormSubmission({
-      type: 'document-feedback',
-      documentType: documentType as 'structured' | 'video' | 'image-text' | 'unknown',
-      name: author,
-      title: docTitle,
-      content: content,
-      timestamp: timeDisplay
+      notificationService.notifyAll({
+        title: `🔔 新的文档留言`,
+        content: `文档: ${docTitle}\n提交者: ${author}\n内容: ${content}\n所在地: ${geo.location}\n时间: ${timeDisplay}`,
+        markdown: `### 🔔 新的文档留言\n**文档**: ${docTitle}\n**提交者**: ${author || '匿名'}\n**所在地**: ${geo.location}\n**内容**:\n${content}\n---\n${mdTime}`,
+      }).catch(() => undefined)
+
+      dingtalkService.notifyFormSubmission({
+        type: 'document-feedback',
+        documentType: documentType as 'structured' | 'video' | 'image-text' | 'unknown',
+        name: author,
+        title: docTitle,
+        content,
+        timestamp: timeDisplay
+      }).catch((error) => {
+        logger.error({ error }, '发送钉钉通知失败')
+      })
     }).catch((error) => {
-      logger.error({ error }, '发送钉钉通知失败')
-      // 静默处理钉钉发送错误，不影响主流程
+      logger.error({ error }, '读取知识库留言通知设置失败')
     })
     
     res.json({

@@ -7,7 +7,7 @@
 import express, { Request, Response } from 'express';
 import systemConfigService from '../services/systemConfigService';
 import { notificationService } from '../services/notificationService';
-import type { NotificationChannelType, NotificationConfig } from '../models/SystemConfig';
+import type { NotificationChannelType, NotificationConfig, NotificationEventSettings } from '../models/SystemConfig';
 import { createLogger } from '../utils/logger';
 import { requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
@@ -170,6 +170,35 @@ router.get('/notification/status', requirePermission(PERMISSIONS.notifications.r
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get channel status'
+    });
+  }
+});
+
+// Get notification event switches. Missing settings default to enabled for backward compatibility.
+router.get('/notification/events', requirePermission(PERMISSIONS.notifications.read), async (_req: Request, res: Response) => {
+  try {
+    const settings = await notificationService.getEventSettings();
+    res.json({ success: true, data: settings });
+  } catch (error) {
+    logger.error({ error }, 'Failed to get notification event settings');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get notification event settings'
+    });
+  }
+});
+
+// Update notification event switches.
+router.put('/notification/events', requirePermission(PERMISSIONS.notifications.update), async (req: Request, res: Response) => {
+  try {
+    const updates = req.body as Partial<NotificationEventSettings>;
+    const settings = await notificationService.updateEventSettings(updates);
+    res.json({ success: true, data: settings, message: '通知事件设置已保存' });
+  } catch (error) {
+    logger.error({ error }, 'Failed to update notification event settings');
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to update notification event settings'
     });
   }
 });

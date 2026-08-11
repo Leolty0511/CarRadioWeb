@@ -378,7 +378,7 @@ router.post('/register', authLimiter, async (req, res) => {
   })
   await emailVerificationService.clearVerification(email, 'register')
   const device = parseMemberDevice(String(req.headers['user-agent'] || ''))
-  notificationService.notifyAll({
+  notificationService.notifyEvent('memberRegistration', {
     title: '新会员注册',
     content: [`会员：${nickname}`, `邮箱：${email}`, `地区：${[geo?.country, geo?.region, geo?.city].filter(Boolean).join(' / ') || '未知'}`, `IP：${ip}`, `设备：${formatMemberDevice(device)}`].join('\n'),
   }).catch(() => undefined)
