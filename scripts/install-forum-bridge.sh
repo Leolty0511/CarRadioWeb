@@ -56,11 +56,15 @@ for _ in $(seq 1 30); do
 done
 
 docker exec flarum_app composer config repositories.carradioweb-forum-bridge path /extensions/carradioweb-forum-bridge
+if ! docker exec flarum_app composer show fof/passport >/dev/null 2>&1; then
+  docker exec flarum_app composer require fof/passport:1.1.1 --with-all-dependencies --no-interaction --no-progress
+fi
 if ! docker exec flarum_app composer show carradioweb/forum-bridge >/dev/null 2>&1; then
   docker exec flarum_app composer require carradioweb/forum-bridge:1.0.0 --with-dependencies --no-interaction --no-progress
 fi
+docker exec flarum_app php flarum extension:enable fof-passport
 docker exec flarum_app php flarum extension:enable carradioweb-forum-bridge
-docker exec flarum_app php flarum migrate --force
+docker exec flarum_app php flarum migrate --no-interaction
 docker exec flarum_app php flarum cache:clear
 
 echo "Forum bridge extension is installed and enabled."

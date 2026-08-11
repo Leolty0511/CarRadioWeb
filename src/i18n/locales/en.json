@@ -1894,6 +1894,37 @@
       "generic": "Something went wrong. Please try again later"
     }
   },
+  "memberProfile": {
+    "eyebrow": "MEMBER CENTER",
+    "title": "Member Center",
+    "description": "Manage your member profile and saved content",
+    "loading": "Loading...",
+    "memberAccount": "Member account",
+    "changeAvatar": "Change avatar",
+    "backToKnowledge": "Back to Knowledge Base",
+    "basicInfo": "Profile details",
+    "nickname": "Nickname",
+    "save": "Save",
+    "nicknameUpdated": "Nickname updated",
+    "nicknameUpdateFailed": "Failed to update nickname",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password (at least 10 characters)",
+    "updatePassword": "Update password",
+    "passwordUpdated": "Password updated",
+    "passwordUpdateFailed": "Failed to update password",
+    "currentPasswordInvalid": "The current password is incorrect",
+    "favorites": "My saved items",
+    "emptyFavorites": "No saved content yet. Use the save button on a knowledge-base article.",
+    "updatedAt": "Updated {{time}}",
+    "removeFavorite": "Remove from saved items",
+    "profileLoadFailed": "Failed to load your profile",
+    "avatarUpdated": "Avatar updated",
+    "avatarUploadFailed": "Failed to upload avatar",
+    "errors": {
+      "generic": "Something went wrong. Please try again later"
+    }
+  },
   "canbus": {
     "title": "CANBus Settings",
     "description": "Select your vehicle to view CANBus settings",
