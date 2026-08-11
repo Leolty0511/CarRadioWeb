@@ -57,7 +57,7 @@ const Forum = () => {
     return (
       <div className="page-container-deep flex items-center justify-center">
         <p className="text-lg text-slate-600 dark:text-gray-400">
-          {t('errors.forumNotConfigured', '请在管理后台 → 功能设置 → 论坛 中启用论坛入口。')}
+          {t('forum.notConfigured')}
         </p>
       </div>
     )
@@ -95,7 +95,7 @@ const Forum = () => {
   return (
     <div className="page-container-deep flex flex-col items-center justify-center gap-3">
       <p className="text-lg text-slate-600 dark:text-gray-400">{t('common.redirecting')}</p>
-      <p className="text-sm text-slate-500 dark:text-gray-500">{user?.type === 'member' ? t('forum.oauthRedirecting', '正在使用会员账号登录论坛') : t('forum.redirectingHint')}</p>
+      <p className="text-sm text-slate-500 dark:text-gray-500">{user?.type === 'member' ? t('forum.oauthRedirecting') : t('forum.redirectingHint')}</p>
     </div>
   )
 }

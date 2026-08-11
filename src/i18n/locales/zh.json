@@ -1707,7 +1707,9 @@
       "description": "社区论坛尚未开放，请稍后再试。",
       "hint": "论坛开放时将另行通知，敬请期待。"
     },
+    "notConfigured": "论坛尚未配置，请在管理后台的功能设置中启用论坛入口。",
     "redirectingHint": "若无法连接，请到 管理后台 → 功能设置 → 论坛 检查 Docker 或尝试重新部署。",
+    "oauthRedirecting": "正在使用会员账号登录论坛...",
     "features": {
       "discussions": {
         "title": "技术讨论",
@@ -3026,6 +3028,7 @@
   },
   "memberAccess": {
     "title": "会员登录",
+    "loginOrRegister": "登录 / 注册",
     "memberAccount": "会员账号",
     "adminAccount": "管理员账号",
     "profile": "个人中心",
