@@ -9,6 +9,7 @@ import User from '../models/User'
 import MemberFavorite from '../models/MemberFavorite'
 import ForumOAuthAuthorizationCode from '../models/ForumOAuthAuthorizationCode'
 import ForumOAuthAccessToken from '../models/ForumOAuthAccessToken'
+import ForumBridgeNonce from '../models/ForumBridgeNonce'
 import BaseDocument from '../models/Document'
 import { signTokenPair, verifyAccessToken, verifyRefreshToken } from '../utils/jwt'
 import { clearTokenCookie, clearRefreshTokenCookie } from '../utils/tokenCookie'
@@ -26,6 +27,8 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD = 10
 const OAUTH_CODE_TTL_MS = 2 * 60 * 1000
 const OAUTH_ACCESS_TOKEN_TTL_MS = 5 * 60 * 1000
+const FORUM_BRIDGE_COOKIE = 'carradioweb_forum_bridge'
+const FORUM_BRIDGE_MAX_TTL_SECONDS = 5 * 60
 const avatarUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -71,6 +74,129 @@ function hashOAuthToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
 }
 
+interface ForumBridgeClaims {
+  forum_user_id: string
+  email: string
+  username: string
+  avatar_url?: string
+  nonce: string
+  iat: number
+  exp: number
+}
+
+function getForumBridgeSecret(): string {
+  return String(process.env.FORUM_SSO_BRIDGE_SECRET || process.env.FORUM_OAUTH_CLIENT_SECRET || '').trim()
+}
+
+function getForumBridgeCookieDomain(): string | undefined {
+  const configured = String(process.env.FORUM_SSO_BRIDGE_COOKIE_DOMAIN || '').trim()
+  if (configured) return configured.startsWith('.') ? configured : `.${configured}`
+  const frontendUrl = String(process.env.FRONTEND_URL || process.env.VITE_APP_URL || '').trim()
+  try {
+    const hostname = new URL(frontendUrl).hostname.toLowerCase()
+    if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1') return undefined
+    const parts = hostname.split('.').filter(Boolean)
+    return parts.length >= 2 ? `.${parts.slice(-2).join('.')}` : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function clearForumBridgeCookie(res: any): void {
+  res.clearCookie(FORUM_BRIDGE_COOKIE, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    ...(getForumBridgeCookieDomain() ? { domain: getForumBridgeCookieDomain() } : {}),
+  })
+}
+
+function decodeForumBridgeClaims(value: string): ForumBridgeClaims | null {
+  const secret = getForumBridgeSecret()
+  const separator = value.lastIndexOf('.')
+  if (secret.length < 32 || separator <= 0) return null
+  const encoded = value.slice(0, separator)
+  const signature = value.slice(separator + 1)
+  const expected = crypto.createHmac('sha256', secret).update(encoded).digest('base64url')
+  if (!sameSecret(signature, expected)) return null
+  try {
+    const claims = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8')) as ForumBridgeClaims
+    const now = Math.floor(Date.now() / 1000)
+    if (!claims || !EMAIL.test(String(claims.email || '').toLowerCase())) return null
+    if (!claims.forum_user_id || !claims.nonce || claims.nonce.length < 16) return null
+    if (!Number.isFinite(claims.iat) || !Number.isFinite(claims.exp)) return null
+    if (claims.iat > now + 30 || claims.exp <= now || claims.exp - claims.iat > FORUM_BRIDGE_MAX_TTL_SECONDS) return null
+    return claims
+  } catch {
+    return null
+  }
+}
+
+async function exchangeForumBridge(req: any, res: any) {
+  const raw = String(req.cookies?.[FORUM_BRIDGE_COOKIE] || '')
+  if (!raw) return null
+  clearForumBridgeCookie(res)
+  const claims = decodeForumBridgeClaims(raw)
+  if (!claims) return null
+
+  const email = claims.email.trim().toLowerCase()
+  if (await blockedForumMember(email)) return null
+  try {
+    await ForumBridgeNonce.create({
+      nonceHash: hashOAuthToken(claims.nonce),
+      forumUserId: claims.forum_user_id,
+      usedAt: new Date(),
+      expiresAt: new Date((claims.exp + FORUM_BRIDGE_MAX_TTL_SECONDS) * 1000),
+    })
+  } catch (error: any) {
+    if (error?.code === 11000) return null
+    throw error
+  }
+
+  const memberByForumId = await Member.findOne({ forumUserId: claims.forum_user_id }).select('+passwordHash')
+  const memberByEmail = await Member.findOne({ email }).select('+passwordHash')
+  if (memberByForumId && memberByEmail && String(memberByForumId._id) !== String(memberByEmail._id)) return null
+  let member = memberByForumId || memberByEmail
+  if (member?.forumUserId && member.forumUserId !== claims.forum_user_id) return null
+  if (member?.status === 'suspended') return null
+
+  const ip = getClientIP(req)
+  const geo = await getGeoLocationByIP(ip)
+  const nickname = String(claims.username || email.split('@')[0] || 'Member').trim().slice(0, 50)
+  if (!member) {
+    member = await Member.create({
+      forumUserId: claims.forum_user_id,
+      email,
+      nickname: nickname || 'Member',
+      avatar: String(claims.avatar_url || '').slice(0, 2000),
+      passwordHash: await bcrypt.hash(crypto.randomBytes(32).toString('base64url'), 12),
+      status: 'active',
+      registrationIp: ip,
+      registrationCountry: geo?.country || '未知',
+      registrationRegion: geo?.region || '未知',
+      registrationCity: geo?.city || '未知',
+      approvedAt: new Date(),
+      lastLoginAt: new Date(),
+      lastLoginIp: ip,
+      ...getMemberPresence(req),
+    })
+  } else {
+    member.forumUserId = claims.forum_user_id
+    member.status = 'active'
+    member.nickname = nickname || member.nickname
+    if (claims.avatar_url) member.avatar = String(claims.avatar_url).slice(0, 2000)
+    member.lastLoginAt = new Date()
+    member.lastLoginIp = ip
+    Object.assign(member, getMemberPresence(req))
+    await member.save()
+  }
+
+  const tokens = signTokenPair({ userId: String(member._id), email: member.email, role: 'member' })
+  setMemberTokenCookies(res, tokens.accessToken, tokens.refreshToken)
+  return { type: 'member' as const, id: String(member._id), nickname: member.nickname, avatar: member.avatar, roles: ['member'] }
+}
+
 function blockedForumEmail(email: string): boolean {
   const blocked = String(process.env.FORUM_SSO_BLOCKED_EMAILS || '')
     .split(',')
@@ -112,8 +238,14 @@ function readBasicClient(req: any): { clientId: string; clientSecret: string } {
 }
 
 router.get('/session', optionalContentAccess, async (req, res) => {
-  if (!req.contentPrincipal) return res.json({ success: true, authenticated: false })
-  res.json({ success: true, authenticated: true, data: req.contentPrincipal })
+  if (req.contentPrincipal) return res.json({ success: true, authenticated: true, data: req.contentPrincipal })
+  try {
+    const principal = await exchangeForumBridge(req, res)
+    if (principal) return res.json({ success: true, authenticated: true, data: principal })
+  } catch {
+    clearForumBridgeCookie(res)
+  }
+  return res.json({ success: true, authenticated: false })
 })
 
 /** OAuth 2.0 authorization endpoint consumed by Flarum FoF Passport. */
@@ -389,6 +521,7 @@ router.post('/logout', async (req, res) => {
   clearMemberTokenCookies(res)
   clearTokenCookie(res)
   clearRefreshTokenCookie(res)
+  clearForumBridgeCookie(res)
   res.json({ success: true })
 })
 

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { getForumBaseUrl } from '@/utils/forumUrl'
@@ -13,7 +12,6 @@ import { MessageCircle } from 'lucide-react'
 
 const Forum = () => {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { siteSettings, loading } = useSiteSettings()
   const { user, loading: authLoading } = useAuth()
   const forumEnabled = siteSettings?.externalLinks?.forum?.enabled ?? false
@@ -29,8 +27,11 @@ const Forum = () => {
     fetch('/api/v1/forum/public-status')
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled && data?.success === true) {setDeployed(data.deployed === true)}
-        else if (!cancelled) {setDeployed(false)}
+        if (!cancelled && data?.success === true) {
+          setDeployed(data.deployed === true)
+        } else if (!cancelled) {
+          setDeployed(false)
+        }
       })
       .catch(() => {
         if (!cancelled) {setDeployed(false)}
@@ -39,14 +40,10 @@ const Forum = () => {
   }, [forumEnabled])
 
   useEffect(() => {
-    if (!forumEnabled || deployed !== true || !forumUrl || authLoading) return
-    if (!user) {
-      navigate('/login?returnTo=/forum', { replace: true })
-      return
-    }
-    const destination = user.type === 'member' ? `${forumUrl}/auth/passport` : forumUrl
+    if (!forumEnabled || deployed !== true || !forumUrl || authLoading) {return}
+    const destination = user?.type === 'member' ? `${forumUrl}/auth/passport` : forumUrl
     window.location.replace(destination)
-  }, [authLoading, deployed, forumEnabled, forumUrl, navigate, user])
+  }, [authLoading, deployed, forumEnabled, forumUrl, user])
 
   if (loading) {
     return (

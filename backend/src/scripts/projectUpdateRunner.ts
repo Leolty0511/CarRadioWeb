@@ -52,11 +52,13 @@ const artifactPaths = [
   'package-lock.json',
   'ecosystem.config.cjs',
   'docker-compose.flarum.yml',
+  'forum-extensions',
   path.join('scripts', 'deploy-flarum.sh'),
   path.join('scripts', 'deploy-flarum.ps1'),
   path.join('scripts', 'cancel-deploy.sh'),
   path.join('scripts', 'cancel-deploy.ps1'),
   path.join('scripts', 'ensure-docker.sh'),
+  path.join('scripts', 'install-forum-bridge.sh'),
 ]
 
 function getCommandEnvironment(command: string): NodeJS.ProcessEnv {
@@ -153,6 +155,15 @@ async function restartFrontend(): Promise<void> {
   // Backend restart below reloads those files, so this is a valid no-op when
   // no separate frontend process or nginx instance exists.
   await writeStatus({ stage: 'frontend_refreshed', message: 'Frontend assets updated; no separate frontend process requires a restart' })
+}
+
+async function installForumBridge(): Promise<void> {
+  if (process.platform === 'win32') return
+  try {
+    await run('bash', [path.join(payload.repoRoot, 'scripts', 'install-forum-bridge.sh')], 'updating_forum_bridge', 'Updating the forum login bridge', 10 * 60_000)
+  } catch (error) {
+    appendLog(`Forum bridge update skipped: ${error instanceof Error ? error.message : String(error)}`)
+  }
 }
 
 async function downloadArtifact(url: string): Promise<string> {
@@ -305,6 +316,7 @@ async function main(): Promise<void> {
     if (payload.artifactUrl) {
       await writeStatus({ stage: 'downloading', message: 'Downloading the prebuilt package from GitHub' })
       await applyArtifact()
+      await installForumBridge()
       await restartFrontend()
       await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
       await writeStatus({ stage: 'health_check', message: 'Checking the new version health' })

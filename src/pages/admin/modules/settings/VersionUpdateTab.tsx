@@ -62,6 +62,7 @@ export function VersionUpdateTab() {
   const [starting, setStarting] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState<ProjectUpdateLogEntry | null>(null)
+  const [showReleaseNotes, setShowReleaseNotes] = useState(false)
 
   const load = useCallback(async () => {
     try {
@@ -256,6 +257,16 @@ export function VersionUpdateTab() {
             </section>
           )}
 
+          {info.updateAvailable && info.releaseNotes && (
+            <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">版本更新说明</h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">查看本次版本的完整中文更新内容</p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowReleaseNotes(true)}>查看完整说明</Button>
+            </div>
+          )}
+
           {status && status.state !== 'idle' && (
             <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
               <div className="flex items-center gap-2">
@@ -305,6 +316,17 @@ export function VersionUpdateTab() {
             </div>
           </article>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={showReleaseNotes}
+        onClose={() => setShowReleaseNotes(false)}
+        title={`v${info.remoteVersion || '最新版本'} 更新说明`}
+        size="lg"
+      >
+        <div className="whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm leading-7 text-slate-700 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-200">
+          {info.releaseNotes}
+        </div>
       </Modal>
 
       <ConfirmDialog

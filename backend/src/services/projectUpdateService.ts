@@ -60,6 +60,7 @@ export interface ProjectUpdateInfo {
   commitsAhead: number
   commitsBehind: number
   updateLog: ProjectUpdateLogEntry[]
+  releaseNotes: string | null
   updateAvailable: boolean
   checkedAt: string | null
   gitRepository: boolean
@@ -109,6 +110,16 @@ interface GithubRelease {
 interface GithubContentResponse {
   content?: string
   encoding?: string
+}
+
+function extractChangelogEntry(raw: string, version: string | null): string | null {
+  if (!raw || !version) return null
+  const heading = `## [${version}]`
+  const start = raw.indexOf(heading)
+  if (start < 0) return null
+  const remaining = raw.slice(start)
+  const nextHeading = remaining.slice(heading.length).search(/^## \[/m)
+  return (nextHeading < 0 ? remaining : remaining.slice(0, heading.length + nextHeading)).trim() || null
 }
 
 async function resolveArtifactUrl(): Promise<string> {
@@ -179,6 +190,7 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
   commitsAhead: number
   commitsBehind: number
   updateLog: ProjectUpdateLogEntry[]
+  releaseNotes: string | null
 }> {
   const [branchCommit, packageFile] = await Promise.all([
     fetchGithubJson<GithubCommit>(`${GITHUB_API_URL}/commits/${encodeURIComponent(branch)}`),
@@ -194,6 +206,15 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
   let commitsAhead = 0
   let commitsBehind = 0
   let updateLog: ProjectUpdateLogEntry[] = []
+  let releaseNotes: string | null = null
+  try {
+    const changelogFile = await fetchGithubJson<GithubContentResponse>(`${GITHUB_API_URL}/contents/CHANGELOG.md?ref=${encodeURIComponent(branch)}`)
+    if (changelogFile.content && changelogFile.encoding === 'base64') {
+      releaseNotes = extractChangelogEntry(Buffer.from(changelogFile.content, 'base64').toString('utf8'), remoteVersion)
+    }
+  } catch {
+    // Release notes are optional; commit details remain available when absent.
+  }
   if (currentCommit && remoteCommit && currentCommit !== remoteCommit && currentCommit !== 'artifact') {
     try {
       const comparison = await fetchGithubJson<GithubCompareResponse>(`${GITHUB_API_URL}/compare/${currentCommit}...${remoteCommit}`)
@@ -210,7 +231,7 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
     commitsBehind = 1
   }
   lastRemoteCheckedAt = new Date().toISOString()
-  return { remoteVersion, remoteCommit, remoteCommitMessage, commitsAhead, commitsBehind, updateLog }
+  return { remoteVersion, remoteCommit, remoteCommitMessage, commitsAhead, commitsBehind, updateLog, releaseNotes }
 }
 
 function getGitEnvironment(): NodeJS.ProcessEnv {
@@ -339,6 +360,7 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
   let commitsAhead = 0
   let commitsBehind = 0
   let updateLog: ProjectUpdateLogEntry[] = []
+  let releaseNotes: string | null = null
   let gitRepository = false
   let repositoryValid = false
   let workingTreeClean = false
@@ -368,6 +390,11 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
           remoteCommitMessage = (await runGit(['log', '-1', '--format=%s', `origin/${branch}`])).stdout || null
           const packageRaw = (await runGit(['show', `origin/${branch}:package.json`])).stdout
           remoteVersion = parsePackageVersion(packageRaw)
+          try {
+            releaseNotes = extractChangelogEntry(await runGit(['show', `origin/${branch}:CHANGELOG.md`]).then(result => result.stdout), remoteVersion)
+          } catch {
+            releaseNotes = null
+          }
           const distance = parseAheadBehind((await runGit(['rev-list', '--left-right', '--count', `HEAD...origin/${branch}`])).stdout)
           commitsAhead = distance.ahead
           commitsBehind = distance.behind
@@ -406,6 +433,7 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
       commitsAhead = remote.commitsAhead
       commitsBehind = remote.commitsBehind
       updateLog = remote.updateLog
+      releaseNotes = remote.releaseNotes
       checkedAt = lastRemoteCheckedAt
     } catch (error) {
       logger.warn({ error }, 'Prebuilt deployment update check failed')
@@ -428,6 +456,7 @@ export async function getProjectUpdateInfo(refreshRemote = false): Promise<Proje
     commitsAhead,
     commitsBehind,
     updateLog,
+    releaseNotes,
     updateAvailable: commitsBehind > 0 && commitsAhead === 0,
     checkedAt,
     gitRepository,

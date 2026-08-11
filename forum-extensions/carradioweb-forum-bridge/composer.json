@@ -1,0 +1,25 @@
+{
+  "name": "carradioweb/forum-bridge",
+  "description": "Short-lived signed login bridge from Flarum to CarRadioWeb",
+  "version": "1.0.0",
+  "type": "flarum-extension",
+  "require": {
+    "flarum/core": "^1.8"
+  },
+  "autoload": {
+    "psr-4": {
+      "CarRadioWeb\\ForumBridge\\": "src/"
+    }
+  },
+  "extra": {
+    "flarum-extension": {
+      "title": "CarRadioWeb Forum Bridge",
+      "category": "authentication",
+      "icon": {
+        "name": "fas fa-link",
+        "backgroundColor": "#0891b2",
+        "color": "#ffffff"
+      }
+    }
+  }
+}

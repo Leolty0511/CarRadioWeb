@@ -81,9 +81,20 @@ if [[ -z "$DB_PASSWORD" ]]; then
   DB_PASSWORD=$(openssl rand -base64 18 | tr -d '+/=' | head -c 24)
 fi
 
+FORUM_SSO_BRIDGE_SECRET="$(read_env_value backend/config.env FORUM_SSO_BRIDGE_SECRET)"
+if [[ -z "$FORUM_SSO_BRIDGE_SECRET" ]]; then
+  FORUM_SSO_BRIDGE_SECRET="$(read_env_value backend/config.env FORUM_OAUTH_CLIENT_SECRET)"
+fi
+FORUM_SSO_BRIDGE_COOKIE_DOMAIN="$(read_env_value backend/config.env FORUM_SSO_BRIDGE_COOKIE_DOMAIN)"
+if [[ -z "$FORUM_SSO_BRIDGE_COOKIE_DOMAIN" && "$APP_URL" != *"localhost"* ]]; then
+  FORUM_SSO_BRIDGE_COOKIE_DOMAIN=".$(printf '%s' "$MAIN_DOMAIN" | sed -E 's/^www\.//')"
+fi
+
 cat > .env.flarum << EOL
 FLARUM_BASE_URL=${FINAL_FLARUM_URL}
 DB_PASSWORD=${DB_PASSWORD}
+FORUM_SSO_BRIDGE_SECRET=${FORUM_SSO_BRIDGE_SECRET}
+FORUM_SSO_BRIDGE_COOKIE_DOMAIN=${FORUM_SSO_BRIDGE_COOKIE_DOMAIN}
 EOL
 
 # Re-deployment must preserve the forum database and uploaded assets.
@@ -121,6 +132,9 @@ if [[ -z "$FLARUM_STATUS" || "$FLARUM_HTTP_READY" != "1" ]]; then
   exit 1
 else
   update_status "deployed" "部署成功！"
+  if [[ -f "scripts/install-forum-bridge.sh" ]]; then
+    bash scripts/install-forum-bridge.sh || true
+  fi
   DOCKER_BIN=$(command -v docker)
   if [[ -n "$DOCKER_BIN" && -d /etc/cron.d && -w /etc/cron.d ]]; then
     cat > /etc/cron.d/carradioweb-flarum << EOL

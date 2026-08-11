@@ -25,6 +25,7 @@ export interface ProjectUpdateInfo {
   commitsAhead: number
   commitsBehind: number
   updateLog: ProjectUpdateLogEntry[]
+  releaseNotes: string | null
   updateAvailable: boolean
   checkedAt: string | null
   gitRepository: boolean

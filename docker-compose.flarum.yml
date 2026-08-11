@@ -13,8 +13,11 @@ services:
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_PREFIX=flarum_
       - DB_PORT=3306
+      - CARRADIOWEB_FORUM_BRIDGE_SECRET=${FORUM_SSO_BRIDGE_SECRET:-}
+      - CARRADIOWEB_FORUM_BRIDGE_COOKIE_DOMAIN=${FORUM_SSO_BRIDGE_COOKIE_DOMAIN:-}
     volumes:
       - flarum_data:/data
+      - ./forum-extensions:/extensions:ro
     ports:
       - "8888:8000"
     depends_on:

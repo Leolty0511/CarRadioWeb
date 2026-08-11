@@ -74,9 +74,16 @@ if (-not $dbPassword) {
   $dbPassword = $sb.ToString()
 }
 
+$bridgeSecret = Read-EnvValue ".\backend\config.env" "FORUM_SSO_BRIDGE_SECRET"
+if (-not $bridgeSecret) { $bridgeSecret = Read-EnvValue ".\backend\config.env" "FORUM_OAUTH_CLIENT_SECRET" }
+$bridgeCookieDomain = Read-EnvValue ".\backend\config.env" "FORUM_SSO_BRIDGE_COOKIE_DOMAIN"
+if (-not $bridgeCookieDomain -and $hostPart -notlike "*localhost*") { $bridgeCookieDomain = "." + ($hostPart -replace '^www\.', '') }
+
 @"
 FLARUM_BASE_URL=$finalFlarumUrl
 DB_PASSWORD=$dbPassword
+FORUM_SSO_BRIDGE_SECRET=$bridgeSecret
+FORUM_SSO_BRIDGE_COOKIE_DOMAIN=$bridgeCookieDomain
 "@ | Set-Content -Path ".\.env.flarum" -Encoding UTF8
 
 # Re-deployment must preserve the forum database and uploaded assets.

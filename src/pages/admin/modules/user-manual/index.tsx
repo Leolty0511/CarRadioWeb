@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
   Download,
   Eye,
@@ -6,13 +6,14 @@ import {
   FolderOpen,
   Pencil,
   Plus,
-  Save,
   Search,
   Trash2,
   Upload,
-  X,
 } from 'lucide-react'
 import { apiClient } from '@/services/apiClient'
+import Modal from '@/components/ui/Modal'
+import { FormModal } from '../../components/FormModal'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
 
 interface Category {
   _id: string
@@ -61,7 +62,10 @@ const UserManualManager: React.FC = () => {
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
-  const fileRef = useRef<HTMLInputElement>(null)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [showManualModal, setShowManualModal] = useState(false)
+  const [manualFile, setManualFile] = useState<File | null>(null)
+  const [previewManual, setPreviewManual] = useState<Manual | null>(null)
 
   const load = async () => {
     setLoading(true)
@@ -90,8 +94,7 @@ const UserManualManager: React.FC = () => {
     })
   }, [categoryFilter, manuals, query])
 
-  const saveCategory = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const saveCategory = async () => {
     if (!categoryForm.name.trim()) {return setError('请输入分类名称')}
     setSaving(true)
     setError('')
@@ -102,6 +105,7 @@ const UserManualManager: React.FC = () => {
     if (result.success) {
       setCategoryForm(emptyCategory)
       setEditingCategory(null)
+      setShowCategoryModal(false)
       await load()
     } else {
       setError(result.error || '保存分类失败')
@@ -117,15 +121,23 @@ const UserManualManager: React.FC = () => {
       order: String(category.order || 0),
       isActive: category.isActive !== false,
     })
+    setShowCategoryModal(true)
   }
 
-  const upload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const selectManualFile = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) {return}
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       setError('只能上传 PDF 文件')
       return
     }
+    setManualFile(file)
+    setError('')
+  }
+
+  const uploadManual = async () => {
+    const file = manualFile
+    if (!file) {return setError('请先选择 PDF 文件')}
     setSaving(true)
     setError('')
     const data = new FormData()
@@ -140,16 +152,16 @@ const UserManualManager: React.FC = () => {
     const result = await apiClient.upload('/user-manual/upload', data, { retries: 0 })
     if (result.success) {
       setManualForm(emptyManual)
+      setManualFile(null)
+      setShowManualModal(false)
       await load()
     } else {
       setError(result.error || '上传失败')
     }
     setSaving(false)
-    if (fileRef.current) {fileRef.current.value = ''}
   }
 
-  const saveManual = async (event: React.FormEvent) => {
-    event.preventDefault()
+  const saveManual = async () => {
     if (!editingManual) {return}
     setSaving(true)
     setError('')
@@ -160,6 +172,7 @@ const UserManualManager: React.FC = () => {
     if (result.success) {
       setEditingManual(null)
       setManualForm(emptyManual)
+      setShowManualModal(false)
       await load()
     } else {
       setError(result.error || '保存手册失败')
@@ -178,6 +191,8 @@ const UserManualManager: React.FC = () => {
       sortOrder: String(manual.sortOrder || 0),
       isPublished: manual.isPublished !== false,
     })
+    setManualFile(null)
+    setShowManualModal(true)
   }
 
   const confirmDelete = async () => {
@@ -197,6 +212,8 @@ const UserManualManager: React.FC = () => {
   const cancelManualEdit = () => {
     setEditingManual(null)
     setManualForm(emptyManual)
+    setManualFile(null)
+    setShowManualModal(false)
   }
 
   return (
@@ -224,39 +241,15 @@ const UserManualManager: React.FC = () => {
               <h2 className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white"><FolderOpen className="h-5 w-5 text-blue-500" />产品分类</h2>
               <p className="mt-1 text-xs text-gray-500">删除分类后，所属手册会保留为未分类</p>
             </div>
-            {editingCategory && (
-              <button type="button" onClick={() => { setEditingCategory(null); setCategoryForm(emptyCategory) }} className="p-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200" title="取消编辑">
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          <form onSubmit={saveCategory} className="grid grid-cols-2 gap-3 border-b border-gray-200 p-5 dark:border-gray-700">
-            <label className="col-span-2">
-              <span className={labelClass}>分类名称</span>
-              <input value={categoryForm.name} onChange={event => setCategoryForm(current => ({ ...current, name: event.target.value }))} placeholder="例如：FY-T 系列" className="input" required />
-            </label>
-            <label className="col-span-2">
-              <span className={labelClass}>分类描述</span>
-              <input value={categoryForm.description} onChange={event => setCategoryForm(current => ({ ...current, description: event.target.value }))} placeholder="用于前台分类页的简短说明" className="input" />
-            </label>
-            <label>
-              <span className={labelClass}>排序</span>
-              <input type="number" value={categoryForm.order} onChange={event => setCategoryForm(current => ({ ...current, order: event.target.value }))} className="input" />
-            </label>
-            <label className="flex items-end pb-3">
-              <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <input type="checkbox" checked={categoryForm.isActive} onChange={event => setCategoryForm(current => ({ ...current, isActive: event.target.checked }))} />
-                前台显示
-              </span>
-            </label>
-            <button disabled={saving} className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-              {editingCategory ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
-              {editingCategory ? '保存分类' : '新增分类'}
+            <button
+              type="button"
+              onClick={() => { setEditingCategory(null); setCategoryForm(emptyCategory); setShowCategoryModal(true) }}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" />新增分类
             </button>
-          </form>
-
-          <div className="max-h-[360px] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
+          </div>
+          <div className="max-h-[420px] divide-y divide-gray-100 overflow-y-auto dark:divide-gray-700">
             {categories.length === 0 && <p className="px-5 py-10 text-center text-sm text-gray-500">暂无分类</p>}
             {categories.map(category => (
               <div key={category._id} className="flex items-center justify-between gap-3 px-5 py-3.5">
@@ -276,54 +269,29 @@ const UserManualManager: React.FC = () => {
           </div>
         </section>
 
-        <section className={`${panelClass} xl:col-span-7`}>
-          <div className="border-b border-gray-200 px-5 py-4 dark:border-gray-700">
-            <h2 className="font-semibold text-gray-900 dark:text-white">{editingManual ? '编辑手册信息' : '上传新手册'}</h2>
-            <p className="mt-1 text-xs text-gray-500">支持 PDF，单个文件最大 50 MB</p>
-          </div>
-          <form onSubmit={editingManual ? saveManual : event => { event.preventDefault(); fileRef.current?.click() }} className="grid grid-cols-1 gap-4 p-5 md:grid-cols-2">
-            <label>
-              <span className={labelClass}>手册标题</span>
-              <input value={manualForm.title} onChange={event => setManualForm(current => ({ ...current, title: event.target.value }))} placeholder="输入手册标题" className="input" required />
-            </label>
-            <label>
-              <span className={labelClass}>产品型号</span>
-              <input value={manualForm.productModel} onChange={event => setManualForm(current => ({ ...current, productModel: event.target.value }))} placeholder="输入产品型号" className="input" required />
-            </label>
-            <label>
-              <span className={labelClass}>产品分类</span>
-              <select value={manualForm.categoryId} onChange={event => setManualForm(current => ({ ...current, categoryId: event.target.value }))} className="input">
-                <option value="">未分类</option>
-                {categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}
-              </select>
-            </label>
-            <label>
-              <span className={labelClass}>版本</span>
-              <input value={manualForm.version} onChange={event => setManualForm(current => ({ ...current, version: event.target.value }))} placeholder="可选" className="input" />
-            </label>
-            <label className="md:col-span-2">
-              <span className={labelClass}>产品说明</span>
-              <textarea value={manualForm.description} onChange={event => setManualForm(current => ({ ...current, description: event.target.value }))} placeholder="可选，用于说明适用范围或注意事项" className="input min-h-20 resize-y" />
-            </label>
-            <label>
-              <span className={labelClass}>排序</span>
-              <input type="number" value={manualForm.sortOrder} onChange={event => setManualForm(current => ({ ...current, sortOrder: event.target.value }))} className="input" />
-            </label>
-            <label className="flex items-end pb-3">
-              <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
-                <input type="checkbox" checked={manualForm.isPublished} onChange={event => setManualForm(current => ({ ...current, isPublished: event.target.checked }))} />
-                前台发布
-              </span>
-            </label>
-            <div className="flex flex-wrap gap-2 md:col-span-2">
-              <button disabled={saving} type="submit" className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-                {editingManual ? <Save className="h-4 w-4" /> : <Upload className="h-4 w-4" />}
-                {editingManual ? '保存修改' : '选择 PDF 并上传'}
-              </button>
-              {editingManual && <button type="button" onClick={cancelManualEdit} className="h-10 rounded-lg border border-gray-300 px-4 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">取消</button>}
+        <section className={`${panelClass} flex min-h-[260px] flex-col xl:col-span-7`}>
+          <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4 dark:border-gray-700">
+            <div>
+              <h2 className="font-semibold text-gray-900 dark:text-white">PDF 手册</h2>
+              <p className="mt-1 text-xs text-gray-500">支持 PDF，单个文件最大 50 MB</p>
             </div>
-            <input ref={fileRef} type="file" accept=".pdf" onChange={upload} className="hidden" />
-          </form>
+            <button
+              type="button"
+              onClick={() => { setEditingManual(null); setManualForm(emptyManual); setManualFile(null); setShowManualModal(true) }}
+              className="inline-flex h-9 items-center gap-2 rounded-md bg-blue-600 px-3 text-sm font-medium text-white hover:bg-blue-700"
+            >
+              <Upload className="h-4 w-4" />上传手册
+            </button>
+          </div>
+          <div className="grid flex-1 place-items-center p-8 text-center">
+            <div>
+              <div className="mx-auto grid h-14 w-14 place-items-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-300">
+                <FileText className="h-7 w-7" />
+              </div>
+              <p className="mt-4 text-lg font-semibold text-gray-900 dark:text-white">{manuals.length} 份手册</p>
+              <p className="mt-1 text-sm text-gray-500">上传后可在下方列表中预览、编辑、下载或删除</p>
+            </div>
+          </div>
         </section>
       </div>
 
@@ -367,7 +335,7 @@ const UserManualManager: React.FC = () => {
                     <td className="px-5 py-3 text-gray-600 dark:text-gray-400">{manual.sizeFormatted}</td>
                     <td className="px-5 py-3">
                       <div className="flex justify-end gap-1">
-                        <a href={manual.url} target="_blank" rel="noreferrer" className="p-2 text-gray-400 hover:text-blue-600" title="预览"><Eye className="h-4 w-4" /></a>
+                        <button type="button" onClick={() => setPreviewManual(manual)} className="p-2 text-gray-400 hover:text-blue-600" title="预览"><Eye className="h-4 w-4" /></button>
                         <a href={manual.downloadUrl} className="p-2 text-gray-400 hover:text-emerald-600" title="下载"><Download className="h-4 w-4" /></a>
                         <button type="button" onClick={() => editManual(manual)} className="p-2 text-gray-400 hover:text-blue-600" title="编辑"><Pencil className="h-4 w-4" /></button>
                         <button type="button" onClick={() => setDeleteTarget({ type: 'manual', id: manual.id, name: manual.title })} className="p-2 text-gray-400 hover:text-red-600" title="删除"><Trash2 className="h-4 w-4" /></button>
@@ -381,22 +349,106 @@ const UserManualManager: React.FC = () => {
         )}
       </section>
 
-      {deleteTarget && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="manual-delete-title">
-          <div className="w-full max-w-md rounded-lg border border-gray-200 bg-white p-5 shadow-2xl dark:border-gray-700 dark:bg-gray-800">
-            <h2 id="manual-delete-title" className="text-lg font-semibold text-gray-900 dark:text-white">确认删除</h2>
-            <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-300">
-              {deleteTarget.type === 'category'
-                ? `确定删除分类“${deleteTarget.name}”吗？${deleteTarget.manualCount > 0 ? `其中 ${deleteTarget.manualCount} 份手册会保留为未分类。` : ''}`
-                : `确定删除手册“${deleteTarget.name}”吗？PDF 文件也会一并删除。`}
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteTarget(null)} className="h-10 rounded-lg border border-gray-300 px-4 text-sm text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">取消</button>
-              <button type="button" disabled={saving} onClick={confirmDelete} className="h-10 rounded-lg bg-red-600 px-4 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-50">删除</button>
-            </div>
-          </div>
+      <FormModal
+        open={showCategoryModal}
+        onClose={() => { setShowCategoryModal(false); setEditingCategory(null); setCategoryForm(emptyCategory) }}
+        onSubmit={() => void saveCategory()}
+        title={editingCategory ? '编辑产品分类' : '新增产品分类'}
+        submitText={editingCategory ? '保存修改' : '创建分类'}
+        loading={saving}
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <label className="sm:col-span-2">
+            <span className={labelClass}>分类名称</span>
+            <input value={categoryForm.name} onChange={event => setCategoryForm(current => ({ ...current, name: event.target.value }))} placeholder="例如：FY-T 系列" className="input" required autoFocus />
+          </label>
+          <label className="sm:col-span-2">
+            <span className={labelClass}>分类描述</span>
+            <textarea value={categoryForm.description} onChange={event => setCategoryForm(current => ({ ...current, description: event.target.value }))} placeholder="用于前台分类页的简短说明" className="input min-h-24 resize-y" />
+          </label>
+          <label>
+            <span className={labelClass}>排序</span>
+            <input type="number" value={categoryForm.order} onChange={event => setCategoryForm(current => ({ ...current, order: event.target.value }))} className="input" />
+          </label>
+          <label className="flex items-end pb-3">
+            <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              <input type="checkbox" checked={categoryForm.isActive} onChange={event => setCategoryForm(current => ({ ...current, isActive: event.target.checked }))} />
+              前台显示
+            </span>
+          </label>
         </div>
-      )}
+      </FormModal>
+
+      <FormModal
+        open={showManualModal}
+        onClose={cancelManualEdit}
+        onSubmit={() => void (editingManual ? saveManual() : uploadManual())}
+        title={editingManual ? '编辑用户手册' : '上传用户手册'}
+        submitText={editingManual ? '保存修改' : '上传手册'}
+        loading={saving}
+        size="lg"
+      >
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {!editingManual && (
+            <label className="md:col-span-2">
+              <span className={labelClass}>PDF 文件</span>
+              <input type="file" accept="application/pdf,.pdf" onChange={selectManualFile} className="input py-2" required />
+              <span className="mt-1.5 block text-xs text-gray-500">{manualFile ? manualFile.name : '单个文件最大 50 MB'}</span>
+            </label>
+          )}
+          <label>
+            <span className={labelClass}>手册标题</span>
+            <input value={manualForm.title} onChange={event => setManualForm(current => ({ ...current, title: event.target.value }))} placeholder="输入手册标题" className="input" required />
+          </label>
+          <label>
+            <span className={labelClass}>产品型号</span>
+            <input value={manualForm.productModel} onChange={event => setManualForm(current => ({ ...current, productModel: event.target.value }))} placeholder="输入产品型号" className="input" required />
+          </label>
+          <label>
+            <span className={labelClass}>产品分类</span>
+            <select value={manualForm.categoryId} onChange={event => setManualForm(current => ({ ...current, categoryId: event.target.value }))} className="input">
+              <option value="">未分类</option>
+              {categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className={labelClass}>版本</span>
+            <input value={manualForm.version} onChange={event => setManualForm(current => ({ ...current, version: event.target.value }))} placeholder="可选" className="input" />
+          </label>
+          <label className="md:col-span-2">
+            <span className={labelClass}>产品说明</span>
+            <textarea value={manualForm.description} onChange={event => setManualForm(current => ({ ...current, description: event.target.value }))} placeholder="可选，用于说明适用范围或注意事项" className="input min-h-24 resize-y" />
+          </label>
+          <label>
+            <span className={labelClass}>排序</span>
+            <input type="number" value={manualForm.sortOrder} onChange={event => setManualForm(current => ({ ...current, sortOrder: event.target.value }))} className="input" />
+          </label>
+          <label className="flex items-end pb-3">
+            <span className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+              <input type="checkbox" checked={manualForm.isPublished} onChange={event => setManualForm(current => ({ ...current, isPublished: event.target.checked }))} />
+              前台发布
+            </span>
+          </label>
+        </div>
+      </FormModal>
+
+      <Modal isOpen={Boolean(previewManual)} onClose={() => setPreviewManual(null)} title={previewManual?.title || '预览用户手册'} size="full">
+        {previewManual && <iframe title={previewManual.title} src={previewManual.url} className="h-[calc(95vh-10rem)] w-full rounded-md border border-gray-200 dark:border-gray-700" />}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={() => void confirmDelete()}
+        title="确认删除"
+        message={deleteTarget?.type === 'category'
+          ? `确定删除分类“${deleteTarget.name}”吗？${deleteTarget.manualCount > 0 ? `其中 ${deleteTarget.manualCount} 份手册会保留为未分类。` : ''}`
+          : `确定删除手册“${deleteTarget?.name || ''}”吗？PDF 文件也会一并删除。`}
+        confirmText="删除"
+        cancelText="取消"
+        danger
+        loading={saving}
+      />
     </div>
   )
 }

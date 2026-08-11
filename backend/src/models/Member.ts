@@ -13,6 +13,7 @@ export interface IMemberLoginRecord {
 }
 
 export interface IMember extends Document {
+  forumUserId?: string
   email: string
   nickname: string
   avatar: string
@@ -50,6 +51,7 @@ const LoginRecordSchema = new Schema<IMemberLoginRecord>({
 }, { _id: false })
 
 const MemberSchema = new Schema<IMember>({
+  forumUserId: { type: String, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
   nickname: { type: String, required: true, trim: true, maxlength: 50 },
   avatar: { type: String, default: '' },
@@ -76,6 +78,7 @@ const MemberSchema = new Schema<IMember>({
 }, { timestamps: true })
 
 MemberSchema.index({ status: 1, createdAt: -1 })
+MemberSchema.index({ forumUserId: 1 }, { unique: true, sparse: true })
 MemberSchema.index({ lastLoginAt: -1 })
 MemberSchema.index({ status: 1, lastSeenAt: -1 })
 
