@@ -67,4 +67,60 @@ docker exec flarum_app php flarum extension:enable carradioweb-forum-bridge
 docker exec flarum_app php flarum migrate --no-interaction
 docker exec flarum_app php flarum cache:clear
 
+# The Flarum application directory is recreated when the forum container is
+# updated; only the database and /data volume are persistent. Restore every
+# extension declared by the project after each deployment so installed
+# extensions do not disappear while their settings remain in the database.
+restore_project_extensions() {
+  local manifest_script
+  manifest_script='const { FORUM_EXTENSIONS = [] } = require("./backend/dist/data/forumExtensions.js"); for (const e of FORUM_EXTENSIONS) console.log([e.id, e.composerPackage, e.vcsUrl || ""].join("\t"));'
+
+  if [[ ! -f backend/dist/data/forumExtensions.js ]] || ! command -v node >/dev/null 2>&1; then
+    echo "Forum extension metadata is unavailable; skipping extension restore."
+    return 0
+  fi
+
+  local pending=0
+  while IFS=$'\t' read -r extension_id composer_package vcs_url; do
+    [[ -z "$extension_id" || -z "$composer_package" ]] && continue
+    if docker exec flarum_app composer show "$composer_package" >/dev/null 2>&1; then
+      docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+      continue
+    fi
+
+    if [[ -n "$vcs_url" ]]; then
+      docker exec flarum_app composer config "repositories.carradioweb-${extension_id}" vcs "$vcs_url" --no-interaction >/dev/null 2>&1 || true
+      docker exec flarum_app composer require "${composer_package}:dev-main" --no-update --no-interaction --no-progress || true
+    else
+      docker exec flarum_app composer require "${composer_package}:*" --no-update --no-interaction --no-progress || true
+    fi
+    pending=$((pending + 1))
+  done < <(node -e "$manifest_script")
+
+  if [[ "$pending" -gt 0 ]]; then
+    echo "Restoring $pending forum extensions..."
+    if ! docker exec flarum_app composer update --no-interaction --no-progress; then
+      echo "Bulk forum extension restore failed; retrying packages individually."
+      while IFS=$'\t' read -r extension_id composer_package vcs_url; do
+        [[ -z "$extension_id" || -z "$composer_package" ]] && continue
+        docker exec flarum_app composer show "$composer_package" >/dev/null 2>&1 || continue
+        docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+      done < <(node -e "$manifest_script")
+    fi
+  fi
+
+  while IFS=$'\t' read -r extension_id composer_package vcs_url; do
+    [[ -z "$extension_id" || -z "$composer_package" ]] && continue
+    if docker exec flarum_app composer show "$composer_package" >/dev/null 2>&1; then
+      docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+    fi
+  done < <(node -e "$manifest_script")
+
+  docker exec flarum_app php flarum migrate --no-interaction >/dev/null 2>&1 || true
+  docker exec flarum_app php flarum cache:clear >/dev/null 2>&1 || true
+  docker exec flarum_app php flarum assets:publish >/dev/null 2>&1 || true
+}
+
+restore_project_extensions
+
 echo "Forum bridge extension is installed and enabled."
