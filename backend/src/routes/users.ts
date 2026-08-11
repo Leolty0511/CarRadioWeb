@@ -7,7 +7,11 @@ import { Router, Request, Response } from 'express'
 import crypto from 'crypto'
 import bcrypt from 'bcryptjs'
 import mongoose from 'mongoose'
+import multer from 'multer'
+import sharp from 'sharp'
 import User from '../models/User'
+import AdminFavorite from '../models/AdminFavorite'
+import BaseDocument from '../models/Document'
 import AdminInvitation from '../models/AdminInvitation'
 import { requireSuperAdmin } from '../middleware/auth'
 import { ALL_PERMISSIONS } from '../config/permissions'
@@ -15,12 +19,18 @@ import { createLogger } from '../utils/logger'
 import { isDuplicateKeyOnField } from '../utils/mongoErrors'
 import emailVerificationService from '../services/emailVerificationService'
 import { classifyTransferState, type TransferRole } from '../services/superAdminTransferState'
+import { uploadImageToOSS } from '../services/uploadService'
 
 const logger = createLogger('users-route')
 
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const INVITE_EXPIRES_MS = 48 * 60 * 60 * 1000
 const MIN_PASSWORD_LENGTH = 10
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)),
+})
 
 const router = Router()
 
@@ -82,6 +92,11 @@ function normalizePermissions(permissions: unknown): string[] {
 
 function hasInvalidPermissions(permissions: unknown): boolean {
   return Array.isArray(permissions) && permissions.some((p) => typeof p !== 'string' || !ALL_PERMISSIONS.includes(p as any))
+}
+
+function favoriteUrl(documentType: string, slugOrId: unknown): string {
+  const routeType = documentType === 'structured' ? 'vehicle' : documentType === 'video' ? 'video' : 'article'
+  return `/knowledge/${routeType}/${String(slugOrId)}`
 }
 
 function isTransactionUnsupported(error: unknown): boolean {
@@ -289,6 +304,109 @@ router.put('/me/account', async (req: Request, res: Response) => {
     logger.error({ error }, 'Update own account failed')
     return res.status(500).json({ success: false, error: 'update_failed' })
   }
+})
+
+/** GET /api/users/me/profile - profile data for the shared account center. */
+router.get('/me/profile', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  const user = await User.findById(req.user._id)
+  if (!user) return res.status(404).json({ success: false, error: 'user_not_found' })
+  return res.json({
+    success: true,
+    data: {
+      id: String(user._id),
+      email: user.email || '',
+      nickname: user.nickname,
+      avatar: user.avatar,
+      createdAt: user.createdAt,
+      provider: user.provider,
+    },
+  })
+})
+
+/** POST /api/users/me/profile/avatar - update the signed-in administrator's avatar. */
+router.post('/me/profile/avatar', avatarUpload.single('avatar'), async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  if (!req.file) return res.status(400).json({ success: false, error: 'invalid_avatar' })
+  try {
+    const buffer = await sharp(req.file.buffer).rotate().resize(512, 512, { fit: 'cover' }).webp({ quality: 85 }).toBuffer()
+    const file = { ...req.file, buffer, size: buffer.length, mimetype: 'image/webp', originalname: `avatar-${String(req.user._id)}.webp` }
+    const result = await uploadImageToOSS(file, { folder: 'uploads', fileName: `admins/${String(req.user._id)}-${Date.now()}.webp` })
+    if (!result.success || !result.url) return res.status(400).json({ success: false, error: result.error || 'avatar_upload_failed' })
+    await User.updateOne({ _id: req.user._id }, { $set: { avatar: result.url } })
+    return res.json({ success: true, data: { avatar: result.url } })
+  } catch (error) {
+    logger.warn({ error, userId: req.user._id }, 'Update own avatar failed')
+    return res.status(400).json({ success: false, error: 'invalid_avatar' })
+  }
+})
+
+/** PUT /api/users/me/profile/password - change an email administrator's password. */
+router.put('/me/profile/password', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  const currentPassword = String(req.body.currentPassword || '')
+  const newPassword = String(req.body.newPassword || '')
+  if (newPassword.length < MIN_PASSWORD_LENGTH || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    return res.status(400).json({ success: false, error: 'password_too_weak' })
+  }
+  const user = await User.findById(req.user._id).select('+passwordHash')
+  if (!user) return res.status(404).json({ success: false, error: 'user_not_found' })
+  if (user.provider !== 'email' || !user.passwordHash) return res.status(400).json({ success: false, error: 'password_account_required' })
+  if (!(await bcrypt.compare(currentPassword, user.passwordHash))) {
+    return res.status(400).json({ success: false, error: 'current_password_invalid' })
+  }
+  user.passwordHash = await bcrypt.hash(newPassword, 12)
+  await user.save()
+  return res.json({ success: true })
+})
+
+router.get('/me/favorites', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  const favorites = await AdminFavorite.find({ adminId: req.user._id }).sort({ createdAt: -1 }).lean()
+  const documents = await BaseDocument.find({ _id: { $in: favorites.map(item => item.documentId) }, status: 'published' }).lean()
+  const documentMap = new Map(documents.map((document: any) => [String(document._id), document]))
+  const items = favorites.flatMap(favorite => {
+    const document: any = documentMap.get(String(favorite.documentId))
+    if (!document) return []
+    return [{
+      id: String(favorite._id),
+      documentId: String(favorite.documentId),
+      documentType: favorite.documentType,
+      title: document.title,
+      summary: document.summary || document.description || document.basicInfo?.introduction || '',
+      updatedAt: document.updatedAt,
+      createdAt: favorite.createdAt,
+      url: favoriteUrl(favorite.documentType, document.slug || document._id),
+    }]
+  })
+  return res.json({ success: true, data: items })
+})
+
+router.get('/me/favorites/status/:documentId', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  const favorite = mongoose.isValidObjectId(req.params.documentId)
+    ? await AdminFavorite.exists({ adminId: req.user._id, documentId: req.params.documentId })
+    : null
+  return res.json({ success: true, data: { favorited: !!favorite } })
+})
+
+router.post('/me/favorites/:documentId', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  if (!mongoose.isValidObjectId(req.params.documentId)) return res.status(400).json({ success: false, error: 'invalid_document_id' })
+  const document: any = await BaseDocument.findOne({ _id: req.params.documentId, status: 'published' }).select('documentType')
+  if (!document) return res.status(404).json({ success: false, error: 'document_not_found' })
+  await AdminFavorite.updateOne(
+    { adminId: req.user._id, documentId: document._id },
+    { $setOnInsert: { adminId: req.user._id, documentId: document._id, documentType: document.documentType } },
+    { upsert: true },
+  )
+  return res.json({ success: true })
+})
+
+router.delete('/me/favorites/:documentId', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  await AdminFavorite.deleteOne({ adminId: req.user._id, documentId: req.params.documentId })
+  return res.json({ success: true })
 })
 
 // All remaining routes require super_admin (authenticateUser already applied in index.ts)

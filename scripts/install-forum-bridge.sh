@@ -92,6 +92,48 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 
+# Keep FoF Passport aligned with the backend after secret rotation or restore.
+# A stale forum setting makes the token exchange return invalid_client.
+OAUTH_CLIENT_ID="$(read_env_value backend/config.env FORUM_OAUTH_CLIENT_ID)"
+OAUTH_CLIENT_SECRET="$(read_env_value backend/config.env FORUM_OAUTH_CLIENT_SECRET)"
+OAUTH_REDIRECT_URI="$(read_env_value backend/config.env FORUM_OAUTH_REDIRECT_URI)"
+FRONTEND_URL="$(read_env_value backend/config.env FRONTEND_URL)"
+OAUTH_CLIENT_ID="${OAUTH_CLIENT_ID:-carradioweb-forum}"
+FRONTEND_URL="${FRONTEND_URL%/}"
+if [[ ${#OAUTH_CLIENT_SECRET} -ge 32 && -n "$FRONTEND_URL" && -n "$OAUTH_REDIRECT_URI" ]]; then
+  docker exec \
+    -e CARRADIOWEB_OAUTH_CLIENT_ID="$OAUTH_CLIENT_ID" \
+    -e CARRADIOWEB_OAUTH_CLIENT_SECRET="$OAUTH_CLIENT_SECRET" \
+    -e CARRADIOWEB_OAUTH_REDIRECT_URI="$OAUTH_REDIRECT_URI" \
+    -e CARRADIOWEB_FRONTEND_URL="$FRONTEND_URL" \
+    flarum_app php -r '
+      $pdo = new PDO(
+        "mysql:host=" . getenv("DB_HOST") . ";port=" . getenv("DB_PORT") . ";dbname=" . getenv("DB_NAME"),
+        getenv("DB_USER"),
+        getenv("DB_PASSWORD")
+      );
+      $table = getenv("DB_PREFIX") . "settings";
+      $key = chr(96) . "key" . chr(96);
+      $sql = "INSERT INTO " . $table . " (" . $key . ", value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)";
+      $statement = $pdo->prepare($sql);
+      $base = rtrim(getenv("CARRADIOWEB_FRONTEND_URL"), "/");
+      $settings = [
+        "fof-passport.app_id" => getenv("CARRADIOWEB_OAUTH_CLIENT_ID"),
+        "fof-passport.app_secret" => getenv("CARRADIOWEB_OAUTH_CLIENT_SECRET"),
+        "fof-passport.app_auth_url" => $base . "/api/member-auth/forum/oauth/authorize",
+        "fof-passport.app_token_url" => $base . "/api/member-auth/forum/oauth/token",
+        "fof-passport.app_user_url" => $base . "/api/member-auth/forum/oauth/user",
+        "fof-passport.app_oauth_scopes" => "read",
+      ];
+      foreach ($settings as $setting => $value) {
+        $statement->execute([$setting, $value]);
+      }
+    '
+  echo "FoF Passport settings synchronized with the backend."
+else
+  echo "Forum OAuth settings are incomplete; skipping Passport synchronization."
+fi
+
 COMPOSER_STATE_RESTORED=0
 if [[ "$CONTAINER_RECREATED" == "1" ]] && restore_forum_composer_state; then
   COMPOSER_STATE_RESTORED=1

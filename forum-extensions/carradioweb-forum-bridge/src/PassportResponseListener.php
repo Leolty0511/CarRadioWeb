@@ -15,7 +15,7 @@ final class PassportResponseListener
     public function handle(SendingResponse $event): void
     {
         $body = (string) $event->response->getBody();
-        $pattern = '~<script>window\.close\(\);\s*window\.opener\.app\.authenticationComplete\((.*?)\);</script>~s';
+        $pattern = '~<script[^>]*>.*?window\.opener\.app\.authenticationComplete\((.*?)\);.*?</script>~is';
 
         if (!preg_match($pattern, $body, $matches)) {
             return;

@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from './apiClient'
+import type { MemberFavorite } from './memberAuthService'
 
 export interface AdminUserRecord {
   _id: string
@@ -55,6 +56,15 @@ export interface UpdateOwnAccountPayload {
   newPassword?: string
 }
 
+export interface AdminProfile {
+  id: string
+  email: string
+  nickname: string
+  avatar: string
+  createdAt?: string
+  provider: 'google' | 'github' | 'email'
+}
+
 /** Fetch all admin users */
 export async function getUsers(): Promise<AdminUserRecord[]> {
   const res = await apiClient.get<AdminUserRecord[]>('/users')
@@ -101,6 +111,36 @@ export async function updateOwnNickname(nickname: string) {
 /** Update the signed-in administrator's email and optional password. */
 export async function updateOwnAccount(data: UpdateOwnAccountPayload) {
   return apiClient.put<AdminUserRecord>('/users/me/account', data)
+}
+
+export async function getAdminProfile() {
+  return apiClient.get<AdminProfile>('/users/me/profile')
+}
+
+export async function uploadAdminAvatar(file: File) {
+  const form = new FormData()
+  form.append('avatar', file)
+  return apiClient.upload<{ avatar: string }>('/users/me/profile/avatar', form, { retries: 0 })
+}
+
+export async function updateAdminPassword(currentPassword: string, newPassword: string) {
+  return apiClient.put('/users/me/profile/password', { currentPassword, newPassword })
+}
+
+export async function getAdminFavorites() {
+  return apiClient.get<MemberFavorite[]>('/users/me/favorites')
+}
+
+export async function getAdminFavoriteStatus(documentId: string) {
+  return apiClient.get<{ favorited: boolean }>(`/users/me/favorites/status/${encodeURIComponent(documentId)}`)
+}
+
+export async function addAdminFavorite(documentId: string) {
+  return apiClient.post(`/users/me/favorites/${encodeURIComponent(documentId)}`, {})
+}
+
+export async function removeAdminFavorite(documentId: string) {
+  return apiClient.delete(`/users/me/favorites/${encodeURIComponent(documentId)}`)
 }
 
 /** Transfer the single super-admin role to another active administrator. */

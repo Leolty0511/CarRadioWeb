@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom'
-import { LockKeyhole, LogOut, Mail, UserRound } from 'lucide-react'
+import { LockKeyhole, Mail } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/contexts/AuthContext'
 import { memberLogin, registerMember, resetMemberPassword, sendMemberCode } from '@/services/memberAuthService'
@@ -9,7 +9,7 @@ type Mode = 'login' | 'register' | 'reset'
 
 export default function MemberAccess() {
   const { t } = useTranslation()
-  const { user, isAuthenticated, loading: sessionLoading, refresh, logout } = useAuth()
+  const { isAuthenticated, loading: sessionLoading, refresh } = useAuth()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const [mode, setMode] = useState<Mode>('login')
@@ -36,23 +36,22 @@ export default function MemberAccess() {
 
   const submitLogin = async (event: React.FormEvent) => {
     event.preventDefault(); const result = await run(() => memberLogin(login, password))
-    if (result.success) { await refresh(); navigate(returnTo, { replace: true }) } else showError(result)
+    if (result.success) { await refresh(); navigate(returnTo, { replace: true }) } else {showError(result)}
   }
   const sendCode = async () => {
     const result = await run(() => sendMemberCode(email, mode === 'reset' ? 'reset_password' : 'register'))
-    if (result.success) setMessage(t('memberAccess.codeSent')); else showError(result)
+    if (result.success) {setMessage(t('memberAccess.codeSent'))} else {showError(result)}
   }
   const submitRegister = async (event: React.FormEvent) => {
     event.preventDefault(); const result = await run(() => registerMember({ email, nickname, password, code }))
-    if (result.success) { await refresh(); navigate(returnTo, { replace: true }) } else showError(result)
+    if (result.success) { await refresh(); navigate(returnTo, { replace: true }) } else {showError(result)}
   }
   const submitReset = async (event: React.FormEvent) => {
     event.preventDefault(); const result = await run(() => resetMemberPassword(email, code, password))
-    if (result.success) { setMode('login'); setLogin(email); setMessage(t('memberAccess.passwordReset')) } else showError(result)
+    if (result.success) { setMode('login'); setLogin(email); setMessage(t('memberAccess.passwordReset')) } else {showError(result)}
   }
 
-  if (!sessionLoading && isAuthenticated && user) return <div className="flex min-h-[calc(100vh-9rem)] items-center justify-center bg-slate-50 px-4 py-12 dark:bg-slate-950"><div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-8 shadow-lg dark:border-slate-700 dark:bg-slate-900"><div className="flex items-center gap-3"><div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full bg-blue-50 text-blue-600">{user.avatar ? <img src={user.avatar} alt="" className="h-full w-full object-cover" /> : <UserRound className="h-5 w-5" />}</div><div><h1 className="font-semibold text-slate-900 dark:text-white">{user.nickname}</h1><p className="text-sm text-slate-500">{user.type === 'member' ? t('memberAccess.memberAccount') : t('memberAccess.adminAccount')}</p></div></div><div className="mt-6 grid gap-3 sm:grid-cols-3">{user.type === 'member' && <button onClick={() => navigate('/profile')} className="rounded-md border border-blue-200 px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50">{t('memberAccess.profile')}</button>}<button onClick={() => navigate(returnTo)} className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">{t('memberAccess.continue')}</button><button onClick={async () => { await logout(); setMessage(t('memberAccess.loggedOut')) }} className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-700"><LogOut className="h-4 w-4" />{t('memberAccess.logout')}</button></div></div></div>
-  if (!sessionLoading && isAuthenticated) return <Navigate to={returnTo} replace />
+  if (!sessionLoading && isAuthenticated) {return <Navigate to={returnTo === '/knowledge' ? '/profile' : returnTo} replace />}
 
   return <div className="flex min-h-[calc(100vh-9rem)] items-center justify-center bg-slate-50 px-4 py-12 dark:bg-slate-950"><div className="mx-auto w-full max-w-lg"><div className="mb-6 text-center"><LockKeyhole className="mx-auto mb-3 h-9 w-9 text-blue-600" /><h1 className="text-3xl font-semibold text-slate-900 dark:text-white">{t('memberAccess.title')}</h1></div><div className="rounded-xl border border-slate-200 bg-white p-8 shadow-lg dark:border-slate-700 dark:bg-slate-900"><div className="mb-5 grid grid-cols-3 border-b border-slate-200 dark:border-slate-700">{(['login', 'register', 'reset'] as Mode[]).map(item => <button key={item} type="button" onClick={() => { setMode(item); setError(''); setMessage('') }} className={`border-b-2 px-2 py-2 text-sm ${mode === item ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500'}`}>{t(`memberAccess.tabs.${item}`)}</button>)}</div>{error && <div className="mb-4 rounded-md bg-red-50 p-3 text-sm text-red-700">{error}</div>}{message && <div className="mb-4 rounded-md bg-green-50 p-3 text-sm text-green-700">{message}</div>}{mode === 'login' ? <form onSubmit={submitLogin} className="space-y-4"><Field label={t('memberAccess.memberEmail')} value={login} onChange={setLogin} type="email" autoComplete="username" /><Field label={t('memberAccess.password')} value={password} onChange={setPassword} type="password" autoComplete="current-password" /><Submit busy={busy} busyLabel={t('memberAccess.processing')}>{t('memberAccess.tabs.login')}</Submit></form> : mode === 'register' ? <form onSubmit={submitRegister} className="space-y-4"><Field label={t('memberAccess.email')} value={email} onChange={setEmail} type="email" autoComplete="email" /><Field label={t('memberAccess.nickname')} value={nickname} onChange={setNickname} autoComplete="name" /><CodeField label={t('memberAccess.emailCode')} sendLabel={t('memberAccess.sendCode')} value={code} onChange={setCode} onSend={sendCode} busy={busy} /><Field label={t('memberAccess.password')} value={password} onChange={setPassword} type="password" autoComplete="new-password" hint={t('memberAccess.passwordHint')} /><Submit busy={busy} busyLabel={t('memberAccess.processing')}>{t('memberAccess.tabs.register')}</Submit></form> : <form onSubmit={submitReset} className="space-y-4"><Field label={t('memberAccess.memberEmail')} value={email} onChange={setEmail} type="email" autoComplete="email" /><CodeField label={t('memberAccess.emailCode')} sendLabel={t('memberAccess.sendCode')} value={code} onChange={setCode} onSend={sendCode} busy={busy} /><Field label={t('memberAccess.newPassword')} value={password} onChange={setPassword} type="password" autoComplete="new-password" hint={t('memberAccess.passwordHint')} /><Submit busy={busy} busyLabel={t('memberAccess.processing')}>{t('memberAccess.resetPassword')}</Submit></form>}</div></div></div>
 }

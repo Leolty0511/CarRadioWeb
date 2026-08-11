@@ -13,6 +13,7 @@ import { getDocument, recordDocumentView } from '@/services/documentApi'
 import { getPersistentFingerprint, getSessionId } from '@/utils/fingerprint'
 import { useAuth } from '@/contexts/AuthContext'
 import { addMemberFavorite, getFavoriteStatus, removeMemberFavorite } from '@/services/memberAuthService'
+import { addAdminFavorite, getAdminFavoriteStatus, removeAdminFavorite } from '@/services/userService'
 
 /**
  * 文档详情页面
@@ -68,8 +69,10 @@ const DocumentDetail: React.FC = () => {
         // 确保文档有正确的类型信息
         (doc as any).documentType = doc.documentType || documentType
         setDocument(doc)
-        if (user?.type === 'member' && doc._id) {
-          const favoriteStatus = await getFavoriteStatus(String(doc._id))
+        if (user && doc._id) {
+          const favoriteStatus = user.type === 'member'
+            ? await getFavoriteStatus(String(doc._id))
+            : await getAdminFavoriteStatus(String(doc._id))
           setFavorited(favoriteStatus.success && favoriteStatus.data?.favorited === true)
         }
 
@@ -96,10 +99,12 @@ const DocumentDetail: React.FC = () => {
   }, [id, type, user?.type])
 
   const toggleFavorite = async () => {
-    if (!document?._id || user?.type !== 'member' || favoriteBusy) return
+    if (!document?._id || !user || favoriteBusy) {return}
     setFavoriteBusy(true)
-    const result = favorited ? await removeMemberFavorite(String(document._id)) : await addMemberFavorite(String(document._id))
-    if (result.success) setFavorited(!favorited)
+    const result = user.type === 'member'
+      ? (favorited ? await removeMemberFavorite(String(document._id)) : await addMemberFavorite(String(document._id)))
+      : (favorited ? await removeAdminFavorite(String(document._id)) : await addAdminFavorite(String(document._id)))
+    if (result.success) {setFavorited(!favorited)}
     setFavoriteBusy(false)
   }
 
@@ -193,7 +198,7 @@ const DocumentDetail: React.FC = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {user?.type === 'member' && <div className="mb-5 flex justify-end"><button type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy} className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${favorited ? 'border-rose-200 bg-rose-50 text-rose-600' : 'border-slate-300 text-slate-600 hover:border-rose-200 hover:text-rose-500'} disabled:opacity-50`}><Heart className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />{favorited ? '已收藏' : '收藏文章'}</button></div>}
+        {user && <div className="mb-5 flex justify-end"><button type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy} className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${favorited ? 'border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300' : 'border-slate-300 text-slate-600 hover:border-rose-200 hover:text-rose-500 dark:border-slate-600 dark:text-slate-300 dark:hover:border-rose-800 dark:hover:text-rose-300'} disabled:opacity-50`}><Heart className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />{t(favorited ? 'memberProfile.favorited' : 'memberProfile.addFavorite')}</button></div>}
         {/* 根据文档类型渲染不同的查看器 */}
         {document.documentType === 'structured' || document.type === 'structured' ? (
           <StructuredDocumentViewer document={document} onBack={handleBack} />

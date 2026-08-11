@@ -66,7 +66,7 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
         }
 
         $body = (string) $response->getBody();
-        $pattern = '~<script[^>]*>\s*window\.close\(\);\s*window\.opener\.app\.authenticationComplete\((.*?)\);\s*</script>~is';
+        $pattern = '~<script[^>]*>.*?window\.opener\.app\.authenticationComplete\((.*?)\);.*?</script>~is';
         if (!preg_match($pattern, $body, $matches)) {
             return $response;
         }
