@@ -132,15 +132,15 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, h
       )}
       {panelOpen && (
         <aside
-          className="announcement-center-panel fixed right-0 top-0 z-[100] flex h-full w-full max-w-[520px] flex-col border-l border-slate-700 bg-slate-900 text-white shadow-2xl"
+          className="announcement-center-panel fixed right-0 top-0 z-[100] flex h-full w-full max-w-[520px] flex-col border-l border-slate-200 bg-white text-slate-900 shadow-2xl dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           aria-label={t('announcement.historyTitle', 'Announcements')}
         >
-          <div className="flex items-center justify-between border-b border-slate-700 px-6 py-5">
+          <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5 dark:border-slate-700">
             <div className="flex items-center gap-3">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 shadow-lg shadow-blue-900/30"><Bell className="h-5 w-5" /></span>
               <h2 className="text-xl font-semibold">{t('announcement.historyTitle', 'Announcements')}</h2>
             </div>
-            <button type="button" onClick={() => setPanelOpen(false)} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-800 hover:text-white" aria-label={t('common.close', 'Close')}>
+            <button type="button" onClick={() => setPanelOpen(false)} className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white" aria-label={t('common.close', 'Close')}>
               <X className="h-5 w-5" />
             </button>
           </div>
@@ -153,16 +153,16 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, h
                   type="button"
                   key={`${itemVersion}-${index}`}
                   onClick={() => openItem(item)}
-                  className="flex w-full items-center gap-4 border-b border-slate-700 px-6 py-5 text-left transition hover:bg-slate-800"
+                  className="flex w-full items-center gap-4 border-b border-slate-200 px-6 py-5 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
                 >
-                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${itemUnread ? 'bg-blue-500/25 text-blue-300' : 'bg-slate-700 text-slate-400'}`}>
+                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${itemUnread ? 'bg-blue-100 text-blue-600 dark:bg-blue-500/25 dark:text-blue-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
                     {itemUnread ? <Bell className="h-4 w-4" /> : <Check className="h-4 w-4" />}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-slate-100">{getItemTitle(item, defaultTitle)}</span>
-                    <span className="mt-1 block text-xs text-slate-400">{formatRelativeDate(item.publishedAt || item.updatedAt || item.createdAt, i18n.language, t('common.unknown', 'Unknown'))}</span>
+                    <span className="block truncate text-sm font-semibold text-slate-900 dark:text-slate-100">{getItemTitle(item, defaultTitle)}</span>
+                    <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{formatRelativeDate(item.publishedAt || item.updatedAt || item.createdAt, i18n.language, t('common.unknown', 'Unknown'))}</span>
                   </span>
-                  <ChevronRight className="h-5 w-5 flex-shrink-0 text-slate-500" />
+                  <ChevronRight className="h-5 w-5 flex-shrink-0 text-slate-400 dark:text-slate-500" />
                 </button>
               )
             })}

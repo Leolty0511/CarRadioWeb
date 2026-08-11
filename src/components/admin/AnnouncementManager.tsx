@@ -71,12 +71,12 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">{t('admin.announcement.title')}</h2>
           <p className="text-slate-600 dark:text-gray-400 mt-1">{t('admin.announcement.description')}</p>
         </div>
-        <div className="flex items-center space-x-4">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <span className="text-sm text-slate-600 dark:text-gray-400">{t('admin.announcement.enableLabel')}:</span>
           <button
             onClick={handleToggleAnnouncement}
@@ -205,7 +205,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
               </div>
 
               {/* 文字格式 */}
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <div>
                   <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-2">{t('admin.announcement.fontSize')}</label>
                   <select
@@ -293,16 +293,16 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
             <div className="lg:sticky lg:top-6 self-start">
               <p className="text-sm font-medium text-slate-600 dark:text-gray-300 mb-3">{t('admin.announcement.preview')}</p>
               {announcementContent ? (
-                <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900 text-white shadow-xl">
-                  <div className="flex items-center gap-3 border-b border-slate-700 px-4 py-4">
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
+                  <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-4 dark:border-slate-700">
                     <span className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
                       <Bell className="h-5 w-5" />
-                      <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-slate-900 bg-red-500" />
+                      <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500 dark:border-slate-900" />
                     </span>
                     <span className="font-semibold">{t('announcement.historyTitle', '公告')}</span>
                   </div>
                   <div className="flex items-center gap-3 px-4 py-4">
-                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500/20 text-blue-300"><Bell className="h-4 w-4" /></span>
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"><Bell className="h-4 w-4" /></span>
                     <span className="min-w-0 flex-1">
                       <span
                         className={`block truncate ${announcementFontSize === 'sm' ? 'text-sm' : announcementFontSize === 'lg' ? 'text-lg' : 'text-base'} ${announcementFontWeight === 'bold' ? 'font-bold' : 'font-normal'} ${announcementFontStyle === 'italic' ? 'italic' : 'not-italic'}`}
@@ -310,9 +310,9 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
                       >
                         {announcementTitle || announcementContent.split(/\r?\n/).find(Boolean) || t('announcement.defaultTitle', '公告')}
                       </span>
-                      <span className="mt-1 block text-xs text-slate-400">{t('announcement.today', '今天')}</span>
+                      <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{t('announcement.today', '今天')}</span>
                     </span>
-                    <ChevronRight className="h-5 w-5 text-slate-500" />
+                    <ChevronRight className="h-5 w-5 text-slate-400 dark:text-slate-500" />
                   </div>
                 </div>
               ) : (
