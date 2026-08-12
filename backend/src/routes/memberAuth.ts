@@ -458,7 +458,12 @@ router.get('/profile', authenticateMember, async (req, res) => {
 })
 
 router.get('/forum-summary', authenticateMember, async (req, res) => {
-  const summary = await getForumMemberSummary(req.member?.forumUserId)
+  const member = req.member!
+  const summary = await getForumMemberSummary(member.forumUserId, member.email)
+  if (summary.linked && summary.forumUserId && member.forumUserId !== summary.forumUserId) {
+    member.forumUserId = summary.forumUserId
+    await member.save()
+  }
   res.json({ success: true, data: summary })
 })
 

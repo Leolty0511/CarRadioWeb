@@ -187,17 +187,18 @@ export const getForumDeployCredentials = (): { dbPassword: string } => {
 /** Read the small notification summary needed by the member profile.
  * Flarum remains the source of truth; no forum credentials leave the backend.
  */
-export async function getForumMemberSummary(forumUserId?: string): Promise<ForumMemberSummary> {
+export async function getForumMemberSummary(forumUserId?: string, email?: string): Promise<ForumMemberSummary> {
   const normalizedId = String(forumUserId || '').trim()
+  const normalizedEmail = String(email || '').trim().toLowerCase()
   const empty: ForumMemberSummary = { available: true, linked: false, unreadCount: 0, notifications: [] }
-  if (!/^\d+$/.test(normalizedId)) return empty
+  if (!/^\d+$/.test(normalizedId) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return empty
   const { dbPassword } = getForumDeployCredentials()
   if (!dbPassword.trim()) return { ...empty, available: false, linked: true, forumUserId: normalizedId }
 
   const phpCode = [
-    '$id=(int)getenv("FORUM_USER_ID");',
+    '$id=(int)getenv("FORUM_USER_ID");$email=strtolower(trim((string)getenv("FORUM_EMAIL")));',
     '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME").";charset=utf8mb4",getenv("DB_USER"),getenv("DB_PASSWORD"),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);',
-    '$u=$pdo->prepare("SELECT id,username,nickname FROM flarum_users WHERE id=? LIMIT 1");$u->execute([$id]);$user=$u->fetch(PDO::FETCH_ASSOC);',
+    '$u=$pdo->prepare("SELECT id,username,nickname FROM flarum_users WHERE (id>0 AND id=?) OR (email<>\'\' AND LOWER(email)=?) LIMIT 1");$u->execute([$id,$email]);$user=$u->fetch(PDO::FETCH_ASSOC);',
     'if(!$user){echo json_encode(["linked"=>false,"unreadCount"=>0,"notifications"=>[]]);exit;}',
     '$c=$pdo->prepare("SELECT COUNT(*) FROM flarum_notifications WHERE user_id=? AND is_deleted=0 AND read_at IS NULL");$c->execute([$id]);',
     '$n=$pdo->prepare("SELECT id,type,subject_id,created_at,read_at FROM flarum_notifications WHERE user_id=? AND is_deleted=0 ORDER BY created_at DESC LIMIT 5");$n->execute([$id]);',
@@ -208,6 +209,7 @@ export async function getForumMemberSummary(forumUserId?: string): Promise<Forum
     const result = await spawnDockerExec(['php', '-r', phpCode], {
       DB_HOST: 'flarum_db', DB_NAME: 'flarum', DB_USER: 'flarum', DB_PASSWORD: dbPassword.trim(),
       FORUM_USER_ID: normalizedId,
+      FORUM_EMAIL: normalizedEmail,
     })
     if (result.code !== 0) return { ...empty, available: false, linked: true, forumUserId: normalizedId }
     const parsed = JSON.parse(result.stdout.trim()) as Partial<ForumMemberSummary>
