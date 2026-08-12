@@ -25,6 +25,7 @@ final class PassportResponseListener
     {
         $identifier = (string) $event->user->getId();
         $email = strtolower(trim((string) $event->user->getEmail()));
+        $profile = $event->user->toArray();
 
         if ($identifier === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             $this->normalizePopupResponse($event);
@@ -37,12 +38,18 @@ final class PassportResponseListener
         }
 
         if (!$user) {
-            $user = User::register($this->availableUsername($event->user->toArray(), $email), $email, bin2hex(random_bytes(32)));
+            $user = User::register($this->availableUsername($profile, $email), $email, bin2hex(random_bytes(32)));
             $user->activate();
             $user->save();
         }
 
         if ($user) {
+            $nickname = $this->profileNickname($profile);
+            if ($nickname !== null && $user->nickname !== $nickname) {
+                $user->nickname = $nickname;
+                $user->save();
+            }
+
             if (!$user->loginProviders()->where(['provider' => 'passport', 'identifier' => $identifier])->exists()) {
                 $user->loginProviders()->create(['provider' => 'passport', 'identifier' => $identifier]);
             }
@@ -92,5 +99,16 @@ final class PassportResponseListener
             $username = substr($candidate, 0, 24) . '_' . $suffix++;
         }
         return $username;
+    }
+
+    private function profileNickname(array $profile): ?string
+    {
+        $nickname = $profile['nickname'] ?? $profile['name'] ?? null;
+        if (!is_string($nickname)) {
+            return null;
+        }
+
+        $nickname = trim(preg_replace('/[\[\]()<>]/u', '', $nickname) ?? '');
+        return $nickname !== '' ? $nickname : null;
     }
 }
