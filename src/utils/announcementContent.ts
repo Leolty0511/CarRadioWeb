@@ -29,3 +29,13 @@ export function announcementHtmlToPlainText(value: string = ''): string {
 export function getAnnouncementHtml(content: string = '', contentHtml?: string): string {
   return contentHtml?.trim() ? contentHtml : plainTextToAnnouncementHtml(content)
 }
+
+export function getAnnouncementDisplayTitle(title: string = '', content: string = '', fallback: string): string {
+  const configured = normalizeAnnouncementText(title).replace(/\s+/g, ' ').trim()
+  if (!configured) { return fallback }
+
+  // Older announcements used the first 160 body characters as a generated title.
+  const normalizedContent = normalizeAnnouncementText(content).replace(/\s+/g, ' ').trim()
+  const isLegacyBodyTitle = configured.length >= 32 && normalizedContent.startsWith(configured)
+  return isLegacyBodyTitle ? fallback : configured
+}

@@ -13,9 +13,10 @@ function historyExpiry(publishedAt: Date): Date {
 }
 
 function announcementTitle(announcement: IAnnouncement): string {
-  const configured = String(announcement.title || '').trim()
-  if (configured) return configured.slice(0, 160)
-  return String(announcement.content || '').split(/\r?\n/).find(Boolean)?.trim().slice(0, 160) || 'Announcement'
+  const configured = String(announcement.title || '').replace(/\s+/g, ' ').trim()
+  const content = String(announcement.content || '').replace(/\s+/g, ' ').trim()
+  if (configured.length >= 32 && content.startsWith(configured)) return ''
+  return configured.slice(0, 160)
 }
 
 async function recordPublishedAnnouncement(announcement: IAnnouncement): Promise<void> {

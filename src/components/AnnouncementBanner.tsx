@@ -10,6 +10,7 @@ import {
 } from '@/services/announcementService'
 import { AnnouncementNoticeCard } from '@/components/announcement/AnnouncementNoticeCard'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
+import { getAnnouncementDisplayTitle } from '@/utils/announcementContent'
 
 interface AnnouncementBannerProps {
   announcement: Announcement | null
@@ -36,9 +37,7 @@ function getItemVersion(item: AnnouncementItem): string {
 }
 
 function getItemTitle(item: AnnouncementItem, fallback: string): string {
-  const configured = String(item.title || '').trim()
-  if (configured) {return configured}
-  return String(item.content || '').split(/\r?\n/).find(Boolean)?.trim().slice(0, 90) || fallback
+  return getAnnouncementDisplayTitle(item.title, item.content, fallback)
 }
 
 function formatRelativeDate(value: string | undefined, language: string, fallback: string): string {

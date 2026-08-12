@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next'
 import AnnouncementManager from '@/components/admin/AnnouncementManager'
 import { clearAnnouncementHistory, getAnnouncement, updateAnnouncement, toggleAnnouncement } from '@/services/announcementService'
 import type { NoticeCardStyle } from '@/services/announcementService'
-import { announcementHtmlToPlainText, getAnnouncementHtml } from '@/utils/announcementContent'
+import { announcementHtmlToPlainText, getAnnouncementDisplayTitle, getAnnouncementHtml } from '@/utils/announcementContent'
 
 import { useToast } from '@/components/ui/Toast'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
@@ -41,7 +41,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       try {
         const data = await getAnnouncement(dataLanguage)
         if (data) {
-          setAnnouncementTitle(data.title || '')
+          setAnnouncementTitle(getAnnouncementDisplayTitle(data.title || '', data.content, ''))
           setAnnouncementContent(data.content)
           setAnnouncementContentHtml(getAnnouncementHtml(data.content, data.contentHtml))
           setAnnouncementEnabled(data.enabled)

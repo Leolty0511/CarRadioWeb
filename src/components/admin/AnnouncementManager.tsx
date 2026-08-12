@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/Button'
 import ImagePicker from '@/components/ImagePicker'
 import LazyRichTextEditor from '@/components/LazyRichTextEditor'
 import type { NoticeCardStyle } from '@/services/announcementService'
-import { getAnnouncementHtml } from '@/utils/announcementContent'
+import { getAnnouncementDisplayTitle, getAnnouncementHtml } from '@/utils/announcementContent'
 import { AnnouncementNoticeCard } from '@/components/announcement/AnnouncementNoticeCard'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
@@ -79,7 +79,11 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
   type TabKey = 'content' | 'style'
   const [activeTab, setActiveTab] = useState<TabKey>('content')
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
-  const previewTitle = announcementTitle || announcementContent.split(/\r?\n/).find(Boolean) || t('announcement.defaultTitle', 'Announcement')
+  const previewTitle = getAnnouncementDisplayTitle(
+    announcementTitle,
+    announcementContent,
+    t('announcement.defaultTitle', 'Announcement'),
+  )
   const previewContentStyle: React.CSSProperties = {
     fontSize: FONT_SIZE_STYLES[announcementFontSize],
     fontWeight: announcementFontWeight === 'bold' ? 700 : 400,
