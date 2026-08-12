@@ -179,6 +179,9 @@ docker exec flarum_app php flarum extension:enable fof-passport
 docker exec flarum_app php flarum extension:enable carradioweb-forum-bridge
 docker exec flarum_app php flarum migrate --no-interaction
 docker exec flarum_app php flarum cache:clear
+# The bridge source is bind-mounted; restart PHP workers so opcache loads the
+# newly pulled middleware immediately.
+docker restart flarum_app >/dev/null
 
 # First-install fallback and explicit repair mode. Normal container recreation
 # uses the exact saved Composer state above so intentionally removed plugins
