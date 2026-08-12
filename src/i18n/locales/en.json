@@ -1939,6 +1939,26 @@
     }
   },
   "memberProfile": {
+    "overview": "Overview",
+    "security": "Security",
+    "email": "Email",
+    "memberSince": "Member since",
+    "savedCount": "Saved items",
+    "forumUnread": "Forum unread",
+    "forum": "Forum activity",
+    "forumNotLinked": "Your forum profile is not linked yet.",
+    "forumUnavailable": "Forum activity is temporarily unavailable.",
+    "unreadMessages": "Unread notifications",
+    "forumNotification": "New forum activity ({{type}})",
+    "forumNotifications": {
+      "newPost": "A discussion you follow has a new reply",
+      "mention": "You were mentioned in the forum",
+      "like": "Someone liked your forum post",
+      "privateMessage": "You have a new private discussion message",
+      "moderation": "A forum discussion was updated by a moderator",
+      "activity": "There is new activity in the forum"
+    },
+    "openForum": "Open forum",
     "eyebrow": "ACCOUNT CENTER",
     "title": "Profile",
     "description": "Manage your profile, account security, and saved content",

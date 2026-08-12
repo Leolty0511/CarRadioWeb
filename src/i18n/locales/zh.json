@@ -3068,6 +3068,26 @@
     }
   },
   "memberProfile": {
+    "overview": "概览",
+    "security": "安全",
+    "email": "邮箱",
+    "memberSince": "注册时间",
+    "savedCount": "收藏内容",
+    "forumUnread": "论坛未读",
+    "forum": "论坛动态",
+    "forumNotLinked": "论坛账号尚未关联。",
+    "forumUnavailable": "论坛动态暂时不可用。",
+    "unreadMessages": "未读通知",
+    "forumNotification": "论坛有新的动态（{{type}}）",
+    "forumNotifications": {
+      "newPost": "你关注的讨论有新回复",
+      "mention": "有人在论坛中提到了你",
+      "like": "有人赞了你的论坛内容",
+      "privateMessage": "你有新的论坛私信",
+      "moderation": "你参与的讨论有管理操作",
+      "activity": "论坛有新的动态"
+    },
+    "openForum": "进入论坛",
     "eyebrow": "账号中心",
     "title": "个人中心",
     "description": "管理个人资料、账号安全和收藏内容",

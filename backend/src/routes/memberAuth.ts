@@ -21,6 +21,7 @@ import { notificationService } from '../services/notificationService'
 import { authenticateMember, getMemberPresence, optionalContentAccess, touchMemberPresence } from '../middleware/contentAccess'
 import { formatMemberDevice, parseMemberDevice } from '../utils/memberDevice'
 import { uploadImageToOSS } from '../services/uploadService'
+import { getForumMemberSummary } from '../services/forumService'
 
 const router = Router()
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -454,6 +455,11 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 router.get('/profile', authenticateMember, async (req, res) => {
   const member = req.member!
   res.json({ success: true, data: { id: String(member._id), email: member.email, nickname: member.nickname, avatar: member.avatar, createdAt: member.createdAt } })
+})
+
+router.get('/forum-summary', authenticateMember, async (req, res) => {
+  const summary = await getForumMemberSummary(req.member?.forumUserId)
+  res.json({ success: true, data: summary })
 })
 
 router.put('/profile', authenticateMember, async (req, res) => {

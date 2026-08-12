@@ -9,6 +9,24 @@ import { createLogger } from '../utils/logger';
 const execAsync = promisify(exec);
 const logger = createLogger('forum-service');
 
+export interface ForumMemberNotification {
+  id: string
+  type: string
+  subjectId: string | null
+  createdAt: string
+  readAt: string | null
+}
+
+export interface ForumMemberSummary {
+  available: boolean
+  linked: boolean
+  forumUserId?: string
+  username?: string
+  nickname?: string
+  unreadCount: number
+  notifications: ForumMemberNotification[]
+}
+
 /** 项目根目录（绝对路径），与启动时的 cwd 无关，开发/生产一致 */
 function getProjectRoot(): string {
   return path.resolve(path.join(__dirname, '../../..'));
@@ -165,6 +183,48 @@ export const getForumDeployCredentials = (): { dbPassword: string } => {
     return { dbPassword: '' };
   }
 };
+
+/** Read the small notification summary needed by the member profile.
+ * Flarum remains the source of truth; no forum credentials leave the backend.
+ */
+export async function getForumMemberSummary(forumUserId?: string): Promise<ForumMemberSummary> {
+  const normalizedId = String(forumUserId || '').trim()
+  const empty: ForumMemberSummary = { available: true, linked: false, unreadCount: 0, notifications: [] }
+  if (!/^\d+$/.test(normalizedId)) return empty
+  const { dbPassword } = getForumDeployCredentials()
+  if (!dbPassword.trim()) return { ...empty, available: false, linked: true, forumUserId: normalizedId }
+
+  const phpCode = [
+    '$id=(int)getenv("FORUM_USER_ID");',
+    '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME").";charset=utf8mb4",getenv("DB_USER"),getenv("DB_PASSWORD"),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);',
+    '$u=$pdo->prepare("SELECT id,username,nickname FROM flarum_users WHERE id=? LIMIT 1");$u->execute([$id]);$user=$u->fetch(PDO::FETCH_ASSOC);',
+    'if(!$user){echo json_encode(["linked"=>false,"unreadCount"=>0,"notifications"=>[]]);exit;}',
+    '$c=$pdo->prepare("SELECT COUNT(*) FROM flarum_notifications WHERE user_id=? AND is_deleted=0 AND read_at IS NULL");$c->execute([$id]);',
+    '$n=$pdo->prepare("SELECT id,type,subject_id,created_at,read_at FROM flarum_notifications WHERE user_id=? AND is_deleted=0 ORDER BY created_at DESC LIMIT 5");$n->execute([$id]);',
+    '$rows=[];foreach($n->fetchAll(PDO::FETCH_ASSOC) as $r){$rows[]=["id"=>(string)$r["id"],"type"=>(string)$r["type"],"subjectId"=>$r["subject_id"]===null?null:(string)$r["subject_id"],"createdAt"=>(string)$r["created_at"],"readAt"=>$r["read_at"]===null?null:(string)$r["read_at"]];}',
+    'echo json_encode(["linked"=>true,"forumUserId"=>(string)$user["id"],"username"=>(string)$user["username"],"nickname"=>(string)($user["nickname"]??""),"unreadCount"=>(int)$c->fetchColumn(),"notifications"=>$rows],JSON_UNESCAPED_UNICODE);',
+  ].join('')
+  try {
+    const result = await spawnDockerExec(['php', '-r', phpCode], {
+      DB_HOST: 'flarum_db', DB_NAME: 'flarum', DB_USER: 'flarum', DB_PASSWORD: dbPassword.trim(),
+      FORUM_USER_ID: normalizedId,
+    })
+    if (result.code !== 0) return { ...empty, available: false, linked: true, forumUserId: normalizedId }
+    const parsed = JSON.parse(result.stdout.trim()) as Partial<ForumMemberSummary>
+    return {
+      available: true,
+      linked: parsed.linked === true,
+      forumUserId: parsed.forumUserId,
+      username: parsed.username,
+      nickname: parsed.nickname,
+      unreadCount: Number(parsed.unreadCount || 0),
+      notifications: Array.isArray(parsed.notifications) ? parsed.notifications as ForumMemberNotification[] : [],
+    }
+  } catch (error) {
+    logger.warn({ error }, 'Unable to read Flarum member notifications')
+    return { ...empty, available: false, linked: true, forumUserId: normalizedId }
+  }
+}
 
 /** 仅启动论坛容器（已部署过但容器已停止时使用），不重新拉取或配置 */
 export const startForumContainers = (): Promise<{ success: boolean; error?: string }> => {
