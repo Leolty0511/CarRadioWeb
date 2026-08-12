@@ -151,6 +151,8 @@ if [[ ${#OAUTH_CLIENT_SECRET} -ge 32 && -n "$FRONTEND_URL" && -n "$OAUTH_REDIREC
         "fof-passport.app_token_url" => $base . "/api/member-auth/forum/oauth/token",
         "fof-passport.app_user_url" => $base . "/api/member-auth/forum/oauth/user",
         "fof-passport.app_oauth_scopes" => "read",
+        "fof-passport.button_title" => "Sign in with main site account",
+        "fof-passport.button_icon" => "fas fa-sign-in-alt",
       ];
       foreach ($settings as $setting => $value) {
         $statement->execute([$setting, $value]);
