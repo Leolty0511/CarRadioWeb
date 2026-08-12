@@ -89,6 +89,9 @@ FORUM_SSO_BRIDGE_COOKIE_DOMAIN="$(read_env_value backend/config.env FORUM_SSO_BR
 if [[ -z "$FORUM_SSO_BRIDGE_COOKIE_DOMAIN" && "$APP_URL" != *"localhost"* ]]; then
   FORUM_SSO_BRIDGE_COOKIE_DOMAIN=".$(printf '%s' "$MAIN_DOMAIN" | sed -E 's/^www\.//')"
 fi
+if [[ -n "$FORUM_SSO_BRIDGE_COOKIE_DOMAIN" ]]; then
+  FORUM_SSO_BRIDGE_COOKIE_DOMAIN=".$(printf '%s' "$FORUM_SSO_BRIDGE_COOKIE_DOMAIN" | sed -E 's/^\.+//; s/^www\.//')"
+fi
 
 cat > .env.flarum << EOL
 FLARUM_BASE_URL=${FINAL_FLARUM_URL}

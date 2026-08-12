@@ -8,12 +8,15 @@ function getSharedCookieDomain(): string | undefined {
   const configured = String(
     process.env.AUTH_COOKIE_DOMAIN || process.env.FORUM_SSO_BRIDGE_COOKIE_DOMAIN || '',
   ).trim()
-  if (configured) return configured.startsWith('.') ? configured : `.${configured}`
+  if (configured) {
+    const normalized = configured.replace(/^\.+/, '').replace(/^www\./i, '')
+    return normalized ? `.${normalized}` : undefined
+  }
 
   try {
     const hostname = new URL(String(process.env.FRONTEND_URL || '')).hostname.toLowerCase()
     if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1') return undefined
-    return `.${hostname.replace(/^www\./, '')}`
+    return `.${hostname.replace(/^www\./i, '')}`
   } catch {
     return undefined
   }

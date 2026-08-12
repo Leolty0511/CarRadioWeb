@@ -78,6 +78,7 @@ $bridgeSecret = Read-EnvValue ".\backend\config.env" "FORUM_SSO_BRIDGE_SECRET"
 if (-not $bridgeSecret) { $bridgeSecret = Read-EnvValue ".\backend\config.env" "FORUM_OAUTH_CLIENT_SECRET" }
 $bridgeCookieDomain = Read-EnvValue ".\backend\config.env" "FORUM_SSO_BRIDGE_COOKIE_DOMAIN"
 if (-not $bridgeCookieDomain -and $hostPart -notlike "*localhost*") { $bridgeCookieDomain = "." + ($hostPart -replace '^www\.', '') }
+if ($bridgeCookieDomain) { $bridgeCookieDomain = "." + (($bridgeCookieDomain -replace '^\.+', '') -replace '^www\.', '') }
 
 @"
 FLARUM_BASE_URL=$finalFlarumUrl

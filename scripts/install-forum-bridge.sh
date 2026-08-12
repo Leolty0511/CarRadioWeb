@@ -36,6 +36,9 @@ if [[ -z "$COOKIE_DOMAIN" ]]; then
   FRONTEND_HOST="$(printf '%s' "$FRONTEND_URL" | sed -E 's#^https?://##; s#[:/].*$##')"
   COOKIE_DOMAIN=".$(printf '%s' "$FRONTEND_HOST" | sed -E 's/^www\.//')"
 fi
+if [[ -n "$COOKIE_DOMAIN" ]]; then
+  COOKIE_DOMAIN=".$(printf '%s' "$COOKIE_DOMAIN" | sed -E 's/^\.+//; s/^www\.//')"
+fi
 
 touch .env.flarum
 grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN)=' .env.flarum > .env.flarum.tmp || true
@@ -47,6 +50,14 @@ grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN)=' .env.fla
 rm -f .env.flarum.tmp
 
 FORUM_STATE_DIR="${FORUM_STATE_DIR:-.forum-state}"
+
+fix_forum_runtime_permissions() {
+  docker exec flarum_app sh -lc '
+    chown 1000:1000 /opt/flarum/composer.json /opt/flarum/composer.lock 2>/dev/null || true
+    chmod 0644 /opt/flarum/composer.json /opt/flarum/composer.lock 2>/dev/null || true
+    chown -R 1000:1000 /opt/flarum/vendor /data/storage /data/assets /opt/flarum/storage /opt/flarum/public 2>/dev/null || true
+  '
+}
 
 save_forum_composer_state() {
   mkdir -p "$FORUM_STATE_DIR"
@@ -66,8 +77,10 @@ restore_forum_composer_state() {
   echo "Restoring the saved forum extension set..."
   docker cp "$FORUM_STATE_DIR/composer.json" flarum_app:/opt/flarum/composer.json
   docker cp "$FORUM_STATE_DIR/composer.lock" flarum_app:/opt/flarum/composer.lock
+  fix_forum_runtime_permissions
   docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer install \
     --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+  fix_forum_runtime_permissions
 }
 
 # The image keeps Composer packages inside the container. Save the exact
@@ -254,6 +267,14 @@ elif [[ "$CONTAINER_RECREATED" == "1" && "$COMPOSER_STATE_RESTORED" != "1" ]]; t
 else
   docker exec flarum_app php flarum cache:clear >/dev/null 2>&1 || true
 fi
+
+# Composer files restored with docker cp are owned by root. The Flarum web
+# process must be able to read them when it discovers extensions and compiles
+# locale assets, otherwise forum-en.js is generated as an empty translation set.
+fix_forum_runtime_permissions
+docker exec --user 1000:1000 flarum_app php flarum cache:clear >/dev/null
+docker exec --user 1000:1000 flarum_app php flarum assets:publish >/dev/null
+fix_forum_runtime_permissions
 
 save_forum_composer_state
 

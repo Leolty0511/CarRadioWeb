@@ -47,7 +47,9 @@ function getForumBaseUrl(): string {
   try {
     const url = new URL(frontendUrl)
     if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') return 'http://localhost:8888'
-    return `${url.protocol}//forum.${url.hostname}`
+    // The public site may be served from either the apex domain or www. Keep
+    // the forum host stable so OAuth redirect URIs do not change by hostname.
+    return `${url.protocol}//forum.${url.hostname.replace(/^www\./i, '')}`
   } catch {
     return ''
   }
@@ -90,7 +92,10 @@ function getForumBridgeSecret(): string {
 
 function getForumBridgeCookieDomain(): string | undefined {
   const configured = String(process.env.FORUM_SSO_BRIDGE_COOKIE_DOMAIN || '').trim()
-  if (configured) return configured.startsWith('.') ? configured : `.${configured}`
+  if (configured) {
+    const normalized = configured.replace(/^\.+/, '').replace(/^www\./i, '')
+    return normalized ? `.${normalized}` : undefined
+  }
   const frontendUrl = String(process.env.FRONTEND_URL || process.env.VITE_APP_URL || '').trim()
   try {
     const hostname = new URL(frontendUrl).hostname.toLowerCase()
