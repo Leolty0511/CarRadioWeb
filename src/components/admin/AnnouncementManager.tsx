@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bell, Info, AlertTriangle, CheckCircle, ChevronRight, Download, FileText, Palette, Trash2 } from 'lucide-react'
+import { Bell, Info, AlertTriangle, CheckCircle, Download, FileText, Palette, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import ImagePicker from '@/components/ImagePicker'
@@ -323,36 +323,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
 
             {/* 预览 */}
             <div className="lg:sticky lg:top-6 self-start">
-              <p className="text-sm font-medium text-slate-600 dark:text-gray-300 mb-3">{t('admin.announcement.preview')}</p>
               {announcementContent ? (
-                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white text-slate-900 shadow-xl dark:border-slate-700 dark:bg-slate-900 dark:text-white">
-                  <div className="flex items-center gap-3 border-b border-slate-200 px-4 py-4 dark:border-slate-700">
-                    <span className="relative flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600">
-                      <Bell className="h-5 w-5" />
-                      <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-red-500 dark:border-slate-900" />
-                    </span>
-                    <span className="font-semibold">{t('announcement.historyTitle', '公告')}</span>
-                  </div>
-                  <div className="flex items-center gap-3 px-4 py-4">
-                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-500/20 dark:text-blue-300"><Bell className="h-4 w-4" /></span>
-                    <span className="min-w-0 flex-1">
-                      <span
-                        className={`block truncate ${announcementFontSize === 'sm' ? 'text-sm' : announcementFontSize === 'lg' ? 'text-lg' : 'text-base'} ${announcementFontWeight === 'bold' ? 'font-bold' : 'font-normal'} ${announcementFontStyle === 'italic' ? 'italic' : 'not-italic'}`}
-                        style={announcementTextColor ? { color: announcementTextColor } : undefined}
-                      >
-                        {announcementTitle || announcementContent.split(/\r?\n/).find(Boolean) || t('announcement.defaultTitle', '公告')}
-                      </span>
-                      <span className="mt-1 block text-xs text-slate-500 dark:text-slate-400">{t('announcement.today', '今天')}</span>
-                    </span>
-                    <ChevronRight className="h-5 w-5 text-slate-400 dark:text-slate-500" />
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-lg border-2 border-dashed border-slate-300 dark:border-gray-600 py-10 text-center text-slate-500 dark:text-gray-500 text-sm">
-                  {t('admin.announcement.noContent')}
-                </div>
-              )}
-              {announcementContent && (
                 <div className="mt-5">
                   <p className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-300">{t('admin.announcement.detailPreview')}</p>
                   <div className="overflow-auto rounded-lg bg-slate-100 p-3 dark:bg-slate-950/40">
@@ -378,6 +349,10 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
                       accentColor={THEME_STYLES[announcementType].accent}
                     />
                   </div>
+                </div>
+              ) : (
+                <div className="rounded-lg border-2 border-dashed border-slate-300 dark:border-gray-600 py-10 text-center text-slate-500 dark:text-gray-500 text-sm">
+                  {t('admin.announcement.noContent')}
                 </div>
               )}
             </div>
