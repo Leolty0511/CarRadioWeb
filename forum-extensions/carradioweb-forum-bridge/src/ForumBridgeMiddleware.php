@@ -4,7 +4,6 @@ namespace CarRadioWeb\ForumBridge;
 
 use Flarum\User\User;
 use Laminas\Diactoros\Stream;
-use Laminas\Diactoros\Response\RedirectResponse;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -17,11 +16,6 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
-        $ssoRedirect = $this->redirectGuestForumEntry($request);
-        if ($ssoRedirect !== null) {
-            return $ssoRedirect;
-        }
-
         $response = $handler->handle($request);
         $response = $this->normalizePassportResponse($request, $response);
         $secret = trim((string) getenv('CARRADIOWEB_FORUM_BRIDGE_SECRET'));
@@ -53,26 +47,6 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
         }
 
         return $response->withAddedHeader('Set-Cookie', $cookie);
-    }
-
-    /** Start the main-site OAuth flow at the forum entry point for guests. */
-    private function redirectGuestForumEntry(ServerRequestInterface $request): ?ResponseInterface
-    {
-        if (strtoupper($request->getMethod()) !== 'GET' || $request->getUri()->getPath() !== '/') {
-            return null;
-        }
-
-        $cookies = $request->getCookieParams();
-        // Flarum also creates `flarum_session` for guests. Only the remember
-        // token is a reliable signal that the browser already has a forum
-        // login; otherwise every visitor would bypass the SSO redirect.
-        if (!empty($cookies['flarum_remember'])) {
-            return null;
-        }
-
-        // Let FoF Passport create and persist its OAuth state in the forum
-        // session before redirecting to the main site authorization endpoint.
-        return new RedirectResponse('/auth/passport', 302);
     }
 
     /**
