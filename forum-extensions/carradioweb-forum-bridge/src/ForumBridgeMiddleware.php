@@ -63,7 +63,10 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
         }
 
         $cookies = $request->getCookieParams();
-        if (!empty($cookies['flarum_session']) || !empty($cookies['flarum_remember'])) {
+        // Flarum also creates `flarum_session` for guests. Only the remember
+        // token is a reliable signal that the browser already has a forum
+        // login; otherwise every visitor would bypass the SSO redirect.
+        if (!empty($cookies['flarum_remember'])) {
             return null;
         }
 
