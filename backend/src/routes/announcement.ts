@@ -1,5 +1,5 @@
 import express from 'express'
-import { getAnnouncement, getAnnouncementHistory, updateAnnouncement, toggleAnnouncement } from '../services/announcementService'
+import { clearAnnouncementHistory, getAnnouncement, getAnnouncementHistory, updateAnnouncement, toggleAnnouncement } from '../services/announcementService'
 import { authenticateUser, requirePermission } from '../middleware/auth'
 import { PERMISSIONS } from '../config/permissions'
 import { createLogger } from '../utils/logger'
@@ -37,6 +37,17 @@ router.get('/history', async (req, res) => {
   } catch (error) {
     logger.error({ error }, '获取历史公告失败')
     res.status(500).json({ success: false, error: '获取历史公告失败' })
+  }
+})
+
+router.delete('/history', authenticateUser, requirePermission(PERMISSIONS.announcements.update), async (req, res) => {
+  try {
+    const language = req.query.language === 'ru' ? 'ru' : 'en'
+    const deletedCount = await clearAnnouncementHistory(language)
+    res.json({ success: true, deletedCount })
+  } catch (error) {
+    logger.error({ error }, 'Failed to clear announcement history')
+    res.status(500).json({ success: false, error: 'announcement_history_clear_failed' })
   }
 })
 

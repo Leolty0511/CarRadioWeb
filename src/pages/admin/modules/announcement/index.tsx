@@ -4,8 +4,9 @@
  */
 
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import AnnouncementManager from '@/components/admin/AnnouncementManager'
-import { getAnnouncement, updateAnnouncement, toggleAnnouncement } from '@/services/announcementService'
+import { clearAnnouncementHistory, getAnnouncement, updateAnnouncement, toggleAnnouncement } from '@/services/announcementService'
 import type { NoticeCardStyle } from '@/services/announcementService'
 import { announcementHtmlToPlainText, getAnnouncementHtml } from '@/utils/announcementContent'
 
@@ -18,6 +19,7 @@ interface AnnouncementManagementProps {
 
 export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ dataLanguage }) => {
   const { showToast } = useToast()
+  const { t } = useTranslation()
 
   // 公告状态
   const [announcementTitle, setAnnouncementTitle] = useState('')
@@ -31,6 +33,7 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
   const [announcementTextColor, setAnnouncementTextColor] = useState('')
   const [noticeCardStyle, setNoticeCardStyle] = useState<NoticeCardStyle>('glass')
   const [announcementImageUrl, setAnnouncementImageUrl] = useState('')
+  const [clearingHistory, setClearingHistory] = useState(false)
 
   // 加载公告
   useEffect(() => {
@@ -77,14 +80,14 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       })
       showToast({
         type: 'success',
-        title: '保存成功',
-        description: '公告设置已更新'
+        title: t('admin.announcement.saveSuccess'),
+        description: t('admin.announcement.saveSuccessDesc')
       })
     } catch (error) {
       showToast({
         type: 'error',
-        title: '保存失败',
-        description: '无法保存公告设置'
+        title: t('admin.announcement.saveFailed'),
+        description: t('admin.announcement.saveFailedDesc')
       })
     }
   }
@@ -97,15 +100,31 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       setAnnouncementEnabled(newEnabled)
       showToast({
         type: 'success',
-        title: newEnabled ? '公告已启用' : '公告已禁用',
+        title: newEnabled ? t('admin.announcement.enabled') : t('admin.announcement.disabled'),
         description: ''
       })
     } catch (error) {
       showToast({
         type: 'error',
-        title: '操作失败',
-        description: '无法切换公告状态'
+        title: t('admin.announcement.actionFailed'),
+        description: t('admin.announcement.toggleFailed')
       })
+    }
+  }
+
+  const handleClearHistory = async () => {
+    setClearingHistory(true)
+    try {
+      const deletedCount = await clearAnnouncementHistory(dataLanguage)
+      showToast({
+        type: 'success',
+        title: t('admin.announcement.clearHistorySuccess'),
+        description: t('admin.announcement.clearHistorySuccessDesc', { count: deletedCount }),
+      })
+    } catch {
+      showToast({ type: 'error', title: t('admin.announcement.clearHistoryFailed'), description: t('admin.announcement.clearHistoryFailedDesc') })
+    } finally {
+      setClearingHistory(false)
     }
   }
 
@@ -136,6 +155,8 @@ export const AnnouncementManagement: React.FC<AnnouncementManagementProps> = ({ 
       setAnnouncementImageUrl={setAnnouncementImageUrl}
       handleToggleAnnouncement={handleToggleAnnouncement}
       handleSaveAnnouncement={handleSaveAnnouncement}
+      handleClearHistory={handleClearHistory}
+      clearingHistory={clearingHistory}
     />
   )
 }

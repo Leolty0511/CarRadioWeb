@@ -149,3 +149,8 @@ export const getAnnouncementHistory = async (
     .sort({ publishedAt: -1 })
     .limit(Math.min(Math.max(limit, 1), 100))
 }
+
+export const clearAnnouncementHistory = async (language: 'en' | 'ru'): Promise<number> => {
+  const result = await AnnouncementHistory.deleteMany({ language })
+  return result.deletedCount || 0
+}

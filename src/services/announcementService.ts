@@ -59,6 +59,12 @@ export const getAnnouncementHistory = async (
   }
 }
 
+export const clearAnnouncementHistory = async (language: 'en' | 'ru'): Promise<number> => {
+  const result = await apiClient.delete(`/announcement/history?language=${language}`)
+  if (!result.success) {throw new Error(result.error || 'announcement_history_clear_failed')}
+  return Number(result.deletedCount || 0)
+}
+
 /**
  * 更新公告设置
  */

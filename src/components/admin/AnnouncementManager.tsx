@@ -1,12 +1,14 @@
 import React, { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bell, Info, AlertTriangle, CheckCircle, ChevronRight, Download, FileText, Palette } from 'lucide-react'
+import { Bell, Info, AlertTriangle, CheckCircle, ChevronRight, Download, FileText, Palette, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import ImagePicker from '@/components/ImagePicker'
 import LazyRichTextEditor from '@/components/LazyRichTextEditor'
 import type { NoticeCardStyle } from '@/services/announcementService'
 import { getAnnouncementHtml } from '@/utils/announcementContent'
+import { AnnouncementNoticeCard } from '@/components/announcement/AnnouncementNoticeCard'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
 const MAX_ANNOUNCEMENT_LENGTH = 5000
 
@@ -34,7 +36,18 @@ interface AnnouncementManagerProps {
   setAnnouncementImageUrl: (url: string) => void
   handleToggleAnnouncement: () => void
   handleSaveAnnouncement: () => void
+  handleClearHistory: () => void
+  clearingHistory: boolean
 }
+
+const THEME_STYLES = {
+  info: { active: 'border-blue-500 bg-blue-600 text-white shadow-md', accent: '#38bdf8' },
+  warning: { active: 'border-amber-500 bg-amber-500 text-white shadow-md', accent: '#f59e0b' },
+  danger: { active: 'border-red-500 bg-red-600 text-white shadow-md', accent: '#ef4444' },
+  success: { active: 'border-emerald-500 bg-emerald-600 text-white shadow-md', accent: '#22c55e' },
+} as const
+
+const FONT_SIZE_STYLES = { sm: '0.875rem', md: '1rem', lg: '1.125rem' } as const
 
 const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
   announcementTitle,
@@ -58,11 +71,21 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
   announcementImageUrl,
   setAnnouncementImageUrl,
   handleToggleAnnouncement,
-  handleSaveAnnouncement
+  handleSaveAnnouncement,
+  handleClearHistory,
+  clearingHistory,
 }) => {
   const { t } = useTranslation()
   type TabKey = 'content' | 'style'
   const [activeTab, setActiveTab] = useState<TabKey>('content')
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const previewTitle = announcementTitle || announcementContent.split(/\r?\n/).find(Boolean) || t('announcement.defaultTitle', 'Announcement')
+  const previewContentStyle: React.CSSProperties = {
+    fontSize: FONT_SIZE_STYLES[announcementFontSize],
+    fontWeight: announcementFontWeight === 'bold' ? 700 : 400,
+    fontStyle: announcementFontStyle,
+    ...(announcementTextColor ? { color: announcementTextColor } : {}),
+  }
 
   const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
     { key: 'content', label: t('admin.announcement.sectionContent', '公告内容与图片'), icon: FileText },
@@ -161,6 +184,15 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
               placeholder={t('admin.announcement.imagePlaceholder', '点击上传或从图库选择')}
             />
           </div>
+          <div className="flex flex-col gap-3 border-t border-slate-200 pt-5 dark:border-slate-700 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-800 dark:text-white">{t('admin.announcement.historyCleanup')}</p>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('admin.announcement.historyCleanupDesc')}</p>
+            </div>
+            <Button type="button" variant="destructive" size="sm" loading={clearingHistory} onClick={() => setClearConfirmOpen(true)}>
+              <Trash2 className="mr-2 h-4 w-4" />{t('admin.announcement.clearHistory')}
+            </Button>
+          </div>
         </CardContent>
       </Card>
       )}
@@ -183,17 +215,17 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
                 <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-3">{t('admin.announcement.theme')}</label>
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { type: 'info' as const, label: t('admin.announcement.themeInfo'), icon: Info, color: 'blue' },
-                    { type: 'warning' as const, label: t('admin.announcement.themeWarning'), icon: AlertTriangle, color: 'orange' },
-                    { type: 'danger' as const, label: t('admin.announcement.themeDanger'), icon: Bell, color: 'red' },
-                    { type: 'success' as const, label: t('admin.announcement.themeSuccess'), icon: CheckCircle, color: 'green' }
-                  ].map(({ type, label, icon: Icon, color }) => (
+                    { type: 'info' as const, label: t('admin.announcement.themeInfo'), icon: Info },
+                    { type: 'warning' as const, label: t('admin.announcement.themeWarning'), icon: AlertTriangle },
+                    { type: 'danger' as const, label: t('admin.announcement.themeDanger'), icon: Bell },
+                    { type: 'success' as const, label: t('admin.announcement.themeSuccess'), icon: CheckCircle }
+                  ].map(({ type, label, icon: Icon }) => (
                     <button
                       key={type}
                       onClick={() => setAnnouncementType(type)}
                       className={`flex items-center justify-center space-x-2 px-4 py-3 rounded-lg border-2 transition-all ${
                         announcementType === type
-                          ? `bg-${color}-600 border-${color}-500 text-white shadow-lg`
+                          ? THEME_STYLES[type].active
                           : 'bg-slate-100 dark:bg-gray-700/50 border-slate-300 dark:border-gray-600 text-slate-700 dark:text-gray-300 hover:border-slate-400 dark:hover:border-gray-500'
                       }`}
                     >
@@ -320,6 +352,34 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
                   {t('admin.announcement.noContent')}
                 </div>
               )}
+              {announcementContent && (
+                <div className="mt-5">
+                  <p className="mb-3 text-sm font-medium text-slate-600 dark:text-slate-300">{t('admin.announcement.detailPreview')}</p>
+                  <div className="overflow-auto rounded-lg bg-slate-100 p-3 dark:bg-slate-950/40">
+                    <AnnouncementNoticeCard
+                      style={noticeCardStyle}
+                      title={previewTitle}
+                      content={announcementContent}
+                      contentHtml={announcementContentHtml}
+                      imageUrl={announcementImageUrl}
+                      teamName="CarRadio Team"
+                      dateText={new Date().toLocaleDateString()}
+                      onClose={() => undefined}
+                      gotItLabel={t('announcement.gotIt')}
+                      importantNoticeLabel={t('announcement.importantNotice')}
+                      sincerelyLabel={t('announcement.sincerely')}
+                      sealMarkLabel={t('announcement.sealMark')}
+                      waxSealChar={t('announcement.waxSealChar')}
+                      newLabel={t('announcement.new')}
+                      deviceBrandLabel={t('announcement.deviceBrand')}
+                      micLabel={t('announcement.mic')}
+                      resetLabel={t('announcement.reset')}
+                      contentStyle={previewContentStyle}
+                      accentColor={THEME_STYLES[announcementType].accent}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </CardContent>
@@ -337,6 +397,16 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({
           {t('common.save')}
         </Button>
       </div>
+      <ConfirmDialog
+        isOpen={clearConfirmOpen}
+        onClose={() => setClearConfirmOpen(false)}
+        onConfirm={handleClearHistory}
+        title={t('admin.announcement.clearHistoryConfirmTitle')}
+        message={t('admin.announcement.clearHistoryConfirmMessage')}
+        confirmText={t('admin.announcement.clearHistory')}
+        cancelText={t('common.cancel')}
+        type="danger"
+      />
     </div>
   )
 }
