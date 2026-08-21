@@ -38,6 +38,37 @@ function formatDate(value: string | null): string {
   return new Date(value).toLocaleString('zh-CN')
 }
 
+const UPDATE_STAGES: { id: string; label: string }[] = [
+  { id: 'starting', label: '准备更新' },
+  { id: 'downloading', label: '下载资源包' },
+  { id: 'extracting', label: '解压资源包' },
+  { id: 'fetching', label: '同步版本信息' },
+  { id: 'updating_code', label: '更新代码' },
+  { id: 'updating_artifacts', label: '替换前后端文件' },
+  { id: 'updating_forum_bridge', label: '更新论坛登录桥接' },
+  { id: 'frontend_refreshed', label: '刷新前端资源' },
+  { id: 'restarting_frontend', label: '重启前端' },
+  { id: 'reloading_frontend', label: '重载前端代理' },
+  { id: 'restarting', label: '重启后端' },
+  { id: 'health_check', label: '检查服务健康' },
+  { id: 'completed', label: '更新完成' },
+]
+
+const FAILED_STAGES = new Set(['failed', 'rolled_back', 'rollback_failed', 'rollback', 'rollback_code', 'rollback_restart', 'rollback_dependencies', 'rollback_backend_dependencies', 'rollback_build'])
+
+function getUpdateProgress(stage?: string, state?: string): { percent: number; label: string; failed: boolean } {
+  if (state === 'completed' || stage === 'completed') {
+    return { percent: 100, label: '更新完成', failed: false }
+  }
+  const failed = state === 'failed' || FAILED_STAGES.has(stage || '')
+  const index = UPDATE_STAGES.findIndex(item => item.id === stage)
+  if (index < 0) {
+    return { percent: failed ? 100 : 8, label: stage || '准备更新', failed }
+  }
+  const percent = Math.round(((index + 1) / UPDATE_STAGES.length) * 100)
+  return { percent: Math.min(percent, state === 'restarting' ? 92 : 96), label: UPDATE_STAGES[index].label, failed }
+}
+
 function formatLogDate(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {return ''}
@@ -274,15 +305,33 @@ export function VersionUpdateTab() {
             </div>
           )}
 
-          {status && status.state !== 'idle' && (
-            <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
-              <div className="flex items-center gap-2">
-                {jobActive ? <Loader2 className="h-4 w-4 animate-spin text-blue-500" /> : <Server className="h-4 w-4 text-slate-500" />}
-                <span className="text-sm font-medium text-slate-800 dark:text-slate-200">{status.message}</span>
+          {status && status.state !== 'idle' && (() => {
+            const progress = getUpdateProgress(status.stage, status.state)
+            return (
+              <div className="border-t border-slate-200 pt-4 dark:border-slate-700">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    {jobActive ? <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-blue-500" /> : <Server className="h-4 w-4 flex-shrink-0 text-slate-500" />}
+                    <span className="truncate text-sm font-medium text-slate-800 dark:text-slate-200">{progress.label}</span>
+                  </div>
+                  <span className={`text-sm font-semibold tabular-nums ${progress.failed ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-200'}`}>
+                    {progress.percent}%
+                  </span>
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={progress.percent}>
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      progress.failed ? 'bg-red-500' : jobActive ? 'bg-blue-500' : 'bg-emerald-500'
+                    }`}
+                    style={{ width: `${progress.percent}%` }}
+                  />
+                </div>
+                <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                  {status.message}
+                </div>
               </div>
-              <div className="mt-2 text-xs text-slate-500 dark:text-slate-400">阶段：{status.stage}</div>
-            </div>
-          )}
+            )
+          })()}
 
           <div className="flex justify-end border-t border-slate-200 pt-4 dark:border-slate-700">
             <Button
