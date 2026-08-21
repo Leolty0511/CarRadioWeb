@@ -3,6 +3,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose'
 export interface ICANBusSetting extends Document {
   vehicleId: Types.ObjectId
   settingImage: string
+  settingImages: string[]
   description: string
   isActive: boolean
   createdAt: Date
@@ -20,6 +21,10 @@ const canBusSettingSchema = new Schema<ICANBusSetting>({
     type: String,
     required: true,
     trim: true
+  },
+  settingImages: {
+    type: [String],
+    default: [],
   },
   description: {
     type: String,

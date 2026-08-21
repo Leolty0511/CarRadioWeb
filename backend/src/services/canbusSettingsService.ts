@@ -12,9 +12,20 @@ interface CANBoxTypeInput {
 
 interface CANBusSettingInput {
   vehicleId: string
-  settingImage: string
+  settingImage?: string
+  settingImages?: string[]
   description?: string
   isActive?: boolean
+}
+
+function normalizeSettingImages(data: { settingImage?: string; settingImages?: string[] }): string[] {
+  const images = [
+    ...(Array.isArray(data.settingImages) ? data.settingImages : []),
+    data.settingImage || '',
+  ]
+    .map(item => String(item || '').trim())
+    .filter(Boolean)
+  return [...new Set(images)]
 }
 
 interface PopulatedSetting extends Omit<ICANBusSetting, 'vehicleId'> {
@@ -83,9 +94,11 @@ class CANBusSettingsService {
   }
 
   async createSetting(data: CANBusSettingInput): Promise<ICANBusSetting> {
+    const settingImages = normalizeSettingImages(data)
     const setting = new CANBusSetting({
       vehicleId: new Types.ObjectId(data.vehicleId),
-      settingImage: data.settingImage,
+      settingImage: settingImages[0] || '',
+      settingImages,
       description: data.description || '',
       isActive: data.isActive ?? true
     })
@@ -98,8 +111,13 @@ class CANBusSettingsService {
     if (data.vehicleId) {
       updateData.vehicleId = new Types.ObjectId(data.vehicleId)
     }
-    if (data.settingImage !== undefined) {
-      updateData.settingImage = data.settingImage
+    if (data.settingImage !== undefined || data.settingImages !== undefined) {
+      const settingImages = normalizeSettingImages({
+        settingImage: data.settingImage,
+        settingImages: data.settingImages,
+      })
+      updateData.settingImage = settingImages[0] || ''
+      updateData.settingImages = settingImages
     }
     if (data.description !== undefined) {
       updateData.description = data.description
@@ -128,8 +146,13 @@ class CANBusSettingsService {
       isActive: true
     })
     if (!setting) return null
-    return {
+    const settingImages = normalizeSettingImages({
       settingImage: setting.settingImage,
+      settingImages: setting.settingImages,
+    })
+    return {
+      settingImage: settingImages[0] || '',
+      settingImages,
       description: setting.description
     }
   }

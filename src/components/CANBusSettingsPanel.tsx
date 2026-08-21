@@ -39,7 +39,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
   // 数据状态
   const [canboxTypes, setCanboxTypes] = useState<CANBoxType[]>([])
   const [internalVehicleData, setInternalVehicleData] = useState<VehicleData>({})
-  const [settingData, setSettingData] = useState<{ settingImage: string; description: string } | null>(null)
+  const [settingData, setSettingData] = useState<{ settingImage: string; settingImages: string[]; description: string } | null>(null)
 
   // UI 状态
   const [loading, setLoading] = useState(false)
@@ -350,21 +350,24 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
               )}
 
               {/* 设置图片 */}
-              <div
-                className="relative cursor-pointer group"
-                onClick={() => setPreviewImage({ url: settingData.settingImage, title: `${selectedBrand} ${selectedModel} ${selectedYear} - CANBus Settings` })}
-              >
-                <img
-                  src={settingData.settingImage}
-                  alt={`${selectedBrand} ${selectedModel} ${selectedYear} CANBus Settings`}
-                  className="w-full max-w-2xl mx-auto rounded-xl shadow-lg transition-transform duration-300 group-hover:scale-[1.02]"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors duration-300 rounded-xl flex items-center justify-center">
-                  <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-white/90 dark:bg-gray-800/90 px-4 py-2 rounded-lg">
-                    <Image className="h-5 w-5 inline-block mr-2" />
-                    {t('canbus.clickToEnlarge')}
-                  </div>
-                </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {(settingData.settingImages?.length ? settingData.settingImages : [settingData.settingImage]).filter(Boolean).map((url, index) => (
+                  <button
+                    key={url}
+                    type="button"
+                    className="relative overflow-hidden rounded-xl"
+                    onClick={() => setPreviewImage({ url, title: `${selectedBrand} ${selectedModel} ${selectedYear} - CANBus Settings ${index + 1}` })}
+                  >
+                    <img
+                      src={url}
+                      alt={`${selectedBrand} ${selectedModel} ${selectedYear} CANBus Settings ${index + 1}`}
+                      className="h-auto w-full object-contain bg-slate-100 dark:bg-gray-800"
+                    />
+                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 text-sm text-white opacity-0 transition hover:bg-black/20 hover:opacity-100">
+                      {t('canbus.clickToEnlarge')}
+                    </span>
+                  </button>
+                ))}
               </div>
 
               {/* 选择信息摘要 */}

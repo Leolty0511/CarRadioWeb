@@ -105,6 +105,7 @@ interface GithubReleaseAsset {
 
 interface GithubRelease {
   assets?: GithubReleaseAsset[]
+  target_commitish?: string
 }
 
 interface GithubContentResponse {
@@ -192,15 +193,37 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
   updateLog: ProjectUpdateLogEntry[]
   releaseNotes: string | null
 }> {
-  const [branchCommit, packageFile] = await Promise.all([
+  const [branchCommit, packageFile, latestRelease] = await Promise.all([
     fetchGithubJson<GithubCommit>(`${GITHUB_API_URL}/commits/${encodeURIComponent(branch)}`),
     fetchGithubJson<GithubContentResponse>(`${GITHUB_API_URL}/contents/package.json?ref=${encodeURIComponent(branch)}`),
+    fetchGithubJson<GithubRelease>(`${GITHUB_API_URL}/releases/tags/latest`).catch(() => null),
   ])
-  const remoteCommit = branchCommit.sha || null
-  const remoteCommitMessage = branchCommit.commit?.message?.split('\n')[0] || null
+  const releaseCommit = latestRelease?.target_commitish?.trim()
+  const packageCommit = releaseCommit && /^[0-9a-f]{40}$/i.test(releaseCommit) ? releaseCommit : null
+  const remoteCommit = packageCommit || branchCommit.sha || null
+  let remoteCommitMessage = branchCommit.commit?.message?.split('\n')[0] || null
+  if (packageCommit && packageCommit !== branchCommit.sha) {
+    try {
+      const packageCommitInfo = await fetchGithubJson<GithubCommit>(`${GITHUB_API_URL}/commits/${packageCommit}`)
+      remoteCommitMessage = packageCommitInfo.commit?.message?.split('\n')[0] || remoteCommitMessage
+    } catch {
+      // Keep the branch commit message when the package commit cannot be resolved.
+    }
+  }
+  const versionRef = packageCommit || branch
   let remoteVersion: string | null = null
   if (packageFile.content && packageFile.encoding === 'base64') {
     remoteVersion = parsePackageVersion(Buffer.from(packageFile.content, 'base64').toString('utf8'))
+  }
+  if (packageCommit) {
+    try {
+      const packagedJson = await fetchGithubJson<GithubContentResponse>(`${GITHUB_API_URL}/contents/package.json?ref=${packageCommit}`)
+      if (packagedJson.content && packagedJson.encoding === 'base64') {
+        remoteVersion = parsePackageVersion(Buffer.from(packagedJson.content, 'base64').toString('utf8')) || remoteVersion
+      }
+    } catch {
+      // Fall back to the branch package.json version.
+    }
   }
 
   let commitsAhead = 0
@@ -208,7 +231,7 @@ async function getArtifactRemoteInfo(branch: string, currentCommit: string | nul
   let updateLog: ProjectUpdateLogEntry[] = []
   let releaseNotes: string | null = null
   try {
-    const changelogFile = await fetchGithubJson<GithubContentResponse>(`${GITHUB_API_URL}/contents/CHANGELOG.md?ref=${encodeURIComponent(branch)}`)
+    const changelogFile = await fetchGithubJson<GithubContentResponse>(`${GITHUB_API_URL}/contents/CHANGELOG.md?ref=${encodeURIComponent(versionRef)}`)
     if (changelogFile.content && changelogFile.encoding === 'base64') {
       releaseNotes = extractChangelogEntry(Buffer.from(changelogFile.content, 'base64').toString('utf8'), remoteVersion)
     }

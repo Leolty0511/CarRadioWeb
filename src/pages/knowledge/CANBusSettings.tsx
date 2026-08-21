@@ -17,8 +17,7 @@ const CANBusSettings: React.FC = () => {
     const loadIntro = async () => {
       try {
         const data = await canbusSettingsService.getPageIntro()
-        const isZh = i18n.language.startsWith('zh')
-        const custom = (isZh ? data.zh : data.en).trim()
+        const custom = (data.en || data.zh).trim()
         if (!cancelled) {
           setIntro(custom || t('knowledge.sections.canbusSettingsDesc'))
         }

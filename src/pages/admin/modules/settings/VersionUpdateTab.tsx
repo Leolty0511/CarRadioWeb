@@ -94,6 +94,7 @@ export function VersionUpdateTab() {
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [selectedLog, setSelectedLog] = useState<ProjectUpdateLogEntry | null>(null)
   const [showReleaseNotes, setShowReleaseNotes] = useState(false)
+  const [watchJob, setWatchJob] = useState(false)
 
   const load = useCallback(async (silent = false) => {
     try {
@@ -122,29 +123,31 @@ export function VersionUpdateTab() {
 
   const jobActive = status?.state === 'running' || status?.state === 'restarting'
   useEffect(() => {
-    if (!jobActive) {return}
-    let refreshTimer: number | undefined
+    if (!jobActive && !watchJob) {return}
     const timer = window.setInterval(async () => {
       try {
         const next = await getProjectUpdateStatus()
         setStatus(next)
         if (next.state === 'completed') {
-          showToast({ type: 'success', title: '项目更新完成', description: '前后端服务已重启，正在刷新版本信息。' })
-          refreshTimer = window.setTimeout(() => { void load(true) }, 3000)
+          setWatchJob(false)
+          showToast({ type: 'success', title: '项目更新完成', description: '服务已重启，即将刷新页面。' })
           window.clearInterval(timer)
+          window.setTimeout(() => {
+            window.location.reload()
+          }, 1500)
         } else if (next.state === 'failed') {
           showToast({ type: 'error', title: '项目更新失败', description: next.message })
+          setWatchJob(false)
           window.clearInterval(timer)
         }
       } catch {
-        // A short connection loss is expected while PM2 restarts the backend.
+        // Backend restart briefly drops the API; keep polling until it returns.
       }
-    }, 2500)
+    }, 2000)
     return () => {
       window.clearInterval(timer)
-      if (refreshTimer) {window.clearTimeout(refreshTimer)}
     }
-  }, [jobActive, load, showToast])
+  }, [jobActive, watchJob, showToast])
 
   const handleCheck = async () => {
     setChecking(true)
@@ -173,7 +176,8 @@ export function VersionUpdateTab() {
     try {
       const next = await applyProjectUpdate()
       setStatus(next)
-      showToast({ type: 'info', title: '更新已开始', description: '页面会持续显示前端、后端安装与重启进度。' })
+      setWatchJob(true)
+      showToast({ type: 'info', title: '更新已开始', description: '页面会持续显示下载、替换和重启进度，完成后自动刷新。' })
     } catch (error) {
       showToast({ type: 'error', title: '无法开始更新', description: error instanceof Error ? error.message : '' })
     } finally {

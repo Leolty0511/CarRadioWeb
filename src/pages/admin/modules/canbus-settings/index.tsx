@@ -30,7 +30,6 @@ type TabType = 'canbox-types' | 'settings'
 function PageIntroEditor() {
   const { showToast } = useToast()
   const [en, setEn] = useState('')
-  const [zh, setZh] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -39,8 +38,7 @@ function PageIntroEditor() {
       setLoading(true)
       try {
         const data = await canbusSettingsService.getAdminPageIntro()
-        setEn(data.en)
-        setZh(data.zh)
+        setEn(data.en || data.zh || '')
       } catch {
         showToast({ type: 'error', title: '加载说明文案失败', description: '' })
       } finally {
@@ -53,8 +51,8 @@ function PageIntroEditor() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      await canbusSettingsService.updatePageIntro({ en, zh })
-      showToast({ type: 'success', title: '页面说明已保存', description: '前台 CANBus 页顶部文案已更新' })
+      await canbusSettingsService.updatePageIntro({ en, zh: '' })
+      showToast({ type: 'success', title: '页面说明已保存', description: '' })
     } catch {
       showToast({ type: 'error', title: '保存失败', description: '' })
     } finally {
@@ -64,46 +62,25 @@ function PageIntroEditor() {
 
   return (
     <Card className="bg-white dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
-      <CardHeader>
-        <CardTitle className="text-slate-800 dark:text-white">页面顶部说明</CardTitle>
-        <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
-          显示在前台 CANBus 设置页标题下方。留空则使用默认文案。
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
-          </div>
-        ) : (
-          <>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">英文说明</label>
-              <textarea
-                value={en}
-                onChange={(event) => setEn(event.target.value)}
-                rows={4}
-                className="w-full rounded-lg border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100"
-                placeholder="For certain vehicles, CAN settings must be configured..."
-              />
+      <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-end">
+        <div className="min-w-0 flex-1">
+          <label className="mb-1 block text-sm font-medium text-slate-800 dark:text-white">页面顶部说明</label>
+          {loading ? (
+            <div className="flex h-10 items-center">
+              <Loader2 className="h-4 w-4 animate-spin text-orange-500" />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">中文说明</label>
-              <textarea
-                value={zh}
-                onChange={(event) => setZh(event.target.value)}
-                rows={4}
-                className="w-full rounded-lg border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100"
-                placeholder="部分车型需配置 CAN 设置以启用原车功能..."
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button onClick={handleSave} disabled={saving} className="bg-orange-500 hover:bg-orange-600">
-                {saving ? '保存中...' : '保存说明'}
-              </Button>
-            </div>
-          </>
-        )}
+          ) : (
+            <input
+              value={en}
+              onChange={(event) => setEn(event.target.value)}
+              className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-800 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+              placeholder="Front-page CANBus intro. Leave empty to use the default text."
+            />
+          )}
+        </div>
+        <Button onClick={handleSave} disabled={saving || loading} className="h-10 bg-orange-500 hover:bg-orange-600">
+          {saving ? '保存中...' : '保存'}
+        </Button>
       </CardContent>
     </Card>
   )
@@ -410,7 +387,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<CANBusSettingInput>({ vehicleId: '', settingImage: '', description: '' })
+  const [formData, setFormData] = useState<CANBusSettingInput>({ vehicleId: '', settingImage: '', settingImages: [], description: '' })
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string }>({ show: false, id: '' })
 
@@ -435,15 +412,17 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   }, [loadData])
 
   const handleAdd = () => {
-    setFormData({ vehicleId: '', settingImage: '', description: '', isActive: true })
+    setFormData({ vehicleId: '', settingImage: '', settingImages: [], description: '', isActive: true })
     setEditingId(null)
     setShowForm(true)
   }
 
   const handleEdit = (setting: CANBusSetting) => {
+    const settingImages = [...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))]
     setFormData({
       vehicleId: setting.vehicleId._id,
-      settingImage: setting.settingImage,
+      settingImage: settingImages[0] || '',
+      settingImages,
       description: setting.description || '',
       isActive: setting.isActive
     })
@@ -452,18 +431,23 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   }
 
   const handleSave = async () => {
-    if (!formData.vehicleId || !formData.settingImage) {
-      showToast({ type: 'warning', title: '请选择车型并上传设置图片', description: '' })
+    if (!formData.vehicleId || (formData.settingImages || []).length === 0) {
+      showToast({ type: 'warning', title: '请选择车型并至少添加一张设置图片', description: '' })
       return
     }
 
     setSaving(true)
     try {
+      const payload = {
+        ...formData,
+        settingImages: formData.settingImages || [],
+        settingImage: (formData.settingImages || [])[0] || formData.settingImage,
+      }
       if (editingId) {
-        await canbusSettingsService.updateSetting(editingId, formData)
+        await canbusSettingsService.updateSetting(editingId, payload)
         showToast({ type: 'success', title: '更新成功', description: '' })
       } else {
-        await canbusSettingsService.createSetting(formData)
+        await canbusSettingsService.createSetting(payload)
         showToast({ type: 'success', title: '创建成功', description: '' })
       }
       setShowForm(false)
@@ -532,9 +516,14 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                         {setting.vehicleId?.brand} {setting.vehicleId?.model || setting.vehicleId?.modelName} ({setting.vehicleId?.year})
                       </td>
                       <td className="px-4 py-3">
-                        {setting.settingImage && (
-                          <img src={setting.settingImage} alt="" className="w-16 h-10 rounded object-cover" />
-                        )}
+                        <div className="flex items-center gap-1">
+                          {([...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))].slice(0, 3)).map((url) => (
+                            <img key={url} src={url} alt="" className="h-10 w-16 rounded object-cover" />
+                          ))}
+                          {([...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))].length > 3) && (
+                            <span className="text-xs text-slate-500">+{[...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))].length - 3}</span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-sm text-slate-600 dark:text-gray-400 max-w-xs truncate">
                         {setting.description || '-'}
@@ -598,23 +587,31 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">设置图片 *</label>
                 <div className="space-y-2">
-                  {formData.settingImage ? (
-                    <div className="relative rounded-lg overflow-hidden border">
-                      <img src={formData.settingImage} alt="" className="w-full max-h-48 object-contain bg-slate-100 dark:bg-gray-700" />
-                      <button
-                        onClick={() => setFormData({ ...formData, settingImage: '' })}
-                        className="absolute top-2 right-2 p-1 bg-red-500 rounded-full text-white"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                  {(formData.settingImages || []).length > 0 ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      {(formData.settingImages || []).map((url) => (
+                        <div key={url} className="relative overflow-hidden rounded-lg border">
+                          <img src={url} alt="" className="h-28 w-full object-cover bg-slate-100 dark:bg-gray-700" />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const settingImages = (formData.settingImages || []).filter(item => item !== url)
+                              setFormData({ ...formData, settingImages, settingImage: settingImages[0] || '' })
+                            }}
+                            className="absolute top-2 right-2 rounded-full bg-red-500 p-1 text-white"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    <div className="h-32 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center">
+                    <div className="h-24 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center">
                       <ImageIcon className="h-8 w-8 text-slate-400" />
                     </div>
                   )}
                   <Button variant="outline" onClick={() => setShowImagePicker(true)} className="w-full">
-                    选择设置图片
+                    添加设置图片
                   </Button>
                 </div>
               </div>
@@ -664,9 +661,10 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
             </div>
             <div className="p-6">
               <ImagePicker
-                value={formData.settingImage}
+                value={(formData.settingImages || [])[0]}
                 onChange={(url: string) => {
-                  setFormData({ ...formData, settingImage: url })
+                  const settingImages = [...new Set([...(formData.settingImages || []), url].filter(Boolean))]
+                  setFormData({ ...formData, settingImages, settingImage: settingImages[0] || '' })
                   setShowImagePicker(false)
                 }}
                 showUpload={true}

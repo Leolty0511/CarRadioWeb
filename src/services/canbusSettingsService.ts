@@ -20,6 +20,7 @@ export interface CANBusSetting {
     year: string
   }
   settingImage: string
+  settingImages?: string[]
   description: string
   isActive: boolean
   createdAt: string
@@ -36,6 +37,7 @@ export interface CANBoxTypeInput {
 export interface CANBusSettingInput {
   vehicleId: string
   settingImage: string
+  settingImages?: string[]
   description?: string
   isActive?: boolean
 }
@@ -76,12 +78,21 @@ class CANBusSettingsService {
   /**
    * 根据车型获取设置信息
    */
-  async getSettingByVehicle(vehicleId: string): Promise<{ settingImage: string; description: string } | null> {
+  async getSettingByVehicle(vehicleId: string): Promise<{ settingImage: string; settingImages: string[]; description: string } | null> {
     try {
-      const response = await apiClient.get<{ settingImage: string; description: string }>(
+      const response = await apiClient.get<{ settingImage: string; settingImages?: string[]; description: string }>(
         `${this.baseUrl}/setting?vehicleId=${vehicleId}`
       )
-      return response.data || null
+      if (!response.data) {return null}
+      const settingImages = [
+        ...(response.data.settingImages || []),
+        response.data.settingImage || '',
+      ].filter(Boolean)
+      return {
+        ...response.data,
+        settingImage: settingImages[0] || '',
+        settingImages: [...new Set(settingImages)],
+      }
     } catch {
       return null
     }
