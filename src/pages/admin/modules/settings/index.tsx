@@ -371,7 +371,7 @@ function SocialMediaTab({ settings, setSettings, onSave, saving }: {
 
 function SettingsManagement({
   dataLanguage: _dataLanguage,
-  isSuperAdmin,
+  isSuperAdmin: _isSuperAdmin,
 }: {
   dataLanguage: DataLanguage
   isSuperAdmin: boolean
@@ -436,7 +436,7 @@ function SettingsManagement({
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-gray-700 pb-0">
-        {TAB_LIST.filter((tab) => tab.key !== 'version' || isSuperAdmin).map((tab) => {
+        {TAB_LIST.map((tab) => {
           const Icon = tab.icon
           const active = activeTab === tab.key
           return (
@@ -474,7 +474,7 @@ function SettingsManagement({
       {activeTab === 'social' && (
         <SocialMediaTab settings={settings} setSettings={setSettings} onSave={handleSave} saving={saving} />
       )}
-      {activeTab === 'version' && isSuperAdmin && <VersionUpdateTab />}
+      {activeTab === 'version' && <VersionUpdateTab />}
     </div>
   )
 }

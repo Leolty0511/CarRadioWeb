@@ -4,7 +4,7 @@ import {
   updateSystemSettings 
 } from '../services/systemSettingsService';
 import { createLogger } from '../utils/logger';
-import { requirePermission, requireSuperAdmin } from '../middleware/auth';
+import { requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
 import {
   getProjectUpdateInfo,
@@ -16,8 +16,8 @@ const logger = createLogger('system-route');
 
 const router = express.Router();
 
-// 项目版本与更新信息（仅超级管理员）
-router.get('/update/info', requireSuperAdmin, async (_req: Request, res: Response) => {
+// 项目版本与更新信息（拥有系统设置页面权限的管理员可查看并拉取）
+router.get('/update/info', requirePermission(PERMISSIONS.pages.settings), async (_req: Request, res: Response) => {
   try {
     res.json({ success: true, data: await getProjectUpdateInfo(false) });
   } catch (error) {
@@ -26,7 +26,7 @@ router.get('/update/info', requireSuperAdmin, async (_req: Request, res: Respons
   }
 });
 
-router.post('/update/check', requireSuperAdmin, async (_req: Request, res: Response) => {
+router.post('/update/check', requirePermission(PERMISSIONS.pages.settings), async (_req: Request, res: Response) => {
   try {
     res.json({ success: true, data: await getProjectUpdateInfo(true) });
   } catch (error) {
@@ -35,7 +35,7 @@ router.post('/update/check', requireSuperAdmin, async (_req: Request, res: Respo
   }
 });
 
-router.get('/update/status', requireSuperAdmin, async (_req: Request, res: Response) => {
+router.get('/update/status', requirePermission(PERMISSIONS.pages.settings), async (_req: Request, res: Response) => {
   try {
     res.json({ success: true, data: await getProjectUpdateStatus() });
   } catch (error) {
@@ -44,7 +44,7 @@ router.get('/update/status', requireSuperAdmin, async (_req: Request, res: Respo
   }
 });
 
-router.post('/update/apply', requireSuperAdmin, async (req: Request, res: Response) => {
+router.post('/update/apply', requirePermission(PERMISSIONS.pages.settings), async (req: Request, res: Response) => {
   try {
     if (req.body?.repository !== 'Leolty0511/CarRadioWeb') {
       return res.status(400).json({ success: false, error: 'update_confirmation_required' });

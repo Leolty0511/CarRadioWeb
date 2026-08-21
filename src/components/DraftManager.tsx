@@ -44,7 +44,7 @@ const DraftManager: React.FC<DraftManagerProps> = ({ isOpen, onClose, onRestore 
 
   const getTypeLabel = (type: Draft['type']) => {
     switch (type) {
-      case 'structured': return '车型资料';
+      case 'structured': return '主机接线教程';
       case 'video': return '视频教程';
       case 'general': return '图文教程';
     }

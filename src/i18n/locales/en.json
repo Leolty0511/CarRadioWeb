@@ -347,7 +347,7 @@
     "noTitle": "No Title",
     "documentPassword": "Document Password",
     "documentPasswordPlaceholder": "Enter password for this document",
-    "passwordProtectionDesc": "Vehicle research documents require password; video tutorials and general documents do not.",
+    "passwordProtectionDesc": "Head unit wiring guides require a password; video tutorials and illustrated tutorials do not.",
     "passwordIncorrect": "Incorrect password, please try again",
     "searchPlaceholder": "Search technical materials...",
     "noResults": "No results found",
@@ -373,7 +373,7 @@
     "technicalData": "Technical Materials",
     "noVehiclesTitle": "No Vehicle Data",
     "noVehiclesDesc": "No vehicle information has been added to the knowledge base yet. Please add vehicle data through the admin panel first.",
-    "structuredDocument": "Vehicle Data",
+    "structuredDocument": "Head Unit Wiring Guide",
     "videoTutorial": "Video Tutorial",
     "generalDocument": "Image-Text Tutorial",
     "documentContent": "Document Content",
@@ -382,8 +382,13 @@
     "clickToViewFullImage": "Click to view full image",
     "noContent": "No Content",
     "noBasicInfo": "No Basic Information",
-    "noResearchData": "No Vehicle Research Data",
-    "noResearchDataDesc": "We are organizing compatibility information, technical specifications and related research data for this vehicle model, please stay tuned.",
+    "noResearchData": "No Wiring Guide Available",
+    "noResearchDataDesc": "The illustrated head unit wiring guide for this vehicle is being prepared.",
+    "wiringGuide": "Head Unit Wiring Guide",
+    "wiringTutorial": "Illustrated Tutorial",
+    "wiringStep": "Step {{index}}",
+    "noWiringTutorial": "No illustrated wiring steps have been added to this article yet.",
+    "noFaqs": "No frequently asked questions yet.",
     "fileDocument": "File Document",
     "fileDocumentDesc": "This is a file type document, content is stored in file format.",
     "supportedFeatures": "Supported Features",
@@ -470,8 +475,9 @@
     "noDocumentsDesc": "No technical documents have been uploaded for this vehicle yet.",
     "technicalTeam": "Technical Team",
     "sections": {
-      "vehicleResearch": "Vehicle Data",
-      "vehicleResearchDesc": "Browse detailed vehicle specifications including OEM center console interior, factory head unit configurations, and more.",
+      "wiringGuide": "Head Unit Wiring Guide",
+      "vehicleResearch": "Head Unit Wiring Guide",
+      "vehicleResearchDesc": "Find the correct illustrated head unit wiring guide by brand, model, and year.",
       "videoTutorials": "Installation Video Tutorials",
       "videoTutorialsDesc": "Watch head unit installation, wiring, and installation precaution videos.",
       "deviceOperationVideos": "Device Operation Video Tutorials",
@@ -498,7 +504,7 @@
       "backToOverview": "Back to Overview"
     },
     "vehicleResearch": {
-      "title": "Vehicle Research",
+      "title": "Head Unit Wiring Guide",
       "basicInfo": "Basic Information",
       "basicInfoDesc": "View vehicle basic information and important notes",
       "basicInfoLabel": "View Details",
@@ -510,8 +516,8 @@
       "wiringDiagram": "Wiring Diagram",
       "dashboard": "Dashboard",
       "interior": "Interior",
-      "noResearchData": "No Vehicle Research Data",
-      "noResearchDataDesc": "No vehicle research information available for this vehicle."
+      "noResearchData": "No Wiring Guide Available",
+      "noResearchDataDesc": "The illustrated head unit wiring guide for this vehicle is being prepared."
     },
     "videoTutorials": {
       "title": "Video Tutorials",
@@ -552,7 +558,7 @@
     "fillCompleteDocumentInfo": "Please fill in complete document information",
     "fillCompleteVehicleInfo": "Please fill in complete vehicle information",
     "contentSections": "Content Sections",
-    "structuredArticle": "Vehicle Data"
+    "structuredArticle": "Head Unit Wiring Guide"
   },
   "contact": {
     "title": "Contact Us",

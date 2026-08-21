@@ -6,6 +6,7 @@ import {
   updateFeedbackStatus,
   deleteFeedback,
   getUnreadFeedbackCount,
+  getFeedbackStats,
   exportFeedback,
   clearAllFeedback,
   batchUpdateFeedbackStatus,
@@ -148,6 +149,26 @@ router.post('/', feedbackRateLimit, async (req, res) => {
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : '创建反馈失败'
+    })
+  }
+})
+
+/**
+ * 全量表单状态统计 - 需要认证
+ */
+router.get('/stats', authenticateUser, requirePermission(PERMISSIONS.feedback.read), async (req, res) => {
+  try {
+    const language = req.query.language as 'en' | 'ru' | undefined
+    const stats = await getFeedbackStats(language)
+    res.json({
+      success: true,
+      stats
+    })
+  } catch (error) {
+    logger.error({ error }, '获取反馈统计失败')
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : '获取反馈统计失败'
     })
   }
 })

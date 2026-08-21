@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Ban, Check, Crown, Edit2, ShieldCheck, Trash2, UserCheck, X } from 'lucide-react'
+import { Ban, Check, Crown, ShieldCheck, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -541,7 +541,9 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
           <ShieldCheck className="w-8 h-8 text-blue-500" />
           <div>
             <h2 className="text-2xl font-bold text-slate-800 dark:text-white">管理员管理</h2>
-            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">邀请、编辑和管理后台管理员</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
+              {canManageAdministrators ? '邀请、编辑和管理后台管理员' : '查看后台管理员列表。邀请、编辑和删除仅超级管理员可操作。'}
+            </p>
           </div>
         </div>
         {canManageAdministrators && <div className="flex flex-wrap gap-2">
@@ -582,7 +584,9 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                     <th className="text-left py-3 px-2 text-slate-500 dark:text-slate-400 font-medium">登录方式</th>
                     <th className="text-left py-3 px-2 text-slate-500 dark:text-slate-400 font-medium">状态</th>
                     <th className="text-left py-3 px-2 text-slate-500 dark:text-slate-400 font-medium">权限数</th>
+                    {canManageAdministrators && (
                     <th className="text-right py-3 px-2 text-slate-500 dark:text-slate-400 font-medium">操作</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -625,32 +629,32 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                       <td className="py-3 px-2 text-slate-500">
                         {u.role === 'super_admin' ? '全部' : u.permissions.length}
                       </td>
+                      {canManageAdministrators && (
                       <td className="py-3 px-2 text-right">
-                        {!canManageAdministrators ? (
-                          <span className="text-xs text-slate-400">只读</span>
-                        ) : u.role === 'super_admin' ? (
-                          <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑昵称" aria-label="编辑昵称">
-                            <Edit2 className="h-4 w-4 text-slate-400" />
+                        {u.role === 'super_admin' ? (
+                          <button type="button" onClick={() => setDialogUser(u)} className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                            编辑
                           </button>
                         ) : (
-                          <div className="flex items-center justify-end gap-1">
-                            <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑" aria-label="编辑">
-                              <Edit2 className="h-4 w-4 text-slate-400" />
+                          <div className="flex items-center justify-end gap-3">
+                            <button type="button" onClick={() => setDialogUser(u)} className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400">
+                              编辑
                             </button>
                             {eligibleTransferTargets.some(target => target._id === u._id) && (
-                              <button onClick={() => { setTransferTarget(u); setTransferPassword('') }} className="p-1.5 rounded hover:bg-amber-50 dark:hover:bg-amber-900/20" title="转让超级管理员" aria-label="转让超级管理员">
-                                <Crown className="h-4 w-4 text-amber-500" />
+                              <button type="button" onClick={() => { setTransferTarget(u); setTransferPassword('') }} className="text-sm text-amber-600 hover:text-amber-700 dark:text-amber-400">
+                                转让
                               </button>
                             )}
-                            <button onClick={() => handleToggleActive(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title={u.isActive ? '停用' : '启用'} aria-label={u.isActive ? '停用' : '启用'}>
-                              {u.isActive ? <Ban className="h-4 w-4 text-orange-400" /> : <UserCheck className="h-4 w-4 text-green-500" />}
+                            <button type="button" onClick={() => handleToggleActive(u)} className="text-sm text-slate-600 hover:text-slate-800 dark:text-slate-300">
+                              {u.isActive ? '停用' : '启用'}
                             </button>
-                            <button onClick={() => setDeleteConfirm({ open: true, user: u })} className="p-1.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20" title="删除" aria-label="删除">
-                              <Trash2 className="h-4 w-4 text-red-400" />
+                            <button type="button" onClick={() => setDeleteConfirm({ open: true, user: u })} className="text-sm text-red-500 hover:text-red-600">
+                              删除
                             </button>
                           </div>
                         )}
                       </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>

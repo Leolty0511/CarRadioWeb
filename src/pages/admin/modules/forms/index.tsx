@@ -12,7 +12,7 @@ import {
   ColumnDef,
   PaginationState
 } from '@tanstack/react-table'
-import { MessageSquare, Eye, Trash2, CheckSquare } from 'lucide-react'
+import { MessageSquare, Eye, Trash2 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
@@ -25,6 +25,7 @@ import {
   updateFormStatus,
   deleteForm,
   getUnreadFormsCount,
+  getFormStats,
   batchUpdateFormStatus,
   batchDeleteForms
 } from '@/services/contactService'
@@ -65,6 +66,7 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
   const [loading, setLoading] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
   const [, setUnreadCount] = useState(0)
+  const [formStats, setFormStats] = useState({ total: 0, pending: 0, read: 0, replied: 0 })
 
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
@@ -80,12 +82,13 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
   const loadForms = async () => {
     setLoading(true)
     try {
-      const [result, count] = await Promise.all([
+      const [result, count, statsResult] = await Promise.all([
         getContactFormsPaginated({
           page: pagination.pageIndex + 1,
           limit: pagination.pageSize
         }),
-        getUnreadFormsCount()
+        getUnreadFormsCount(),
+        getFormStats()
       ])
 
       const transformedForms = result.forms.map(form => ({
@@ -97,6 +100,7 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
       setForms(transformedForms)
       setTotalCount(result.total)
       setUnreadCount(count)
+      setFormStats(statsResult)
       onUnreadCountChange?.(count)
     } catch (error) {
       console.error('加载表单失败:', error)
@@ -111,10 +115,10 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
   }, [pagination.pageIndex, pagination.pageSize])
 
   const stats = useMemo(() => ({
-    total: totalCount,
-    new: forms.filter(f => f.status === 'pending').length,
-    replied: forms.filter(f => f.status === 'replied').length
-  }), [forms, totalCount])
+    total: formStats.total || totalCount,
+    new: formStats.pending,
+    replied: formStats.replied
+  }), [formStats, totalCount])
 
   const selectedIds = useMemo(() => {
     return Object.keys(rowSelection).filter(key => rowSelection[key])
@@ -292,14 +296,14 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
     }
   }
 
-  const handleBatchMarkRead = async () => {
+  const handleBatchMarkStatus = async (status: FormStatus, label: string) => {
     if (selectedIds.length === 0) {return}
     try {
-      const result = await batchUpdateFormStatus(selectedIds, 'read')
+      const result = await batchUpdateFormStatus(selectedIds, status)
       if (result.success) {
         setRowSelection({})
         await loadForms()
-        showToast({ type: 'success', title: `已标记 ${result.modifiedCount} 条为已读`, description: '' })
+        showToast({ type: 'success', title: `已标记 ${result.modifiedCount} 条为${label}`, description: '' })
       }
     } catch (error) {
       showToast({ type: 'error', title: '批量更新失败', description: '' })
@@ -319,9 +323,11 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
           <CardTitle className="text-slate-800 dark:text-white">联系表单</CardTitle>
           {selectedIds.length > 0 && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleBatchMarkRead}>
-                <CheckSquare className="h-4 w-4 mr-1" />
+              <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('read', '已读')}>
                 标记已读 ({selectedIds.length})
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('replied', '已回复')}>
+                标记已回复 ({selectedIds.length})
               </Button>
               <Button
                 variant="outline"

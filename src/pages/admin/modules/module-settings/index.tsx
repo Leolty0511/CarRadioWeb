@@ -271,7 +271,7 @@ function ExternalLinksPanel({ dataLanguage, showToast, refreshSiteSettings }: Pa
 // ---------- Knowledge Panel ----------
 
 const KNOWLEDGE_SECTIONS: { key: keyof KnowledgeSectionSettings; label: string; desc: string }[] = [
-  { key: 'vehicleDataEnabled', label: '车型数据', desc: '知识库入口页显示「车型数据」板块' },
+  { key: 'vehicleDataEnabled', label: '主机接线教程', desc: '知识库入口页显示「主机接线教程」板块' },
   { key: 'videoTutorialsEnabled', label: '安装视频教程', desc: '知识库入口页显示「安装视频教程」板块' },
   { key: 'deviceOperationVideosEnabled', label: '设备操作视频教程', desc: '知识库入口页显示「设备操作视频教程」板块' },
   { key: 'tutorialsEnabled', label: '图文教程', desc: '知识库入口页显示「图文教程」板块' },

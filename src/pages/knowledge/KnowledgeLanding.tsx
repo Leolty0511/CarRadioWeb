@@ -15,7 +15,7 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: 'vehicle-data', path: '/knowledge/vehicle-data', i18nKey: 'vehicleResearch', settingKey: 'vehicleDataEnabled' },
+  { key: 'vehicle-data', path: '/knowledge/vehicle-data', i18nKey: 'wiringGuide', settingKey: 'vehicleDataEnabled' },
   { key: 'video-tutorials', path: '/knowledge/video-tutorials', i18nKey: 'videoTutorials', settingKey: 'videoTutorialsEnabled' },
   { key: 'device-operation-videos', path: '/knowledge/device-operation-videos', i18nKey: 'deviceOperationVideos', settingKey: 'deviceOperationVideosEnabled' },
   { key: 'tutorials', path: '/knowledge/tutorials', i18nKey: 'generalDocuments', settingKey: 'tutorialsEnabled' },

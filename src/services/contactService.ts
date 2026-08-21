@@ -388,6 +388,28 @@ export const clearAllForms = async (): Promise<boolean> => {
 /**
  * 获取未读表单数量
  */
+export interface FormStats {
+  total: number
+  pending: number
+  read: number
+  replied: number
+}
+
+export const getFormStats = async (): Promise<FormStats> => {
+  try {
+    const result = await apiClient.get('/feedback/stats')
+    if (result.success && result.stats) {
+      return {
+        total: result.stats.total ?? 0,
+        pending: result.stats.pending ?? 0,
+        read: result.stats.read ?? 0,
+        replied: result.stats.replied ?? 0,
+      }
+    }
+  } catch { /* Silent */ }
+  return { total: 0, pending: 0, read: 0, replied: 0 }
+}
+
 export const getUnreadFormsCount = async (): Promise<number> => {
   try {
     const result = await apiClient.get('/feedback/unread/count')

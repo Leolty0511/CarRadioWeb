@@ -36,6 +36,13 @@ export interface PaginatedFeedbackResult {
   totalPages: number
 }
 
+export interface FeedbackStats {
+  total: number
+  pending: number
+  read: number
+  replied: number
+}
+
 /**
  * 获取所有反馈（按资料体系）- 兼容旧接口
  */
@@ -227,6 +234,28 @@ export const deleteFeedback = async (id: string): Promise<void> => {
   } catch (error) {
     logger.error({ error }, '删除反馈失败')
     throw error
+  }
+}
+
+/**
+ * 全量表单状态统计（不受分页影响）
+ */
+export const getFeedbackStats = async (language?: 'en' | 'ru'): Promise<FeedbackStats> => {
+  try {
+    const filter: Record<string, unknown> = {}
+    if (language) {
+      filter.language = language
+    }
+    const [total, pending, read, replied] = await Promise.all([
+      Feedback.countDocuments(filter),
+      Feedback.countDocuments({ ...filter, status: 'pending' }),
+      Feedback.countDocuments({ ...filter, status: 'read' }),
+      Feedback.countDocuments({ ...filter, status: 'replied' }),
+    ])
+    return { total, pending, read, replied }
+  } catch (error) {
+    logger.error({ error }, '获取反馈统计失败')
+    return { total: 0, pending: 0, read: 0, replied: 0 }
   }
 }
 
