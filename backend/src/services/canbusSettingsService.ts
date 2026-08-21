@@ -140,7 +140,7 @@ class CANBusSettingsService {
    * 根据车型获取设置信息
    * @param vehicleId 车型 ID
    */
-  async getSettingByVehicle(vehicleId: string): Promise<{ settingImage: string; description: string } | null> {
+  async getSettingByVehicle(vehicleId: string): Promise<{ settingImage: string; settingImages: string[]; description: string } | null> {
     const setting = await CANBusSetting.findOne({
       vehicleId: new Types.ObjectId(vehicleId),
       isActive: true
