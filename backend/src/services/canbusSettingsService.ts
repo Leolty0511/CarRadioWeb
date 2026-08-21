@@ -1,6 +1,7 @@
 import { CANBoxType, ICANBoxType } from '../models/CANBoxType'
 import { CANBusSetting, ICANBusSetting } from '../models/CANBusSetting'
 import { Types } from 'mongoose'
+import { ModuleSettings } from '../models/ModuleSettings'
 
 interface CANBoxTypeInput {
   name: string
@@ -131,6 +132,43 @@ class CANBusSettingsService {
       settingImage: setting.settingImage,
       description: setting.description
     }
+  }
+
+  async getPageIntro(): Promise<{ en: string; zh: string }> {
+    const moduleSettings = await ModuleSettings.findOne().lean()
+    const settings = (moduleSettings?.knowledgeBase as { settings?: Record<string, unknown> } | undefined)?.settings
+    return {
+      en: typeof settings?.canbusIntroEn === 'string' ? settings.canbusIntroEn : '',
+      zh: typeof settings?.canbusIntroZh === 'string' ? settings.canbusIntroZh : '',
+    }
+  }
+
+  async updatePageIntro(intro: { en?: string; zh?: string }): Promise<{ en: string; zh: string }> {
+    const current = await this.getPageIntro()
+    const next = {
+      en: intro.en !== undefined ? String(intro.en) : current.en,
+      zh: intro.zh !== undefined ? String(intro.zh) : current.zh,
+    }
+    const existing = await ModuleSettings.findOne()
+    if (!existing) {
+      await ModuleSettings.create({
+        knowledgeBase: { settings: { canbusIntroEn: next.en, canbusIntroZh: next.zh } },
+      })
+      return next
+    }
+    const knowledgeBase = (existing.knowledgeBase && typeof existing.knowledgeBase === 'object')
+      ? { ...existing.knowledgeBase as Record<string, unknown> }
+      : {}
+    const settings = (knowledgeBase.settings && typeof knowledgeBase.settings === 'object')
+      ? { ...knowledgeBase.settings as Record<string, unknown> }
+      : {}
+    settings.canbusIntroEn = next.en
+    settings.canbusIntroZh = next.zh
+    knowledgeBase.settings = settings
+    existing.knowledgeBase = knowledgeBase
+    existing.markModified('knowledgeBase')
+    await existing.save()
+    return next
   }
 }
 

@@ -1,14 +1,38 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings } from 'lucide-react'
 import CANBusSettingsPanel from '@/components/CANBusSettingsPanel'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
+import canbusSettingsService from '@/services/canbusSettingsService'
 
 const CANBusSettings: React.FC = () => {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const sectionEnabled = useKnowledgeSection('canbusSettingsEnabled')
+  const [intro, setIntro] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    const loadIntro = async () => {
+      try {
+        const data = await canbusSettingsService.getPageIntro()
+        const isZh = i18n.language.startsWith('zh')
+        const custom = (isZh ? data.zh : data.en).trim()
+        if (!cancelled) {
+          setIntro(custom || t('knowledge.sections.canbusSettingsDesc'))
+        }
+      } catch {
+        if (!cancelled) {
+          setIntro(t('knowledge.sections.canbusSettingsDesc'))
+        }
+      }
+    }
+    loadIntro()
+    return () => {
+      cancelled = true
+    }
+  }, [i18n.language, t])
 
   if (sectionEnabled !== true) {return null}
 
@@ -16,7 +40,7 @@ const CANBusSettings: React.FC = () => {
     <div className="page-container">
       <SEOHead
         title={`${t('knowledge.sections.canbusSettings')} - ${t('knowledge.seo.title')}`}
-        description={t('knowledge.sections.canbusSettingsDesc')}
+        description={intro || t('knowledge.sections.canbusSettingsDesc')}
         keywords={['CANBus', 'CAN settings', 'car model settings']}
         type="website"
       />
@@ -36,9 +60,11 @@ const CANBusSettings: React.FC = () => {
               {t('knowledge.sections.canbusSettings')}
             </h1>
           </div>
-          <p className="text-slate-600 dark:text-gray-400 max-w-3xl">
-            {t('knowledge.sections.canbusSettingsDesc')}
-          </p>
+          {intro ? (
+            <p className="text-slate-600 dark:text-gray-400 max-w-3xl whitespace-pre-wrap">
+              {intro}
+            </p>
+          ) : null}
         </div>
 
         <CANBusSettingsPanel />

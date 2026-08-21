@@ -48,6 +48,24 @@ class CANBusSettingsService {
   /**
    * 获取所有 CANBox 类型（仅启用的，用于展示）
    */
+  async getPageIntro(): Promise<{ en: string; zh: string }> {
+    const response = await apiClient.get<{ en: string; zh: string }>(`${this.baseUrl}/intro`)
+    return response.data || { en: '', zh: '' }
+  }
+
+  async getAdminPageIntro(): Promise<{ en: string; zh: string }> {
+    const response = await apiClient.get<{ en: string; zh: string }>(`${this.baseUrl}/admin/intro`)
+    return response.data || { en: '', zh: '' }
+  }
+
+  async updatePageIntro(data: { en: string; zh: string }): Promise<{ en: string; zh: string }> {
+    const response = await apiClient.put<{ en: string; zh: string }>(`${this.baseUrl}/admin/intro`, data)
+    if (!response.success || !response.data) {
+      throw new Error(response.error || 'Failed to update intro')
+    }
+    return response.data
+  }
+
   async getCANBoxTypes(): Promise<CANBoxType[]> {
     const response = await apiClient.get<CANBoxType[]>(
       `${this.baseUrl}/canbox-types`

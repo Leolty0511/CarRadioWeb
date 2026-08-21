@@ -45,7 +45,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
   const [loading, setLoading] = useState(false)
   const [loadingVehicles, setLoadingVehicles] = useState(false)
   const [showDropdown, setShowDropdown] = useState<'brand' | 'model' | 'year' | null>(null)
-  const [imageModalOpen, setImageModalOpen] = useState(false)
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null)
 
   // 加载 CANBox 类型列表（仅展示用）
   useEffect(() => {
@@ -192,11 +192,17 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                     className="p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-slate-50 dark:bg-gray-800/50"
                   >
                     {canbox.image ? (
-                      <img
-                        src={canbox.image}
-                        alt={canbox.name}
-                        className="w-full aspect-square object-contain rounded-lg"
-                      />
+                      <button
+                        type="button"
+                        className="block w-full overflow-hidden rounded-lg bg-white dark:bg-gray-900"
+                        onClick={() => setPreviewImage({ url: canbox.image, title: canbox.name })}
+                      >
+                        <img
+                          src={canbox.image}
+                          alt={canbox.name}
+                          className="h-full w-full aspect-square object-cover"
+                        />
+                      </button>
                     ) : (
                       <div className="w-full aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
                         <Settings className="h-8 w-8 text-gray-400" />
@@ -346,7 +352,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
               {/* 设置图片 */}
               <div
                 className="relative cursor-pointer group"
-                onClick={() => setImageModalOpen(true)}
+                onClick={() => setPreviewImage({ url: settingData.settingImage, title: `${selectedBrand} ${selectedModel} ${selectedYear} - CANBus Settings` })}
               >
                 <img
                   src={settingData.settingImage}
@@ -387,12 +393,12 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
       </Card>
 
       {/* 图片放大弹窗 */}
-      {settingData?.settingImage && (
+      {previewImage && (
         <EnhancedImageModal
-          isOpen={imageModalOpen}
-          onClose={() => setImageModalOpen(false)}
-          imageUrl={settingData.settingImage}
-          title={`${selectedBrand} ${selectedModel} ${selectedYear} - CANBus Settings`}
+          isOpen={Boolean(previewImage)}
+          onClose={() => setPreviewImage(null)}
+          imageUrl={previewImage.url}
+          title={previewImage.title}
         />
       )}
     </div>

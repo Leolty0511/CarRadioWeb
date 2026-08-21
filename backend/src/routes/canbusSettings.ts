@@ -57,6 +57,22 @@ router.get('/setting', async (req: Request, res: Response) => {
   }
 });
 
+/**
+ * 获取页面顶部说明文案
+ */
+router.get('/intro', async (_req: Request, res: Response) => {
+  try {
+    if (!(await isKnowledgeSectionEnabled('canbusSettingsEnabled'))) {
+      return res.status(404).json({ success: false, error: 'module_disabled' })
+    }
+    const intro = await canbusSettingsService.getPageIntro()
+    res.json({ success: true, data: intro })
+  } catch (error) {
+    logger.error({ err: error }, 'GET /intro error')
+    res.status(500).json({ success: false, error: 'Failed to get intro' })
+  }
+})
+
 // ==================== 管理接口（需要认证）====================
 
 // --- CANBox 类型管理 ---
@@ -215,5 +231,28 @@ router.delete('/admin/settings/:id', authenticateUser, requirePermission(PERMISS
     res.status(500).json({ success: false, error: 'Failed to delete setting' });
   }
 });
+
+router.get('/admin/intro', authenticateUser, requirePermission(PERMISSIONS.canbus.read), async (_req: Request, res: Response) => {
+  try {
+    const intro = await canbusSettingsService.getPageIntro()
+    res.json({ success: true, data: intro })
+  } catch (error) {
+    logger.error({ err: error }, 'GET /admin/intro error')
+    res.status(500).json({ success: false, error: 'Failed to get intro' })
+  }
+})
+
+router.put('/admin/intro', authenticateUser, requirePermission(PERMISSIONS.canbus.update), async (req: Request, res: Response) => {
+  try {
+    const intro = await canbusSettingsService.updatePageIntro({
+      en: typeof req.body?.en === 'string' ? req.body.en : undefined,
+      zh: typeof req.body?.zh === 'string' ? req.body.zh : undefined,
+    })
+    res.json({ success: true, data: intro })
+  } catch (error) {
+    logger.error({ err: error }, 'PUT /admin/intro error')
+    res.status(500).json({ success: false, error: 'Failed to update intro' })
+  }
+})
 
 export default router

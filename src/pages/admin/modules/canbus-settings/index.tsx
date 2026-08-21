@@ -27,11 +27,94 @@ interface CANBusSettingsManagementProps {
 
 type TabType = 'canbox-types' | 'settings'
 
+function PageIntroEditor() {
+  const { showToast } = useToast()
+  const [en, setEn] = useState('')
+  const [zh, setZh] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true)
+      try {
+        const data = await canbusSettingsService.getAdminPageIntro()
+        setEn(data.en)
+        setZh(data.zh)
+      } catch {
+        showToast({ type: 'error', title: '加载说明文案失败', description: '' })
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [showToast])
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await canbusSettingsService.updatePageIntro({ en, zh })
+      showToast({ type: 'success', title: '页面说明已保存', description: '前台 CANBus 页顶部文案已更新' })
+    } catch {
+      showToast({ type: 'error', title: '保存失败', description: '' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <Card className="bg-white dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
+      <CardHeader>
+        <CardTitle className="text-slate-800 dark:text-white">页面顶部说明</CardTitle>
+        <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
+          显示在前台 CANBus 设置页标题下方。留空则使用默认文案。
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-orange-500" />
+          </div>
+        ) : (
+          <>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">英文说明</label>
+              <textarea
+                value={en}
+                onChange={(event) => setEn(event.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100"
+                placeholder="For certain vehicles, CAN settings must be configured..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">中文说明</label>
+              <textarea
+                value={zh}
+                onChange={(event) => setZh(event.target.value)}
+                rows={4}
+                className="w-full rounded-lg border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-slate-800 dark:text-gray-100"
+                placeholder="部分车型需配置 CAN 设置以启用原车功能..."
+              />
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={handleSave} disabled={saving} className="bg-orange-500 hover:bg-orange-600">
+                {saving ? '保存中...' : '保存说明'}
+              </Button>
+            </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export const CANBusSettingsManagement: React.FC<CANBusSettingsManagementProps> = ({ dataLanguage }) => {
   const [activeTab, setActiveTab] = useState<TabType>('canbox-types')
 
   return (
     <div className="space-y-6">
+      <PageIntroEditor />
       {/* Tab 切换 */}
       <div className="flex gap-2 border-b border-slate-200 dark:border-gray-700 pb-4">
         <Button
