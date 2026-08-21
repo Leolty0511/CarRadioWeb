@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Car, ChevronRight, Shield } from 'lucide-react'
+import { Car, Shield } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import VehicleSelector from '@/components/VehicleSelector'
@@ -145,7 +145,7 @@ const VehicleData: React.FC = () => {
       <SEOHead
         title={`${t('knowledge.sections.vehicleResearch')} - ${t('knowledge.seo.title')}`}
         description={t('knowledge.sections.vehicleResearchDesc')}
-        keywords={['vehicle data', 'car specifications', 'OEM head unit']}
+        keywords={['head unit wiring', 'car stereo installation', 'vehicle wiring guide']}
         type="website"
       />
       <BreadcrumbSchema items={[
@@ -188,10 +188,18 @@ const VehicleData: React.FC = () => {
           </Card>
         ) : (
           <div className="space-y-8">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-700 dark:bg-slate-800/50">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                {selectedVehicle.brand} {selectedVehicle.model} {selectedVehicle.year}
+              </p>
+              <Button variant="outline" onClick={() => { setSelectedVehicle(null); setVehicleDocuments([]) }}>
+                {t('knowledge.backToSelect')}
+              </Button>
+            </div>
             {vehicleDocuments.length > 0 ? (
               <div className="grid gap-6">
                 {vehicleDocuments.map((doc) => (
-                  <Card key={doc.id} className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50 backdrop-blur-sm shadow-xl hover:shadow-2xl transition-all duration-300 group hover:scale-[1.02]">
+                  <Card key={doc._id || doc.id} className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-gray-700 shadow-lg transition-shadow hover:shadow-xl">
                     <CardContent className="p-6">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -210,10 +218,9 @@ const VehicleData: React.FC = () => {
                         <Button
                           size="lg"
                           onClick={() => handleViewDocument(doc)}
-                          className="bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-white shadow-lg"
+                          className="bg-blue-600 text-white shadow-sm hover:bg-blue-700"
                         >
-                          <span className="mr-2">{t('knowledge.view')}</span>
-                          <ChevronRight className="h-5 w-5" />
+                          {t('knowledge.view')}
                         </Button>
                       </div>
                     </CardContent>

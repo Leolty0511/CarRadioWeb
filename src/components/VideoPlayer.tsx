@@ -1,9 +1,10 @@
 import React from 'react'
-import { Play, ExternalLink } from 'lucide-react'
+import { Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import DocumentFeedback from '@/components/DocumentFeedback'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import CarRadioVideoFrame from '@/components/CarRadioVideoFrame'
 
 interface VideoPlayerProps {
   document: any
@@ -154,47 +155,12 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
             {currentVideo.description && (
               <p className="text-sm text-slate-600 dark:text-gray-300 mb-4">{currentVideo.description}</p>
             )}
-            {embedUrl ? (
-              <div className="relative">
-                {isLocalVideo ? (
-                  <video
-                    controls
-                    className="w-full rounded-lg shadow-lg"
-                    style={{ aspectRatio: '16/9' }}
-                  >
-                    <source src={embedUrl} type="video/mp4" />
-                    <source src={embedUrl} type="video/webm" />
-                    {t('knowledge.video.browserNotSupported')}
-                  </video>
-                ) : (
-                  <div className="relative w-full rounded-lg shadow-lg overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                    <iframe
-                      src={embedUrl}
-                      title={currentVideo.title || document.title}
-                      className="w-full h-full"
-                      frameBorder="0"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-slate-100 dark:bg-gray-900/50 border border-slate-200 dark:border-gray-600/50 rounded-lg p-8 text-center">
-                <div className="w-16 h-16 bg-slate-200 dark:bg-gray-700/50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Play className="h-8 w-8 text-slate-400 dark:text-gray-400" />
-                </div>
-                <p className="text-slate-600 dark:text-gray-300 mb-4">{t('knowledge.video.cannotParseLink')}</p>
-                <p className="text-slate-400 dark:text-gray-500 text-sm mb-4">{t('knowledge.video.currentLink')}: {videoUrl}</p>
-                <Button
-                  onClick={() => window.open(videoUrl, '_blank')}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  {t('knowledge.video.openVideoInNewWindow')}
-                </Button>
-              </div>
-            )}
+            <CarRadioVideoFrame
+              embedUrl={embedUrl}
+              isLocalVideo={Boolean(isLocalVideo)}
+              title={currentVideo.title || document.title}
+              sourceUrl={videoUrl || ''}
+            />
           </div>
 
           {/* 外部链接按钮 */}
@@ -205,7 +171,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
                 variant="outline"
                 className="bg-white/50 dark:bg-gray-800/50 border-slate-200 dark:border-gray-600/50 text-slate-700 dark:text-white hover:bg-slate-100 dark:hover:bg-gray-700/50"
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
                 {t('knowledge.video.watchInNewWindow')}
               </Button>
             </div>

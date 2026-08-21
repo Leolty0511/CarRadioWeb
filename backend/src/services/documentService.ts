@@ -563,6 +563,18 @@ export class DocumentService {
       operations.push(this.createImageRefOperation(documentId, document.basicInfo.vehicleImage, 'structured', 'vehicleImage'));
     }
 
+    for (const section of document.tutorialSections || []) {
+      if (section.imageUrl) {
+        operations.push(this.createImageRefOperation(documentId, section.imageUrl, 'structured', 'tutorialSection'));
+      }
+    }
+
+    for (const faq of document.faqs || []) {
+      for (const imageUrl of faq.images || []) {
+        if (imageUrl) operations.push(this.createImageRefOperation(documentId, imageUrl, 'structured', 'faq'));
+      }
+    }
+
     // 处理兼容车型图片
     if (document.compatibleModels) {
       for (const model of document.compatibleModels) {
@@ -711,29 +723,41 @@ export class DocumentService {
   ) {
     const operations: any[] = [];
 
-    // 处理基本信息图片更新
-    if (updates.basicInfo?.vehicleImage && updates.basicInfo.vehicleImage !== oldDocument.basicInfo?.vehicleImage) {
-      // 移除旧图片引用
-      if (oldDocument.basicInfo?.vehicleImage) {
+    const collectImages = (article: Partial<IStructuredArticle>) => {
+      const urls = new Map<string, string>();
+      if (article.basicInfo?.vehicleImage) urls.set(article.basicInfo.vehicleImage, 'vehicleImage');
+      for (const section of article.tutorialSections || []) {
+        if (section.imageUrl) urls.set(section.imageUrl, 'tutorialSection');
+      }
+      for (const faq of article.faqs || []) {
+        for (const imageUrl of faq.images || []) {
+          if (imageUrl) urls.set(imageUrl, 'faq');
+        }
+      }
+      return urls;
+    };
+
+    const oldImages = collectImages(oldDocument);
+    const nextImages = collectImages({
+      basicInfo: updates.basicInfo || oldDocument.basicInfo,
+      tutorialSections: updates.tutorialSections || oldDocument.tutorialSections,
+      faqs: updates.faqs || oldDocument.faqs,
+    });
+
+    for (const imageUrl of oldImages.keys()) {
+      if (!nextImages.has(imageUrl)) {
         operations.push({
           updateOne: {
-            filter: { url: oldDocument.basicInfo.vehicleImage },
-            update: {
-              $pull: { references: { documentId: new mongoose.Types.ObjectId(documentId) } }
-            }
+            filter: { url: imageUrl },
+            update: { $pull: { references: { documentId: new mongoose.Types.ObjectId(documentId) } } }
           }
         });
       }
-      // 添加新图片引用
-      operations.push(this.createImageRefOperation(documentId, updates.basicInfo.vehicleImage, 'structured', 'vehicleImage'));
     }
 
-    // 处理兼容车型图片更新
-    if (updates.compatibleModels && updates.compatibleModels.length > 0) {
-      for (const model of updates.compatibleModels) {
-        if (model.dashboardImage) {
-          operations.push(this.createImageRefOperation(documentId, model.dashboardImage, 'structured', 'dashboardImage'));
-        }
+    for (const [imageUrl, fieldName] of nextImages) {
+      if (!oldImages.has(imageUrl)) {
+        operations.push(this.createImageRefOperation(documentId, imageUrl, 'structured', fieldName));
       }
     }
 

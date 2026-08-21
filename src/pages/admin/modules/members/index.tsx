@@ -11,8 +11,8 @@ const DEVICE_LABELS: Record<MemberRecord['lastSeenDeviceType'], string> = { desk
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString('zh-CN') : '暂无记录'
 
 function DeviceIcon({ type }: { type: MemberRecord['lastSeenDeviceType'] }) {
-  if (type === 'mobile') return <Smartphone className="h-4 w-4" />
-  if (type === 'tablet') return <Tablet className="h-4 w-4" />
+  if (type === 'mobile') {return <Smartphone className="h-4 w-4" />}
+  if (type === 'tablet') {return <Tablet className="h-4 w-4" />}
   return <Monitor className="h-4 w-4" />
 }
 
@@ -36,7 +36,7 @@ export function MemberManagement() {
         setPage(result.data.page || requestedPage)
         setTotal(result.data.total || 0)
         setTotalPages(Math.max(1, result.data.totalPages || 1))
-        if (result.data.stats) setStats(result.data.stats)
+        if (result.data.stats) {setStats(result.data.stats)}
       }
     } catch {
       showToast({ type: 'error', title: '会员数据加载失败' })
@@ -53,10 +53,10 @@ export function MemberManagement() {
     if (result.success) {
       showToast({ type: 'success', title: status === 'active' ? '会员账号已恢复' : '会员账号已停用' })
       await load(page)
-    } else showToast({ type: 'error', title: '会员状态更新失败' })
+    } else {showToast({ type: 'error', title: '会员状态更新失败' })}
   }
 
-  if (loading && members.length === 0) return <div className="p-6 text-slate-500">加载中...</div>
+  if (loading && members.length === 0) {return <div className="p-6 text-slate-500">加载中...</div>}
 
   return <div className="mx-auto w-full max-w-[1480px] space-y-6">
     <div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-sm font-medium text-cyan-600">ACCOUNT OPERATIONS</p><h2 className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">会员管理</h2></div><p className="text-sm text-slate-500">在线状态按最近 5 分钟活动统计</p></div>

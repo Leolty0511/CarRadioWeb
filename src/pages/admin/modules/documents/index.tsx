@@ -1,7 +1,7 @@
 /**
  * 文档管理模块主页面
  * 完全恢复原有核心功能
- * 支持图文教程、安装视频教程、设备操作视频教程和车型资料
+ * 支持图文教程、安装视频教程、设备操作视频教程和主机接线教程
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -315,7 +315,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">车型资料</p>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">主机接线教程</p>
               <p className="text-3xl font-bold text-slate-800 dark:text-white">{structuredDocs.length}</p>
             </div>
             <div className="p-3 bg-green-600/20 rounded-xl border border-green-500/30">
@@ -385,7 +385,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
               }`}
             >
               <Car className="h-4 w-4" />
-              车型资料 <span className="ml-1 opacity-75">({structuredDocs.length})</span>
+              主机接线教程 <span className="ml-1 opacity-75">({structuredDocs.length})</span>
             </button>
             <button
               onClick={() => setTypeFilter('installation-video')}
@@ -432,7 +432,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
             }}
             className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
           >
-            创建车型资料
+            创建主机接线教程
           </Button>
           <Button
             onClick={() => {
@@ -507,13 +507,13 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
 
       {/* 文档列表 */}
       <div className="space-y-6">
-        {/* 结构化文章 - 车辆层级结构 */}
+        {/* 主机接线教程 - 车辆层级结构 */}
         {structuredDocs.length > 0 && (typeFilter === 'all' || typeFilter === 'structured') && (
           <Card className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
             <CardHeader>
               <CardTitle className="text-slate-800 dark:text-white flex items-center">
                 <Car className="h-5 w-5 mr-2 text-blue-400" />
-                车型资料（结构化文章）
+                主机接线教程
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -741,7 +741,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
             setShowStructuredArticleEditor(false)
             setEditingStructuredArticle(null)
           }}
-          title={editingStructuredArticle ? '编辑车型资料' : '创建车型资料'}
+          title={editingStructuredArticle ? '编辑主机接线教程' : '创建主机接线教程'}
           size="xl"
         >
           <StructuredArticleEditor

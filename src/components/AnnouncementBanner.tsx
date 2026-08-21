@@ -207,7 +207,13 @@ const AnnouncementBanner: React.FC<AnnouncementBannerProps> = ({ announcement, h
       <button
         type="button"
         className="relative rounded-lg p-2 text-slate-600 transition-colors hover:bg-gray-100 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
-        onClick={() => setPanelOpen(true)}
+        onClick={() => {
+          if (unread) {
+            openItem(latest)
+            return
+          }
+          setPanelOpen(true)
+        }}
         aria-label={t('announcement.open', 'Open announcements')}
         aria-expanded={panelOpen}
         title={t('announcement.open', 'Open announcements')}

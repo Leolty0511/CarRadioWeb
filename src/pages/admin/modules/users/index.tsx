@@ -353,6 +353,7 @@ interface UserManagementProps {
 
 export function UserManagement({ currentUser, forceAccountSetup = false, onAccountUpdated }: UserManagementProps) {
   const { showToast } = useToast()
+  const canManageAdministrators = currentUser?.role === 'super_admin'
   const [users, setUsers] = useState<AdminUserRecord[]>([])
   const [invitations, setInvitations] = useState<AdminInvitationRecord[]>([])
   const [allPermissions, setAllPermissions] = useState<string[]>([])
@@ -374,7 +375,11 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
   const fetchData = useCallback(async () => {
     setLoading(true)
     try {
-      const [u, p, i] = await Promise.all([getUsers(), getPermissions(), getAdminInvitations()])
+      const [u, p, i] = await Promise.all([
+        getUsers(),
+        canManageAdministrators ? getPermissions() : Promise.resolve([]),
+        canManageAdministrators ? getAdminInvitations() : Promise.resolve([]),
+      ])
       setUsers(u)
       setAllPermissions(p)
       setInvitations(i)
@@ -383,7 +388,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
     } finally {
       setLoading(false)
     }
-  }, [showToast])
+  }, [canManageAdministrators, showToast])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -539,7 +544,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">邀请、编辑和管理后台管理员</p>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
+        {canManageAdministrators && <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={() => {
@@ -553,7 +558,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
             转让超级管理员
           </Button>
           <Button onClick={() => setDialogUser('new')}>邀请管理员</Button>
-        </div>
+        </div>}
       </div>
 
       <Card>
@@ -621,7 +626,9 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                         {u.role === 'super_admin' ? '全部' : u.permissions.length}
                       </td>
                       <td className="py-3 px-2 text-right">
-                        {u.role === 'super_admin' ? (
+                        {!canManageAdministrators ? (
+                          <span className="text-xs text-slate-400">只读</span>
+                        ) : u.role === 'super_admin' ? (
                           <button onClick={() => setDialogUser(u)} className="p-1.5 rounded hover:bg-slate-100 dark:hover:bg-slate-700" title="编辑昵称" aria-label="编辑昵称">
                             <Edit2 className="h-4 w-4 text-slate-400" />
                           </button>
@@ -653,7 +660,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
         </CardContent>
       </Card>
 
-      <Card>
+      {canManageAdministrators && <Card>
         <CardHeader>
           <CardTitle className="text-base">邀请记录</CardTitle>
         </CardHeader>
@@ -706,7 +713,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
             </div>
           )}
         </CardContent>
-      </Card>
+      </Card>}
 
       {dialogUser !== null && (
         <UserDialog

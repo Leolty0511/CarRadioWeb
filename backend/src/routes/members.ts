@@ -1,6 +1,5 @@
 import { Router } from 'express'
 import Member from '../models/Member'
-import { requireSuperAdmin } from '../middleware/auth'
 
 const router = Router()
 
@@ -13,8 +12,6 @@ router.get('/online', async (_req, res) => {
     .lean()
   res.json({ success: true, data: { count: items.length, since, items } })
 })
-
-router.use(requireSuperAdmin)
 
 router.get('/', async (req, res) => {
   await Member.updateMany({ status: { $in: ['pending', 'rejected'] } }, { $set: { status: 'active', reviewNote: '', approvedAt: new Date() } })

@@ -409,10 +409,7 @@ router.delete('/me/favorites/:documentId', async (req: Request, res: Response) =
   return res.json({ success: true })
 })
 
-// All remaining routes require super_admin (authenticateUser already applied in index.ts)
-router.use(requireSuperAdmin)
-
-/** GET /api/users — list all admin users */
+/** GET /api/users — all administrators can view the administrator directory. */
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const users = await User.find()
@@ -424,6 +421,9 @@ router.get('/', async (_req: Request, res: Response) => {
     res.status(500).json({ success: false, error: 'fetch_failed' })
   }
 })
+
+// All management routes below remain restricted to the super administrator.
+router.use(requireSuperAdmin)
 
 /** GET /api/users/invitations - list administrator invitations and delivery status */
 router.get('/invitations', async (_req: Request, res: Response) => {

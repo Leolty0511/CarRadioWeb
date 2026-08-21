@@ -190,7 +190,7 @@ export const AdminLayout: React.FC = () => {
     const required = getRequiredPermissionsForNavId(activeTab)
     if (required.length > 0 && !required.every(permission => userHasPermission(user, permission))) {
       const next = getFirstAccessibleNavTab(false, perm => userHasPermission(user, perm))
-      setActiveTab(next ?? 'dashboard')
+      setActiveTab(next ?? 'users')
     }
   }, [user, activeTab])
 

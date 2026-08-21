@@ -1,1217 +1,281 @@
-import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
-import logger from '@/utils/logger';
-import { useTranslation } from 'react-i18next';
-import { useToast } from '@/components/ui/Toast';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-// 移除未使用的 lazy 定义，使用包装好的懒加载组件
-import ImageUpload from '@/components/ImageUpload';
-// 不再使用localStorage获取车型，改为从结构化文档中提取
-import { saveDraft, loadDraft, deleteDraft } from '@/services/draftService';
-import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Trash2,
-  Car,
-  Monitor,
-  Settings,
-  FileText,
-  CheckCircle,
-  XCircle
-} from 'lucide-react';
-const CompatibleModelsSection = lazy(() => import('./structured-article/CompatibleModelsSection'));
-const IncompatibleModelsSection = lazy(() => import('./structured-article/IncompatibleModelsSection'));
-const FAQsSection = lazy(() => import('./structured-article/FAQsSection'));
-import LazyRichTextEditor from '@/components/LazyRichTextEditor';
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/Input'
+import { useToast } from '@/components/ui/Toast'
+import ImageUpload from '@/components/ImageUpload'
+import LazyRichTextEditor from '@/components/LazyRichTextEditor'
+import { deleteDraft, loadDraft, saveDraft } from '@/services/draftService'
+import { getVehicles } from '@/services/vehicleService'
 
-// 重构接口：将原车主机和可选模块嵌套到每个适配型号中
-interface OriginalHost {
-  frontImage: string;
-  backImage: string;
-  pinDefinitionImage: string;
-  description: string;
-  partNumber?: string; // 新增零件号字段
-  frontImageDescription?: string; // 新增
-  backImageDescription?: string; // 新增
-  pinDefinitionDescription?: string; // 新增
-  wiringDiagram?: string; // 新增线束连接图
+type TutorialLayout = 'imageLeft' | 'imageRight'
+
+interface TutorialSection {
+  id: string
+  heading: string
+  content: string
+  imageUrl: string
+  imageAlt: string
+  layout: TutorialLayout
 }
 
-interface OptionalModules {
-  airConditioningPanel: {
-    image: string;
-    description: string;
-    partNumber?: string; // 新增零件号字段
-    interfaceImage?: string; // 新增接口图片
-  };
-  displayBackPanel: {
-    image: string;
-    description: string;
-    partNumber?: string; // 新增零件号字段
-    interfaceImage?: string; // 新增接口图片
-  };
-  dashboardPanel: {
-    image: string;
-    description: string;
-    partNumber?: string; // 新增零件号字段
-    interfaceImage?: string; // 新增接口图片
-  };
+interface ArticleFAQ {
+  id: string
+  title: string
+  description: string
+  images: string[]
 }
 
-interface CompatibleModel {
-  id: string;
-  name: string;
-  dashboardImage: string;
-  description: string;
-  originalHost: OriginalHost;
-  optionalModules: OptionalModules;
-}
-
-interface IncompatibleModel {
-  id: string;
-  name: string;
-  dashboardImage: string;
-  description: string;
-}
-
-interface FAQ {
-  id: string;
-  title: string;
-  description: string;
-  images: string[];
-  // linkedModels 已移除，因为FAQ本身就是针对当前车型的
-}
-
-interface UserFeedback {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: number;
-  replies?: UserReply[];
-}
-
-interface UserReply {
-  id: string;
-  author: string;
-  content: string;
-  timestamp: number;
-}
-
-interface StructuredArticle {
-  id: string | number;
+interface ArticleFormData {
+  title: string
+  author: string
   basicInfo: {
-    title: string;
-    author?: string;
-    vehicleImage: string;
-    introduction: string;
-    importantNotes?: string;
-    brand: string;
-    model: string;
-    yearRange: string;
-  };
-  features: {
-    supported: string[];
-    unsupported: string[];
-  };
-  compatibleModels: CompatibleModel[];
-  incompatibleModels: IncompatibleModel[];
-  faqs: FAQ[];
-  feedback: UserFeedback[];
+    brand: string
+    model: string
+    yearRange: string
+    vehicleImage: string
+    introduction: string
+    importantNotes: string
+  }
+  tutorialSections: TutorialSection[]
+  faqs: ArticleFAQ[]
 }
 
 interface StructuredArticleEditorProps {
-  article?: any; // 使用 any 类型来兼容不同的数据结构
-  onSave: (article: any) => void;
-  onCancel: () => void;
+  article?: any
+  onSave: (article: any) => void
+  onCancel: () => void
 }
 
-// 添加Section接口类型定义
-interface Section {
-  id: string;
-  title: string;
-  icon: React.ComponentType<any>;
-}
+const createId = (prefix: string) => `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
 
-const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({
-  article,
-  onSave,
-  onCancel
-}) => {
-  const { t } = useTranslation();
-  const { showToast } = useToast();
-  const [vehicles, setVehicles] = useState<any[]>([]);
+const normalizeSection = (section: any, index: number): TutorialSection => ({
+  id: section?.id || createId(`tutorial_${index}`),
+  heading: section?.heading || section?.title || '',
+  content: section?.content || section?.description || '',
+  imageUrl: section?.imageUrl || section?.image || '',
+  imageAlt: section?.imageAlt || '',
+  layout: section?.layout === 'imageRight' ? 'imageRight' : 'imageLeft',
+})
 
-  // 自动保存状态
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
-  const [lastSaveTime, setLastSaveTime] = useState<Date | null>(null);
-  const [draftRestore, setDraftRestore] = useState<{ show: boolean; data: any; time: Date | null }>({ show: false, data: null, time: null });
-  const [isInitialMount, setIsInitialMount] = useState(true);
+const normalizeFAQ = (faq: any, index: number): ArticleFAQ => ({
+  id: faq?.id || createId(`faq_${index}`),
+  title: faq?.title || faq?.question || '',
+  description: faq?.description || faq?.answer || '',
+  images: Array.isArray(faq?.images) ? faq.images : [],
+})
 
-  // 为sections数组添加明确的类型声明 - 使用useMemo避免重复创建
-  const sections: Section[] = React.useMemo(() => [
-    { id: 'basic', title: t('admin.structuredArticle.basicInfo'), icon: Car },
-    { id: 'features', title: t('admin.structuredArticle.features'), icon: Settings },
-    { id: 'compatible', title: t('admin.structuredArticle.compatibleModels'), icon: Monitor },
-    { id: 'incompatible', title: t('admin.structuredArticle.incompatibleModels'), icon: Monitor },
-    { id: 'faqs', title: t('admin.structuredArticle.faqs'), icon: FileText }
-  ], [t]);
+const initialFormData = (article?: any): ArticleFormData => ({
+  title: article?.title || article?.basicInfo?.title || '',
+  author: article?.author || 'Technical Team',
+  basicInfo: {
+    brand: article?.basicInfo?.brand || article?.brand || '',
+    model: article?.basicInfo?.model || article?.model || '',
+    yearRange: article?.basicInfo?.yearRange || article?.yearRange || '',
+    vehicleImage: article?.basicInfo?.vehicleImage || article?.vehicleImage || '',
+    introduction: article?.basicInfo?.introduction || article?.introduction || '',
+    importantNotes: article?.basicInfo?.importantNotes || article?.importantNotes || '',
+  },
+  tutorialSections: Array.isArray(article?.tutorialSections) ? article.tutorialSections.map(normalizeSection) : [],
+  faqs: Array.isArray(article?.faqs) ? article.faqs.map(normalizeFAQ) : [],
+})
 
-  const [activeSection, setActiveSection] = useState(0);
+const hasVisibleContent = (value: string) =>
+  value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ').trim().length > 0 || /<(img|video|iframe)\b/i.test(value)
 
-  // 确保activeSection在有效范围内
-  const safeSetActiveSection = useCallback((index: number) => {
-    const safeIndex = Math.max(0, Math.min(sections.length - 1, index));
-    logger.debug(`Setting active section from ${activeSection} to ${safeIndex}`);
-    setActiveSection(safeIndex);
-  }, [activeSection, sections.length]);
+const StructuredArticleEditor: React.FC<StructuredArticleEditorProps> = ({ article, onSave, onCancel }) => {
+  const { t } = useTranslation()
+  const { showToast } = useToast()
+  const [formData, setFormData] = useState<ArticleFormData>(() => initialFormData(article))
+  const [vehicles, setVehicles] = useState<any[]>([])
+  const [activeStep, setActiveStep] = useState(0)
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved')
 
-  // 添加状态变更监听和错误恢复
+  const steps = useMemo(() => [
+    t('admin.structuredArticle.basicInfo'),
+    t('admin.structuredArticle.wiringTutorial'),
+    t('admin.structuredArticle.faqs'),
+  ], [t])
+
   useEffect(() => {
-    logger.debug('Active section changed to:', activeSection, sections[activeSection]?.title);
+    setFormData(initialFormData(article))
+    setActiveStep(0)
+  }, [article])
 
-    // 如果当前索引超出范围，自动修正
-    if (activeSection >= sections.length || activeSection < 0) {
-      logger.warn('Invalid active section detected, resetting to 0');
-      setActiveSection(0);
-    }
-  }, [activeSection, sections.length]);
-
-  const [formData, setFormData] = useState<StructuredArticle>(() => {
-    // 如果是编辑已有文章，需要转换数据结构
-    if (article) {
-      logger.debug('Editing article:', article);
-      logger.debug('Article supportedFeatures:', article.supportedFeatures);
-      logger.debug('Article unsupportedFeatures:', article.unsupportedFeatures);
-
-      return {
-        id: article.id || Date.now(),
-                 basicInfo: {
-           title: article.title || article.basicInfo?.title || '',
-           vehicleImage: article.vehicleImage || article.basicInfo?.vehicleImage || '',
-           introduction: article.introduction || article.basicInfo?.introduction || '',
-           brand: article.brand || article.basicInfo?.brand || '',
-           model: article.model || article.basicInfo?.model || '',
-           yearRange: article.yearRange || article.basicInfo?.yearRange || ''
-         },
-                 features: {
-           supported: Array.isArray(article.supportedFeatures)
-             ? article.supportedFeatures.map((f: any) => typeof f === 'string' ? f : f.name || '')
-             : Array.isArray(article.features?.supported)
-               ? article.features.supported.map((f: any) => typeof f === 'string' ? f : f.name || '')
-               : [],
-           unsupported: Array.isArray(article.unsupportedFeatures)
-             ? article.unsupportedFeatures.map((f: any) => typeof f === 'string' ? f : f.name || '')
-             : Array.isArray(article.features?.unsupported)
-               ? article.features.unsupported.map((f: any) => typeof f === 'string' ? f : f.name || '')
-               : []
-         },
-        compatibleModels: article.compatibleModels ? article.compatibleModels.map((model: any, index: number) => ({
-          id: model.id || `compatible_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
-          name: model.modelName || model.name || '',
-          dashboardImage: model.dashboardImage || '',
-          description: model.description || '',
-          originalHost: {
-            frontImage: model.originalHost?.frontImage || '',
-            backImage: model.originalHost?.backImage || '',
-            pinDefinitionImage: model.originalHost?.pinDefinitionImage || '',
-            description: model.originalHost?.hostDescription || model.originalHost?.description || '',
-            partNumber: model.originalHost?.partNumber || '',
-            frontImageDescription: model.originalHost?.frontImageDescription || '',
-            backImageDescription: model.originalHost?.backImageDescription || '',
-            pinDefinitionDescription: model.originalHost?.pinDefinitionDescription || '',
-            wiringDiagram: model.originalHost?.wiringDiagram || ''
-          },
-          optionalModules: {
-            airConditioningPanel: {
-              image: model.optionalModules?.airConditioningPanel?.image || '',
-              description: model.optionalModules?.airConditioningPanel?.description || '',
-              partNumber: model.optionalModules?.airConditioningPanel?.partNumber || '',
-              interfaceImage: model.optionalModules?.airConditioningPanel?.interfaceImage || ''
-            },
-            displayBackPanel: {
-              image: model.optionalModules?.displayBackPanel?.image || '',
-              description: model.optionalModules?.displayBackPanel?.description || '',
-              partNumber: model.optionalModules?.displayBackPanel?.partNumber || '',
-              interfaceImage: model.optionalModules?.displayBackPanel?.interfaceImage || ''
-            },
-            dashboardPanel: {
-              image: model.optionalModules?.dashboardPanel?.image || '',
-              description: model.optionalModules?.dashboardPanel?.description || '',
-              partNumber: model.optionalModules?.dashboardPanel?.partNumber || '',
-              interfaceImage: model.optionalModules?.dashboardPanel?.interfaceImage || ''
-            }
-          }
-        })) : [],
-        incompatibleModels: article.incompatibleModels ? article.incompatibleModels.map((model: any, index: number) => ({
-          id: model.id || `incompatible_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 9)}`,
-          name: model.modelName || model.name || '',
-          dashboardImage: model.dashboardImage || '',
-          description: model.description || ''
-        })) : [],
-        faqs: article.faqs ? article.faqs.map((faq: any) => ({
-          id: faq.id || `faq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          title: faq.title || '',
-          description: faq.description || '',
-          images: faq.images || [],
-          // linkedModels 已移除
-        })) : [],
-        feedback: article.userFeedback ? article.userFeedback.map((feedback: any) => ({
-          id: feedback.id || `feedback_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          author: feedback.user || feedback.author || '',
-          content: feedback.content || '',
-          timestamp: feedback.timestamp || new Date(feedback.date).getTime(),
-          replies: feedback.replies || []
-        })) : []
-      };
-    }
-
-    // 新建文章
-    return {
-      id: Date.now(),
-      basicInfo: {
-        title: '',
-        vehicleImage: '',
-        introduction: '',
-        brand: '',
-        model: '',
-        yearRange: ''
-      },
-      features: {
-        supported: [],
-        unsupported: []
-      },
-      compatibleModels: [],
-      incompatibleModels: [],
-      faqs: [],
-      feedback: []
-    };
-  });
-
-  const [newSupportedFeature, setNewSupportedFeature] = useState('');
-  const [newUnsupportedFeature, setNewUnsupportedFeature] = useState('');
-
-  // 自动保存到localStorage
-  const autoSaveToLocalStorage = useCallback(() => {
-    try {
-      saveDraft('structured', formData, article?.id);
-      setAutoSaveStatus('saved');
-      setLastSaveTime(new Date());
-      logger.debug('自动保存成功');
-    } catch (error) {
-      logger.error('自动保存失败:', error);
-      setAutoSaveStatus('unsaved');
-    }
-  }, [formData, article?.id]);
-
-  // 从localStorage恢复数据
   useEffect(() => {
-    if (!article) {
-      const draftData = loadDraft('structured', article?.id);
-
-      if (draftData) {
-        setDraftRestore({
-          show: true,
-          data: draftData.formData,
-          time: new Date(draftData.timestamp)
-        });
-      }
-    }
-  }, [article]);
-
-  // 监听formData变化，debounce自动保存
-  useEffect(() => {
-    // 跳过初始挂载
-    if (isInitialMount) {
-      setIsInitialMount(false);
-      return;
-    }
-
-    setAutoSaveStatus('unsaved');
-
-    // 3秒后自动保存
-    const timer = setTimeout(() => {
-      if (formData.basicInfo.title || formData.basicInfo.introduction) {
-        setAutoSaveStatus('saving');
-        autoSaveToLocalStorage();
-      }
-    }, 3000);
-
-    return () => clearTimeout(timer);
-  }, [formData, autoSaveToLocalStorage, isInitialMount]);
-
-  // 车型数据不再从localStorage加载（暂时移除车型选择功能，或后续从API加载）
-  useEffect(() => {
-    // 从后端加载车型列表，用于下拉选择
-    let isMounted = true
-    import('@/services/vehicleService').then(async ({ getVehicles }) => {
-      try {
-        const list = await getVehicles()
-        if (isMounted) {
-          // 统一映射字段，确保有 id/brand/model/year
-          setVehicles(
-            (list || []).map((v: any) => ({
-              id: v.id || v._id || `${v.brand}-${v.model}-${v.year}`,
-              brand: v.brand || '',
-              model: v.model || v.modelName || '',
-              year: v.year || ''
-            }))
-          )
-        }
-      } catch (err) {
-        logger.error('加载车型失败:', err)
-        if (isMounted) {setVehicles([])}
-      }
+    let mounted = true
+    getVehicles().then(list => {
+      if (mounted) {setVehicles(list || [])}
+    }).catch(() => {
+      if (mounted) {setVehicles([])}
     })
-    return () => { isMounted = false }
-  }, []);
+    return () => { mounted = false }
+  }, [])
 
-  // 添加数据持久化保护
   useEffect(() => {
-    // 组件卸载前保存草稿
-    return () => {
-      if (formData.basicInfo.title || formData.basicInfo.introduction) {
-        saveDraft('structured', formData, article?.id);
-      }
-    };
-  }, [formData, article?.id]);
+    if (!article && !formData.title && !formData.basicInfo.introduction) {return}
+    const timer = window.setTimeout(() => {
+      setAutoSaveStatus('saving')
+      saveDraft('structured', formData, article?._id || article?.id)
+      setAutoSaveStatus('saved')
+    }, 3000)
+    return () => window.clearTimeout(timer)
+  }, [article, formData])
 
-  // 当 article 改变时重新初始化 formData
   useEffect(() => {
-    if (article) {
-      logger.debug('Article changed, reinitializing formData:', article);
-      logger.debug('Article basicInfo importantNotes:', article.basicInfo?.importantNotes);
-
-      const newFormData: StructuredArticle = {
-        id: formData.id,
-        basicInfo: {
-          title: formData.basicInfo.title,
-          vehicleImage: formData.basicInfo.vehicleImage,
-          introduction: formData.basicInfo.introduction,
-          brand: formData.basicInfo.brand,
-          model: formData.basicInfo.model,
-          yearRange: formData.basicInfo.yearRange,
-        },
-        features: {
-          supported: formData.features.supported,
-          unsupported: formData.features.unsupported,
-        },
-        compatibleModels: formData.compatibleModels,
-        incompatibleModels: formData.incompatibleModels,
-        faqs: formData.faqs,
-        feedback: [], // 添加缺失的feedback字段
-      };
-
-      logger.debug('Setting new formData:', newFormData);
-      setFormData(newFormData);
+    if (article) {return}
+    const draft = loadDraft('structured', undefined)
+    if (draft?.formData && window.confirm(t('admin.structuredArticle.restoreDraft'))) {
+      const empty = initialFormData()
+      setFormData({
+        ...empty,
+        ...draft.formData,
+        basicInfo: { ...empty.basicInfo, ...draft.formData.basicInfo },
+        tutorialSections: (draft.formData.tutorialSections || []).map(normalizeSection),
+        faqs: (draft.formData.faqs || []).map(normalizeFAQ),
+      })
     }
-  }, [article]);
+  }, [article, t])
 
-  // 组件加载时恢复草稿
-  useEffect(() => {
-    if (!article) {
-      const draft = loadDraft('structured', undefined);
-      if (draft) {
-        setDraftRestore({ show: true, data: draft.formData, time: new Date(draft.timestamp) });
-      }
-    }
-  }, [article]);
+  const updateBasicInfo = useCallback((field: keyof ArticleFormData['basicInfo'], value: string) => {
+    setAutoSaveStatus('unsaved')
+    setFormData(current => ({ ...current, basicInfo: { ...current.basicInfo, [field]: value } }))
+  }, [])
 
-  // 加载用户留言数据
-  useEffect(() => {
-    if (article && article.id) {
-      const loadFeedback = async () => {
-        // TODO: 实现反馈加载功能
-        // const feedback = await getDocumentFeedback(article.id)
-        // setFeedbackList(feedback)
+  const addTutorialSection = () => {
+    setFormData(current => ({
+      ...current,
+      tutorialSections: [...current.tutorialSections, {
+        id: createId('tutorial'), heading: '', content: '', imageUrl: '', imageAlt: '',
+        layout: current.tutorialSections.length % 2 === 0 ? 'imageLeft' : 'imageRight',
+      }],
+    }))
+  }
 
-        // 同步到 formData 以保持兼容性
-        // setFormData(prev => ({
-        //   ...prev,
-        //   feedback: feedback.map((fb: any) => ({
-        //     id: fb.id,
-        //     author: fb.author,
-        //     content: fb.content,
-        //     timestamp: fb.timestamp,
-        //     replies: fb.replies
-        //   }))
-        // }))
+  const updateTutorialSection = (id: string, field: keyof TutorialSection, value: string) => {
+    setFormData(current => ({
+      ...current,
+      tutorialSections: current.tutorialSections.map(section => section.id === id ? { ...section, [field]: value } : section),
+    }))
+  }
 
-        // logger.debug(`Loaded ${feedback.length} feedback items for document ${article.id}`)
-      }
-      loadFeedback()
-    }
-  }, [article]);
+  const moveTutorialSection = (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    if (target < 0 || target >= formData.tutorialSections.length) {return}
+    setFormData(current => {
+      const next = [...current.tutorialSections]
+      ;[next[index], next[target]] = [next[target], next[index]]
+      return { ...current, tutorialSections: next }
+    })
+  }
 
-  const handleBasicInfoChange = useCallback((field: keyof typeof formData.basicInfo, value: string) => {
-    logger.debug(`handleBasicInfoChange called: field=${field}, value=`, value);
-    setFormData(prev => {
-      const newFormData = {
-        ...prev,
-        basicInfo: {
-          ...prev.basicInfo,
-          [field]: value
-        }
-      };
-      logger.debug('Updated formData:', newFormData);
-      return newFormData;
-    });
-  }, []);
-
-  // 保存时转换数据结构以匹配查看器期望的格式
-  const handleSave = () => {
-    logger.debug('StructuredArticleEditor: handleSave called');
-    logger.debug('StructuredArticleEditor: Current formData:', formData);
-
-         // 数据验证
-     const errors = [];
-
-     if (!formData.basicInfo.title?.trim()) {
-       errors.push(t('admin.structuredArticle.validation.titleRequired'));
-     }
-
-     if (!formData.basicInfo.brand?.trim()) {
-       errors.push(t('admin.structuredArticle.validation.brandRequired'));
-     }
-
-     if (!formData.basicInfo.model?.trim()) {
-       errors.push(t('admin.structuredArticle.validation.modelRequired'));
-     }
-
-     if (!formData.basicInfo.yearRange?.trim()) {
-       errors.push(t('admin.structuredArticle.validation.yearRangeRequired'));
-     }
-
-     if (!formData.basicInfo.introduction?.trim()) {
-       errors.push(t('admin.structuredArticle.validation.introductionRequired'));
-     }
-
-     // 检查适配型号
-     if (formData.compatibleModels.length === 0) {
-       errors.push(t('admin.structuredArticle.validation.compatibleModelsRequired'));
-     } else {
-       formData.compatibleModels.forEach((model, index) => {
-         if (!model.name?.trim()) {
-           errors.push(t('admin.structuredArticle.validation.compatibleModelNameRequired', { index: index + 1 }));
-         }
-         if (!model.description?.trim()) {
-           errors.push(t('admin.structuredArticle.validation.compatibleModelDescRequired', { index: index + 1 }));
-         }
-       });
-     }
-
-     // 检查FAQ
-     if (formData.faqs.length === 0) {
-       errors.push(t('admin.structuredArticle.validation.faqsRequired'));
-     } else {
-       formData.faqs.forEach((faq, index) => {
-         if (!faq.title?.trim()) {
-           errors.push(t('admin.structuredArticle.validation.faqTitleRequired', { index: index + 1 }));
-         }
-         if (!faq.description?.trim()) {
-           errors.push(t('admin.structuredArticle.validation.faqDescRequired', { index: index + 1 }));
-         }
-       });
-     }
-
-         if (errors.length > 0) {
-      showToast({
-        type: 'error',
-        title: t('admin.structuredArticle.validation.completeInfo'),
-        description: errors.join(', ')
-      });
-      return;
-    }
-
-    // 转换数据结构以匹配查看器期望的格式
-    const convertedData = {
-      id: formData.id,
-      type: 'structured', // 添加类型标识
-      title: formData.basicInfo.title.trim(),
-      // 将基本信息放入 basicInfo 对象中
-      basicInfo: {
-        brand: formData.basicInfo.brand.trim(),
-        model: formData.basicInfo.model.trim(),
-        yearRange: formData.basicInfo.yearRange.trim(),
-        vehicleImage: formData.basicInfo.vehicleImage || '',
-        introduction: formData.basicInfo.introduction || '',
-        importantNotes: formData.basicInfo.importantNotes || ''
-      },
-      // 为了兼容性，也保留扁平结构
-      author: formData.basicInfo.author?.trim() || 'Technical Team',
-      brand: formData.basicInfo.brand.trim(),
-      model: formData.basicInfo.model.trim(),
-      yearRange: formData.basicInfo.yearRange.trim(),
-      vehicleImage: formData.basicInfo.vehicleImage || '',
-      introduction: formData.basicInfo.introduction || '',
-      importantNotes: formData.basicInfo.importantNotes || '',
-      uploadDate: new Date().toISOString().split('T')[0],
-      views: 0,
-
-      // 功能支持 - 确保数据结构正确
-      supportedFeatures: formData.features.supported.map(name => ({
-        name: name.trim(),
-        description: ''
-      })),
-      unsupportedFeatures: formData.features.unsupported.map(name => ({
-        name: name.trim(),
-        description: ''
-      })),
-
-      // 适配型号 - 确保数据结构正确
-      compatibleModels: formData.compatibleModels.map(model => ({
-        modelName: model.name.trim(),
-        dashboardImage: model.dashboardImage || '',
-        description: model.description.trim(),
-        originalHost: {
-          frontImage: model.originalHost.frontImage || '',
-          backImage: model.originalHost.backImage || '',
-          pinDefinitionImage: model.originalHost.pinDefinitionImage || '',
-          hostDescription: model.originalHost.description || '',
-          partNumber: model.originalHost.partNumber || '',
-          frontImageDescription: model.originalHost.frontImageDescription || '',
-          backImageDescription: model.originalHost.backImageDescription || '',
-          pinDefinitionDescription: model.originalHost.pinDefinitionDescription || ''
-        },
-        optionalModules: {
-          airConditioningPanel: {
-            image: model.optionalModules.airConditioningPanel.image || '',
-            description: model.optionalModules.airConditioningPanel.description || '',
-            partNumber: model.optionalModules.airConditioningPanel.partNumber || '',
-            interfaceImage: model.optionalModules.airConditioningPanel.interfaceImage || ''
-          },
-          displayBackPanel: {
-            image: model.optionalModules.displayBackPanel.image || '',
-            description: model.optionalModules.displayBackPanel.description || '',
-            partNumber: model.optionalModules.displayBackPanel.partNumber || '',
-            interfaceImage: model.optionalModules.displayBackPanel.interfaceImage || ''
-          },
-          dashboardPanel: {
-            image: model.optionalModules.dashboardPanel.image || '',
-            description: model.optionalModules.dashboardPanel.description || '',
-            partNumber: model.optionalModules.dashboardPanel.partNumber || '',
-            interfaceImage: model.optionalModules.dashboardPanel.interfaceImage || ''
-          }
-        }
-      })),
-
-             // 不适配型号 - 确保数据结构正确
-       incompatibleModels: formData.incompatibleModels.map(model => ({
-         modelName: model.name.trim(),
-         dashboardImage: model.dashboardImage || '',
-         description: model.description.trim()
-       })),
-
-      // FAQ - 确保数据结构正确
-      faqs: formData.faqs.map(faq => ({
-        title: faq.title.trim(),
-        description: faq.description.trim(),
-        solution: '',
-        images: faq.images || [],
-        // linkedModels 已移除，不再保存
-      })),
-
-      // 用户留言 - 确保数据结构正确
-      userFeedback: formData.feedback.map(feedback => ({
-        user: feedback.author.trim(),
-        date: new Date(feedback.timestamp).toISOString().split('T')[0],
-        content: feedback.content.trim()
-      }))
-    };
-
-    logger.debug('StructuredArticleEditor: Converted data:', convertedData);
-    logger.debug('StructuredArticleEditor: Calling onSave');
-
-    // 清除自动保存的数据
-    try {
-      const autoSaveKey = `structured_article_autosave_${article?.id || 'new'}`;
-      localStorage.removeItem(autoSaveKey);
-      logger.debug('已清除自动保存数据:', autoSaveKey);
-    } catch (error) {
-      logger.error('清除自动保存数据失败:', error);
-    }
-
-    onSave(convertedData);
-  };
-
-  const addSupportedFeature = () => {
-    if (newSupportedFeature.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        features: {
-          ...prev.features,
-          supported: [...prev.features.supported, newSupportedFeature.trim()]
-        }
-      }));
-      setNewSupportedFeature('');
-    }
-  };
-
-  const addUnsupportedFeature = () => {
-    if (newUnsupportedFeature.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        features: {
-          ...prev.features,
-          unsupported: [...prev.features.unsupported, newUnsupportedFeature.trim()]
-        }
-      }));
-      setNewUnsupportedFeature('');
-    }
-  };
-
-  const removeFeature = (type: 'supported' | 'unsupported', index: number) => {
-    setFormData(prev => ({
-      ...prev,
-      features: {
-        ...prev.features,
-        [type]: prev.features[type].filter((_, i) => i !== index)
-      }
-    }));
-  };
-
-  const addCompatibleModel = () => {
-    const existingCount = formData.compatibleModels.length;
-    const newId = `compatible_${Date.now()}_${existingCount}_${Math.random().toString(36).substr(2, 9)}`;
-    logger.debug('Adding compatible model with ID:', newId);
-    const newModel: CompatibleModel = {
-      id: newId,
-      name: '',
-      dashboardImage: '',
-      description: '',
-      originalHost: {
-        frontImage: '',
-        backImage: '',
-        pinDefinitionImage: '',
-        description: '',
-        partNumber: '', // 新增零件号字段
-        frontImageDescription: '', // 新增
-        backImageDescription: '', // 新增
-        pinDefinitionDescription: '', // 新增
-        wiringDiagram: '' // 新增线束连接图
-      },
-      optionalModules: {
-        airConditioningPanel: {
-          image: '',
-          description: '',
-          partNumber: '', // 新增零件号字段
-          interfaceImage: '' // 新增接口图片
-        },
-        displayBackPanel: {
-          image: '',
-          description: '',
-          partNumber: '', // 新增零件号字段
-          interfaceImage: '' // 新增接口图片
-        },
-        dashboardPanel: {
-          image: '',
-          description: '',
-          partNumber: '', // 新增零件号字段
-          interfaceImage: '' // 新增接口图片
-        }
-      }
-    };
-    setFormData(prev => ({
-      ...prev,
-      compatibleModels: [...prev.compatibleModels, newModel]
-    }));
-  };
-
-  const updateCompatibleModel = useCallback((id: string, field: string, value: any) => {
-    logger.debug('updateCompatibleModel called:', { id, field, value });
-
-    setFormData(prev => {
-      const updated = {
-        ...prev,
-        compatibleModels: prev.compatibleModels.map(model => {
-          if (model.id === id) {
-            logger.debug('Updating model:', model.id);
-            // 处理嵌套字段更新
-            if (field.includes('.')) {
-              const parts = field.split('.');
-              logger.debug('Nested field update:', { parts, value });
-
-              if (parts[0] === 'originalHost') {
-                return {
-                  ...model,
-                  originalHost: {
-                    ...model.originalHost,
-                    [parts[1]]: value
-                  }
-                };
-              } else if (parts[0] === 'optionalModules') {
-                const moduleName = parts[1];
-                const propName = parts[2];
-                logger.debug('Updating optionalModules:', { moduleName, propName, value });
-
-                return {
-                  ...model,
-                  optionalModules: {
-                    ...model.optionalModules,
-                    [moduleName]: {
-                      ...model.optionalModules[moduleName as keyof OptionalModules],
-                      [propName]: value
-                    }
-                  }
-                };
-              }
-            }
-            return { ...model, [field]: value };
-          }
-          return model;
-        })
-      };
-      logger.debug('Updated formData:', updated);
-      return updated;
-    });
-  }, []);
-
-  const removeCompatibleModel = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      compatibleModels: prev.compatibleModels.filter(model => model.id !== id)
-    }));
-  };
-
-  const addIncompatibleModel = () => {
-    const existingCount = formData.incompatibleModels.length;
-    const newId = `incompatible_${Date.now()}_${existingCount}_${Math.random().toString(36).substr(2, 9)}`;
-    logger.debug('Adding incompatible model with ID:', newId);
-    const newModel: IncompatibleModel = {
-      id: newId,
-      name: '',
-      dashboardImage: '',
-      description: ''
-    };
-    setFormData(prev => ({
-      ...prev,
-      incompatibleModels: [...prev.incompatibleModels, newModel]
-    }));
-  };
-
-  const updateIncompatibleModel = useCallback((id: string, field: string, value: string) => {
-    logger.debug('updateIncompatibleModel called:', { id, field, value });
-
-    setFormData(prev => {
-      const updated = {
-        ...prev,
-        incompatibleModels: prev.incompatibleModels.map(model => {
-          if (model.id === id) {
-            logger.debug('Updating incompatible model:', model.id, 'field:', field, 'value:', value);
-            return { ...model, [field]: value };
-          }
-          return model;
-        })
-      };
-      logger.debug('Updated incompatible models formData:', updated.incompatibleModels);
-      return updated;
-    });
-  }, []);
-
-  const removeIncompatibleModel = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      incompatibleModels: prev.incompatibleModels.filter(model => model.id !== id)
-    }));
-  };
+  const removeTutorialSection = (id: string) => {
+    setFormData(current => ({ ...current, tutorialSections: current.tutorialSections.filter(section => section.id !== id) }))
+  }
 
   const addFAQ = () => {
-    const newFAQ: FAQ = {
-      id: `faq_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      title: '',
-      description: '',
-      images: []
-      // linkedModels 已移除
-    };
-    setFormData(prev => ({
-      ...prev,
-      faqs: [...prev.faqs, newFAQ]
-    }));
-  };
+    setFormData(current => ({ ...current, faqs: [...current.faqs, { id: createId('faq'), title: '', description: '', images: [] }] }))
+  }
 
-  const updateFAQ = useCallback((id: string, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      faqs: prev.faqs.map(faq =>
-        faq.id === id ? { ...faq, [field]: value } : faq
-      )
-    }));
-  }, []);
+  const updateFAQ = (id: string, field: keyof ArticleFAQ, value: string | string[]) => {
+    setFormData(current => ({ ...current, faqs: current.faqs.map(faq => faq.id === id ? { ...faq, [field]: value } : faq) }))
+  }
 
   const removeFAQ = (id: string) => {
-    setFormData(prev => ({
-      ...prev,
-      faqs: prev.faqs.filter(faq => faq.id !== id)
-    }));
-  };
+    setFormData(current => ({ ...current, faqs: current.faqs.filter(faq => faq.id !== id) }))
+  }
 
-  const renderBasicInfo = () => (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            {t('admin.structuredArticle.title')}
-          </label>
-          <Input
-            value={formData.basicInfo.title || ''}
-            onChange={(e) => handleBasicInfoChange('title', e.target.value)}
-            placeholder={t('admin.structuredArticle.titlePlaceholder')}
-            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            {t('knowledge.author')}
-          </label>
-          <Input
-            value={formData.basicInfo.author || ''}
-            onChange={(e) => handleBasicInfoChange('author', e.target.value)}
-            placeholder={t('admin.structuredArticle.authorPlaceholder') || '输入作者名称'}
-            className="bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:border-blue-500 focus:ring-blue-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-          />
-        </div>
-
-        <div>
-           <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-             {t('admin.structuredArticle.selectVehicle')}
-           </label>
-          <select
-            className="w-full px-3 py-2 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 [&>option]:bg-white [&>option]:dark:bg-slate-800 [&>option]:text-slate-900 [&>option]:dark:text-white"
-            value={
-              formData.basicInfo.brand && formData.basicInfo.model && formData.basicInfo.yearRange
-                ? `${formData.basicInfo.brand} ${formData.basicInfo.model} ${formData.basicInfo.yearRange}`
-                : ''
-            }
-            onChange={(e) => {
-              const selectedVehicle = vehicles.find(v => `${v.brand} ${v.model} ${v.year}` === e.target.value);
-              if (selectedVehicle) {
-                handleBasicInfoChange('brand', selectedVehicle.brand);
-                handleBasicInfoChange('model', selectedVehicle.model);
-                handleBasicInfoChange('yearRange', selectedVehicle.year);
-              } else {
-                // 清空选择
-                handleBasicInfoChange('brand', '');
-                handleBasicInfoChange('model', '');
-                handleBasicInfoChange('yearRange', '');
-              }
-            }}
-          >
-            <option value="">{t('admin.structuredArticle.selectVehiclePlaceholder')}</option>
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={`${vehicle.brand} ${vehicle.model} ${vehicle.year}`}>
-                {vehicle.brand} {vehicle.model} {vehicle.year}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          {t('admin.structuredArticle.vehicleImage')}
-        </label>
-        <ImageUpload
-          value={formData.basicInfo.vehicleImage}
-          onChange={(value) => handleBasicInfoChange('vehicleImage', value)}
-          placeholder={t('admin.structuredArticle.uploadVehicleImage')}
-          imageType="structured-article"
-        />
-      </div>
-
-      <div>
-        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-          {t('admin.structuredArticle.introduction')}
-        </label>
-        <LazyRichTextEditor
-          value={formData.basicInfo.introduction}
-          onChange={(value) => handleBasicInfoChange('introduction', value)}
-          placeholder={t('admin.structuredArticle.introductionPlaceholder')}
-        />
-      </div>
-
-      {/* 注意事项（红色强调） */}
-      <div>
-        <label className="block text-sm font-medium text-red-600 dark:text-red-400 mb-2">
-          {t('admin.structuredArticle.importantNotes')}
-        </label>
-        <LazyRichTextEditor
-          value={formData.basicInfo.importantNotes || ''}
-          onChange={(value) => handleBasicInfoChange('importantNotes', value)}
-          placeholder={t('admin.structuredArticle.importantNotesPlaceholder')}
-        />
-      </div>
-    </div>
-  );
-
-  const renderFeatures = () => (
-    <div className="space-y-6">
-      {/* 功能支持 - 左右布局 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 左侧：支持的功能 */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-4 flex items-center">
-            <CheckCircle className="h-5 w-5 mr-2 text-green-500" />
-            {t('admin.structuredArticle.supportedFeatures')}
-          </h3>
-          <div className="space-y-2">
-            {formData.features.supported.map((feature, index) => (
-              <div key={index} className="flex items-center gap-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg p-3">
-                <CheckCircle className="h-4 w-4 text-green-500 dark:text-green-400 flex-shrink-0" />
-                <Input
-                  value={feature}
-                  onChange={(e) => {
-                    const newFeatures = [...formData.features.supported];
-                    newFeatures[index] = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      features: {
-                        ...prev.features,
-                        supported: newFeatures
-                      }
-                    }));
-                  }}
-                  className="flex-1 bg-white dark:bg-slate-800 border-green-300 dark:border-green-600 text-slate-900 dark:text-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeFeature('supported', index)}
-                  className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 border-red-300 dark:border-red-600 hover:border-red-400 dark:hover:border-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <Input
-                value={newSupportedFeature}
-                onChange={(e) => setNewSupportedFeature(e.target.value)}
-                placeholder={t('admin.structuredArticle.addSupportedFeature')}
-                className="flex-1 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:border-green-500 focus:ring-green-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-              />
-              <Button onClick={addSupportedFeature} className="bg-green-600 hover:bg-green-700">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* 右侧：不支持的功能 */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-4 flex items-center">
-            <XCircle className="h-5 w-5 mr-2 text-red-500" />
-            {t('admin.structuredArticle.unsupportedFeatures')}
-          </h3>
-          <div className="space-y-2">
-            {formData.features.unsupported.map((feature, index) => (
-              <div key={index} className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg p-3">
-                <XCircle className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0" />
-                <Input
-                  value={feature}
-                  onChange={(e) => {
-                    const newFeatures = [...formData.features.unsupported];
-                    newFeatures[index] = e.target.value;
-                    setFormData(prev => ({
-                      ...prev,
-                      features: {
-                        ...prev.features,
-                        unsupported: newFeatures
-                      }
-                    }));
-                  }}
-                  className="flex-1 bg-white dark:bg-slate-800 border-red-300 dark:border-red-600 text-slate-900 dark:text-white focus:border-red-500 focus:ring-red-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeFeature('unsupported', index)}
-                  className="text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 border-red-300 dark:border-red-600 hover:border-red-400 dark:hover:border-red-500 bg-transparent hover:bg-red-50 dark:hover:bg-red-900/20"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-            <div className="flex gap-2">
-              <Input
-                value={newUnsupportedFeature}
-                onChange={(e) => setNewUnsupportedFeature(e.target.value)}
-                placeholder={t('admin.structuredArticle.addUnsupportedFeature')}
-                className="flex-1 bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-900 dark:text-white focus:border-red-500 focus:ring-red-500/20 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-              />
-              <Button onClick={addUnsupportedFeature} className="bg-red-600 hover:bg-red-700">
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // 兼容模型渲染已迁移为 CompatibleModelsSection（懒加载）
-  // 不兼容模型与 FAQ 的内联渲染已删除，统一使用 IncompatibleModelsSection 与 FAQsSection 懒加载呈现。
-
-  // 旧的 renderFeedback 已迁移至 FeedbackSection（懒加载）
-
-  const renderCurrentSection = () => {
-    switch (activeSection) {
-      case 0:
-        return renderBasicInfo();
-      case 1:
-        return renderFeatures();
-      case 2:
-        return (
-          <Suspense fallback={<div className="text-sm text-gray-500">{t('common.loading')}</div>}>
-            <CompatibleModelsSection
-              models={formData.compatibleModels}
-              onAdd={addCompatibleModel}
-              onRemove={removeCompatibleModel}
-              onUpdate={updateCompatibleModel}
-            />
-          </Suspense>
-        );
-      case 3:
-        return (
-          <Suspense fallback={<div className="text-sm text-gray-500">{t('common.loading')}</div>}>
-            <IncompatibleModelsSection
-              models={formData.incompatibleModels}
-              onAdd={addIncompatibleModel}
-              onRemove={removeIncompatibleModel}
-              onUpdate={updateIncompatibleModel}
-            />
-          </Suspense>
-        );
-      case 4:
-        return (
-          <Suspense fallback={<div className="text-sm text-gray-500">{t('common.loading')}</div>}>
-            <FAQsSection
-              faqs={formData.faqs}
-              onAdd={addFAQ}
-              onRemove={removeFAQ}
-              onUpdate={updateFAQ}
-            />
-          </Suspense>
-        );
-      default:
-        return renderBasicInfo();
+  const validate = (): string | null => {
+    const { basicInfo } = formData
+    if (!formData.title.trim() || !basicInfo.brand.trim() || !basicInfo.model.trim() || !basicInfo.yearRange.trim()) {
+      return t('admin.structuredArticle.validation.basicInfoRequired')
     }
-  };
+    if (!hasVisibleContent(basicInfo.introduction)) {return t('admin.structuredArticle.validation.introductionRequired')}
+    if (formData.tutorialSections.length === 0) {return t('admin.structuredArticle.validation.tutorialRequired')}
+    const invalidTutorial = formData.tutorialSections.findIndex(section => !section.heading.trim() || !hasVisibleContent(section.content))
+    if (invalidTutorial >= 0) {return t('admin.structuredArticle.validation.tutorialIncomplete', { index: invalidTutorial + 1 })}
+    const invalidFAQ = formData.faqs.findIndex(faq => !faq.title.trim() || !hasVisibleContent(faq.description))
+    if (invalidFAQ >= 0) {return t('admin.structuredArticle.validation.faqIncomplete', { index: invalidFAQ + 1 })}
+    return null
+  }
 
-  return (
-    <div className="max-w-6xl mx-auto p-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle>{t('admin.structuredArticle.title')}</CardTitle>
-            {/* 自动保存状态显示 */}
-            <div className="flex items-center gap-3 text-sm">
-              {autoSaveStatus === 'saving' && (
-                <span className="text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
-                  <span className="animate-spin">⏳</span> 保存中...
-                </span>
-              )}
-              {autoSaveStatus === 'saved' && lastSaveTime && (
-                <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
-                  <CheckCircle className="h-4 w-4" />
-                  已自动保存 {lastSaveTime.toLocaleTimeString()}
-                </span>
-              )}
-              {autoSaveStatus === 'unsaved' && (
-                <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                  <XCircle className="h-4 w-4" /> 有未保存的更改
-                </span>
-              )}
-            </div>
+  const handleSave = () => {
+    const error = validate()
+    if (error) {
+      showToast({ type: 'error', title: t('common.error'), description: error })
+      return
+    }
+    const basicInfo = {
+      ...formData.basicInfo,
+      brand: formData.basicInfo.brand.trim(), model: formData.basicInfo.model.trim(), yearRange: formData.basicInfo.yearRange.trim(),
+    }
+    deleteDraft('structured', (article?._id || article?.id)?.toString())
+    onSave({
+      type: 'structured', title: formData.title.trim(), author: formData.author.trim() || 'Technical Team', basicInfo, ...basicInfo,
+      tutorialSections: formData.tutorialSections.map(section => ({ ...section, heading: section.heading.trim() })),
+      faqs: formData.faqs.map(faq => ({ ...faq, title: faq.title.trim() })),
+      features: { supported: [], unsupported: [] }, supportedFeatures: [], unsupportedFeatures: [],
+      compatibleModels: [], incompatibleModels: [], userFeedback: article?.userFeedback || [],
+    })
+  }
+
+  const renderBasicInfo = () => {
+    const selectedValue = `${formData.basicInfo.brand}|${formData.basicInfo.model}|${formData.basicInfo.yearRange}`
+    return <Card>
+      <CardHeader><CardTitle>{t('admin.structuredArticle.basicInfo')}</CardTitle></CardHeader>
+      <CardContent className="space-y-5">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.title')}</label><Input value={formData.title} onChange={event => setFormData(current => ({ ...current, title: event.target.value }))} /></div>
+          <div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('knowledge.author')}</label><Input value={formData.author} onChange={event => setFormData(current => ({ ...current, author: event.target.value }))} /></div>
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.selectVehicle')}</label>
+            <select className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white" value={selectedValue === '||' ? '' : selectedValue} onChange={event => {
+              const vehicle = vehicles.find(item => `${item.brand}|${item.model || item.modelName}|${item.year}` === event.target.value)
+              updateBasicInfo('brand', vehicle?.brand || ''); updateBasicInfo('model', vehicle?.model || vehicle?.modelName || ''); updateBasicInfo('yearRange', vehicle?.year || '')
+            }}>
+              <option value="">{t('admin.structuredArticle.selectVehiclePlaceholder')}</option>
+              {vehicles.map(vehicle => { const model = vehicle.model || vehicle.modelName || ''; const value = `${vehicle.brand}|${model}|${vehicle.year}`; return <option key={vehicle.id || vehicle._id || value} value={value}>{vehicle.brand} {model} {vehicle.year}</option> })}
+            </select>
           </div>
-        </CardHeader>
-        <CardContent>
-          {/* 导航标签 */}
-          <div className="flex flex-wrap gap-2 mb-6 border-b border-slate-200 dark:border-slate-700">
-            {sections.map((section, index) => {
-              const IconComponent = section.icon;
-              return (
-                <button
-                  key={section.id}
-                  onClick={() => safeSetActiveSection(index)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-t-lg transition-colors ${
-                    activeSection === index
-                      ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                      : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800/50'
-                  }`}
-                >
-                  <IconComponent className="h-4 w-4" />
-                  <span className="text-sm font-medium">{section.title}</span>
-                </button>
-              );
-            })}
-          </div>
+        </div>
+        <div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.vehicleImage')}</label><ImageUpload value={formData.basicInfo.vehicleImage} onChange={value => updateBasicInfo('vehicleImage', value)} imageType="structured-article" /></div>
+        <div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.introduction')}</label><LazyRichTextEditor value={formData.basicInfo.introduction} onChange={value => updateBasicInfo('introduction', value)} /></div>
+        <div><label className="mb-2 block text-sm font-medium text-red-600 dark:text-red-400">{t('admin.structuredArticle.importantNotes')}</label><LazyRichTextEditor value={formData.basicInfo.importantNotes} onChange={value => updateBasicInfo('importantNotes', value)} /></div>
+      </CardContent>
+    </Card>
+  }
 
-          {/* 内容区域 */}
-          <div className="min-h-[500px] max-h-[70vh] overflow-y-auto scrollbar-none pr-2 mb-8">
-            {renderCurrentSection()}
-          </div>
+  const renderTutorial = () => <div className="space-y-4">
+    {formData.tutorialSections.map((section, index) => <Card key={section.id}>
+      <CardHeader><div className="flex flex-wrap items-center justify-between gap-3"><CardTitle className="text-base">{t('admin.structuredArticle.tutorialSection', { index: index + 1 })}</CardTitle><div className="flex flex-wrap gap-2">
+        <Button variant="outline" size="sm" onClick={() => updateTutorialSection(section.id, 'layout', section.layout === 'imageLeft' ? 'imageRight' : 'imageLeft')}>{t('admin.structuredArticle.switchLayout')}</Button>
+        <Button variant="outline" size="sm" disabled={index === 0} onClick={() => moveTutorialSection(index, -1)}>{t('common.moveUp')}</Button>
+        <Button variant="outline" size="sm" disabled={index === formData.tutorialSections.length - 1} onClick={() => moveTutorialSection(index, 1)}>{t('common.moveDown')}</Button>
+        <Button variant="outline" size="sm" onClick={() => removeTutorialSection(section.id)}>{t('common.delete')}</Button>
+      </div></div></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2"><div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.sectionTitle')}</label><Input value={section.heading} onChange={event => updateTutorialSection(section.id, 'heading', event.target.value)} /></div><div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.sectionImage')}</label><ImageUpload value={section.imageUrl} onChange={value => updateTutorialSection(section.id, 'imageUrl', value)} uploadFolder="documents" imageType="general" />{section.imageUrl && <Input className="mt-2" value={section.imageAlt} onChange={event => updateTutorialSection(section.id, 'imageAlt', event.target.value)} placeholder={t('admin.structuredArticle.imageDescription')} />}</div></div>
+        <div><label className="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-300">{t('admin.structuredArticle.sectionContent')}</label><LazyRichTextEditor value={section.content} onChange={value => updateTutorialSection(section.id, 'content', value)} /></div>
+      </CardContent>
+    </Card>)}
+    {formData.tutorialSections.length === 0 && <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">{t('admin.structuredArticle.noTutorialSections')}</div>}
+    <Button onClick={addTutorialSection}>{t('admin.structuredArticle.addTutorialSection')}</Button>
+  </div>
 
-          {/* 导航按钮 */}
-          <div className="flex justify-between items-center py-4 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 sticky bottom-0 z-10 -mx-6 -mb-6 px-6">
-            <Button
-              variant="outline"
-              onClick={() => safeSetActiveSection(activeSection - 1)}
-              disabled={activeSection === 0}
-            >
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              {t('admin.structuredArticle.previous')}
-            </Button>
+  const renderFAQs = () => <div className="space-y-4">
+    {formData.faqs.map((faq, index) => <Card key={faq.id}><CardHeader><div className="flex items-center justify-between gap-3"><CardTitle className="text-base">{t('admin.structuredArticle.faqItem', { index: index + 1 })}</CardTitle><Button variant="outline" size="sm" onClick={() => removeFAQ(faq.id)}>{t('common.delete')}</Button></div></CardHeader><CardContent className="space-y-4"><Input value={faq.title} onChange={event => updateFAQ(faq.id, 'title', event.target.value)} placeholder={t('admin.structuredArticle.faqQuestion')} /><LazyRichTextEditor value={faq.description} onChange={value => updateFAQ(faq.id, 'description', value)} /><ImageUpload value={faq.images[0] || ''} onChange={value => updateFAQ(faq.id, 'images', value ? [value] : [])} uploadFolder="documents" imageType="structured-article" /></CardContent></Card>)}
+    {formData.faqs.length === 0 && <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">{t('admin.structuredArticle.noFaqs')}</div>}
+    <Button onClick={addFAQ}>{t('admin.structuredArticle.addFaq')}</Button>
+  </div>
 
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={onCancel}>
-                {t('common.cancel')}
-              </Button>
-
-              {activeSection === sections.length - 1 ? (
-                <Button onClick={handleSave}>
-                  {t('common.save')}
-                </Button>
-              ) : (
-                <Button onClick={() => safeSetActiveSection(activeSection + 1)}>
-                  {t('admin.structuredArticle.next')}
-                  <ChevronRight className="h-4 w-4 ml-2" />
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <ConfirmDialog
-        isOpen={draftRestore.show}
-        onClose={() => {
-          deleteDraft('structured', article?.id);
-          setDraftRestore({ show: false, data: null, time: null });
-        }}
-        onConfirm={() => {
-          if (draftRestore.data && draftRestore.time) {
-            setFormData(draftRestore.data);
-            setLastSaveTime(draftRestore.time);
-            showToast({
-              type: 'success',
-              title: '已恢复草稿',
-              description: `恢复了 ${draftRestore.time.toLocaleString()} 的自动保存数据`
-            });
-            deleteDraft('structured', article?.id);
-          }
-          setDraftRestore({ show: false, data: null, time: null });
-        }}
-        title="恢复草稿"
-        message={`检测到未保存的草稿（${draftRestore.time?.toLocaleString() ?? ''}），是否恢复？`}
-        confirmText="恢复"
-        cancelText="放弃"
-        type="info"
-      />
+  return <div className="flex h-full min-h-[620px] flex-col bg-slate-50 dark:bg-slate-950">
+    <div className="border-b border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-lg font-semibold text-slate-900 dark:text-white">{t('admin.structuredArticle.wiringGuideEditor')}</h2><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{autoSaveStatus === 'saving' ? t('common.saving') : autoSaveStatus === 'saved' ? t('common.saved') : t('common.unsaved')}</p></div><div className="flex gap-2"><Button variant="outline" onClick={onCancel}>{t('common.cancel')}</Button><Button onClick={handleSave}>{t('common.save')}</Button></div></div>
+      <div className="mt-4 grid grid-cols-3 gap-2" role="tablist">{steps.map((step, index) => <button key={step} type="button" role="tab" aria-selected={activeStep === index} onClick={() => setActiveStep(index)} className={`min-h-10 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${activeStep === index ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800'}`}>{index + 1}. {step}</button>)}</div>
     </div>
-  );
-};
+    <div className="flex-1 overflow-y-auto p-5">{activeStep === 0 ? renderBasicInfo() : activeStep === 1 ? renderTutorial() : renderFAQs()}</div>
+    <div className="flex items-center justify-between border-t border-slate-200 bg-white px-5 py-4 dark:border-slate-800 dark:bg-slate-900"><Button variant="outline" disabled={activeStep === 0} onClick={() => setActiveStep(current => current - 1)}>{t('common.previous')}</Button>{activeStep === steps.length - 1 ? <Button onClick={handleSave}>{t('common.save')}</Button> : <Button onClick={() => setActiveStep(current => current + 1)}>{t('common.next')}</Button>}</div>
+  </div>
+}
 
-export default StructuredArticleEditor;
+export default StructuredArticleEditor

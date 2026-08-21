@@ -33,6 +33,9 @@
     "previous": "Previous",
     "next": "Next",
     "loading": "Loading...",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "unsaved": "Not saved",
     "redirecting": "Redirecting...",
     "search": "Search",
     "searchPlaceholder": "Search...",
@@ -538,7 +541,9 @@
       "currentLink": "Current Link",
       "openVideoInNewWindow": "Open video in new window",
       "watchInNewWindow": "Watch video in new window",
-      "browserNotSupported": "Your browser does not support video playback"
+      "browserNotSupported": "Your browser does not support video playback",
+      "carRadioScreenLabel": "13.1-inch car radio video screen",
+      "screenSizeLabel": "13.1-inch car radio display"
     },
     "viewDocument": "View Document",
     "view": "View",
@@ -1811,6 +1816,42 @@
     "saveChanges": "Save Changes"
   },
   "admin": {
+    "structuredArticle": {
+      "create": "Create Head Unit Wiring Guide",
+      "edit": "Edit Head Unit Wiring Guide",
+      "noArticles": "No wiring guides yet",
+      "noArticlesForModel": "No wiring guide for this vehicle",
+      "basicInfo": "Basic Information",
+      "wiringTutorial": "Illustrated Tutorial",
+      "wiringGuideEditor": "Head Unit Wiring Guide Editor",
+      "restoreDraft": "An unsaved wiring guide draft was found. Restore it?",
+      "tutorialSection": "Tutorial Step {{index}}",
+      "switchLayout": "Switch Layout",
+      "sectionTitle": "Step Title",
+      "sectionImage": "Step Image",
+      "sectionContent": "Step Instructions",
+      "imageDescription": "Image description",
+      "noTutorialSections": "No tutorial steps yet. Add the first wiring step.",
+      "addTutorialSection": "Add Tutorial Step",
+      "faqs": "FAQs",
+      "faqItem": "FAQ {{index}}",
+      "faqQuestion": "Enter a question",
+      "noFaqs": "No FAQs yet. Add one when needed.",
+      "addFaq": "Add FAQ",
+      "title": "Title",
+      "selectVehicle": "Select Vehicle",
+      "selectVehiclePlaceholder": "Select a vehicle",
+      "vehicleImage": "Vehicle Image",
+      "introduction": "Introduction",
+      "importantNotes": "Important Notes",
+      "validation": {
+        "basicInfoRequired": "Enter a title and select a vehicle",
+        "introductionRequired": "Enter an introduction",
+        "tutorialRequired": "Add at least one illustrated wiring step",
+        "tutorialIncomplete": "Complete the title and content for tutorial step {{index}}",
+        "faqIncomplete": "Complete the question and answer for FAQ {{index}}"
+      }
+    },
     "announcement": {
       "title": "Announcement Management",
       "description": "Publish announcements shown in the header notification center",

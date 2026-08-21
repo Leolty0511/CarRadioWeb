@@ -70,6 +70,15 @@ export interface FAQ {
   images: string[]
 }
 
+export interface WiringTutorialSection {
+  id: string
+  heading: string
+  content: string
+  imageUrl: string
+  imageAlt: string
+  layout: 'imageLeft' | 'imageRight'
+}
+
 // 用户反馈接口
 export interface UserFeedback {
   id: string
@@ -98,6 +107,7 @@ export interface StructuredArticle {
   vehicleImage: string
   introduction: string
   importantNotes: string
+  tutorialSections: WiringTutorialSection[]
   supportedFeatures: SupportedFeature[]
   unsupportedFeatures: SupportedFeature[]
   compatibleModels: CompatibleModel[]

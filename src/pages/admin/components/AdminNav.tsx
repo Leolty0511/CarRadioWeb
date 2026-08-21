@@ -71,6 +71,7 @@ export const AdminNav: React.FC<AdminNavProps> = ({
       items.filter(item => {
         if (item.superAdminOnly) {return isSuperAdmin}
         if (isSuperAdmin) {return true}
+        if (item.id === 'users' || item.id === 'members') {return true}
         const required = getRequiredPermissionsForNavId(item.id)
         return required.length > 0 && required.every(permission => userHasPermission(user ?? null, permission))
       }),

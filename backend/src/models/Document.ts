@@ -78,6 +78,16 @@ export interface IStructuredArticle extends Document {
     model: string;           // 型号
     yearRange: string;       // 年份范围
   };
+
+  // 主机接线图文教程
+  tutorialSections: Array<{
+    id: string;
+    heading: string;
+    content: string;
+    imageUrl?: string;
+    imageAlt?: string;
+    layout: 'imageLeft' | 'imageRight';
+  }>;
   
   // 功能特性
   features: {
@@ -294,6 +304,18 @@ const StructuredArticleSchema = new Schema<IStructuredArticle>({
     model: { type: String, required: true },
     yearRange: { type: String, required: true }
   },
+  tutorialSections: [{
+    id: { type: String, required: true },
+    heading: { type: String, required: true },
+    content: { type: String, required: true },
+    imageUrl: String,
+    imageAlt: String,
+    layout: {
+      type: String,
+      enum: ['imageLeft', 'imageRight'],
+      default: 'imageLeft'
+    }
+  }],
   features: {
     supported: [{ name: String, description: String }],
     unsupported: [{ name: String, description: String }]

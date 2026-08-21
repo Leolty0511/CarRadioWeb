@@ -9,12 +9,12 @@ export const DEFAULT_ADMIN_USERNAME = 'admin'
 export const DEFAULT_ADMIN_PASSWORD = 'admin'
 const BCRYPT_ROUNDS = 12
 
-/** Create the well-known first-login account only when no super administrator exists. */
-export async function ensureDefaultAdmin(): Promise<boolean> {
-  if (await User.exists({ role: 'super_admin' })) {return false}
+function isProduction(): boolean {
+  return process.env.NODE_ENV === 'production'
+}
 
+async function createDefaultAdmin(mustChangeCredentials: boolean): Promise<boolean> {
   const passwordHash = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, BCRYPT_ROUNDS)
-  const mustChangeCredentials = process.env.NODE_ENV === 'production'
 
   try {
     await User.create({
@@ -45,4 +45,35 @@ export async function ensureDefaultAdmin(): Promise<boolean> {
       : 'Development default admin account created'
   )
   return true
+}
+
+/** Local development only: keep the well-known admin/admin login without touching production. */
+async function ensureLocalDevAdmin(): Promise<boolean> {
+  const passwordHash = await bcrypt.hash(DEFAULT_ADMIN_PASSWORD, BCRYPT_ROUNDS)
+  const existing = await User.findOne({ loginUsername: DEFAULT_ADMIN_USERNAME }).select('+passwordHash')
+
+  if (existing) {
+    existing.role = 'super_admin'
+    existing.isActive = true
+    existing.passwordHash = passwordHash
+    existing.mustChangeCredentials = false
+    if (!existing.providerId) {
+      existing.providerId = `local_${DEFAULT_ADMIN_USERNAME}`
+    }
+    await existing.save()
+    logger.info('Development admin password reset to the local default')
+    return true
+  }
+
+  return createDefaultAdmin(false)
+}
+
+/** Create the well-known first-login account only when no super administrator exists. */
+export async function ensureDefaultAdmin(): Promise<boolean> {
+  if (!isProduction()) {
+    return ensureLocalDevAdmin()
+  }
+
+  if (await User.exists({ role: 'super_admin' })) {return false}
+  return createDefaultAdmin(true)
 }

@@ -159,8 +159,8 @@ export const NAV_CONFIG: NavGroup[] = [
     icon: ShieldCheck,
     defaultExpanded: true,
     items: [
-      { id: 'users', label: '管理员', icon: Users, superAdminOnly: true },
-      { id: 'members', label: '会员管理', icon: Users, superAdminOnly: true },
+      { id: 'users', label: '管理员', icon: Users },
+      { id: 'members', label: '会员管理', icon: Users },
       { id: 'audit-log', label: '操作日志', icon: ScrollText, superAdminOnly: true }
     ]
   },
@@ -213,5 +213,5 @@ export function getFirstAccessibleNavTab(
     const required = getRequiredPermissionsForNavId(item.id)
     if (required.length > 0 && required.every(permissionsCheck)) {return item.id}
   }
-  return null
+  return 'users'
 }
