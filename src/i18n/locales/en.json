@@ -1993,6 +1993,7 @@
     "logout": "Log out",
     "loggedOut": "You have been logged out",
     "memberEmail": "Member email",
+    "loginIdentifier": "Email or nickname",
     "email": "Email",
     "nickname": "Nickname",
     "password": "Password",
@@ -2010,7 +2011,7 @@
       "reset": "Reset password"
     },
     "errors": {
-      "invalid_credentials": "The email or password is incorrect",
+      "invalid_credentials": "The email, nickname, or password is incorrect",
       "account_suspended": "This account has been suspended",
       "email_already_exists": "This email is already registered",
       "invalid_code": "The verification code is incorrect",

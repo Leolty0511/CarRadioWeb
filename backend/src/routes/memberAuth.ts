@@ -36,6 +36,10 @@ const avatarUpload = multer({
   fileFilter: (_req, file, callback) => callback(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)),
 })
 
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 function validPassword(password: string) {
   return password.length >= MIN_PASSWORD && /[A-Z]/.test(password) && /[a-z]/.test(password) && /\d/.test(password)
 }
@@ -394,10 +398,14 @@ router.post('/register', authLimiter, async (req, res) => {
 })
 
 router.post('/login', authLimiter, async (req, res) => {
-  const email = String(req.body.login || req.body.email || '').trim().toLowerCase()
+  const login = String(req.body.login || req.body.email || '').trim()
   const password = String(req.body.password || '')
-  if (!email || !password) return res.status(400).json({ success: false, error: 'credentials_required' })
-  const member = await Member.findOne({ email }).select('+passwordHash')
+  if (!login || !password) return res.status(400).json({ success: false, error: 'credentials_required' })
+  const email = login.toLowerCase()
+  const nickname = new RegExp(`^${escapeRegex(login)}$`, 'i')
+  const member = await Member.findOne({
+    $or: [{ email }, { nickname }],
+  }).select('+passwordHash')
   if (!member || !(await bcrypt.compare(password, member.passwordHash))) return res.status(401).json({ success: false, error: 'invalid_credentials' })
   if (member.status === 'pending' || member.status === 'rejected') {
     member.status = 'active'
