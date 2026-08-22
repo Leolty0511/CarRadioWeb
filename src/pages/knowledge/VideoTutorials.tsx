@@ -17,6 +17,11 @@ interface VideoTutorialsProps {
   routePath?: string
 }
 
+const getHeadUnitImages = (type: HeadUnitType) => Array.from(new Set([
+  ...(type.images || []),
+  type.image,
+].filter(Boolean))).slice(0, 2)
+
 const VideoTutorials: React.FC<VideoTutorialsProps> = ({
   tutorialType = 'installation',
   titleKey = 'videoTutorials',
@@ -35,6 +40,12 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
   )
   const langPrefix = i18n.language === 'en' ? '' : `/${i18n.language}`
   const selectedHeadUnitType = headUnitTypes.find(type => type._id === headUnitTypeId)
+  const previewImages = previewHeadUnitType
+    ? getHeadUnitImages(previewHeadUnitType).map((url, index) => ({
+      url,
+      label: `${t('knowledge.headUnitImageLabel')} ${index + 1}`,
+    }))
+    : []
 
   React.useEffect(() => {
     if (tutorialType !== 'device-operation') {
@@ -161,34 +172,40 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
                     ref={headUnitCarouselRef}
                     className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-11 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   >
-                    {headUnitTypes.map(type => (
-                      <button
-                        key={type._id}
-                        type="button"
-                        onClick={() => setPreviewHeadUnitType(type)}
-                        className="w-[min(78vw,280px)] flex-none snap-start overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left transition hover:-translate-y-0.5 hover:border-cyan-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-cyan-600"
-                      >
-                        {type.image ? (
-                          <img
-                            src={getKnowledgeImageThumbnailUrl(type.image)}
-                            alt={type.name}
-                            className="h-36 w-full object-cover"
-                            loading="lazy"
-                            decoding="async"
-                          />
-                        ) : (
-                          <div className="flex h-36 items-center justify-center bg-slate-100 text-sm text-slate-400 dark:bg-gray-700 dark:text-gray-500">
-                            {t('knowledge.noHeadUnitImage')}
+                    {headUnitTypes.map(type => {
+                      const images = getHeadUnitImages(type)
+                      return (
+                        <button
+                          key={type._id}
+                          type="button"
+                          onClick={() => setPreviewHeadUnitType(type)}
+                          className="w-[min(78vw,280px)] flex-none snap-start overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left transition hover:-translate-y-0.5 hover:border-cyan-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-cyan-600"
+                        >
+                          <div className={`grid gap-1 bg-slate-100 p-1 dark:bg-gray-900 ${images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {images.length > 0 ? images.map((image, index) => (
+                              <img
+                                key={`${type._id}-${image}`}
+                                src={getKnowledgeImageThumbnailUrl(image)}
+                                alt={`${type.name} ${index + 1}`}
+                                className="h-36 w-full object-contain bg-white p-1 dark:bg-gray-800"
+                                loading="lazy"
+                                decoding="async"
+                              />
+                            )) : (
+                              <div className="flex h-36 items-center justify-center bg-slate-100 text-sm text-slate-400 dark:bg-gray-700 dark:text-gray-500">
+                                {t('knowledge.noHeadUnitImage')}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        <div className="p-4">
-                          <h3 className="font-medium text-slate-800 dark:text-white">{type.name}</h3>
-                          <p className="mt-1 text-xs text-slate-400 dark:text-gray-500">
-                            {t('knowledge.viewHeadUnitDetails')}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
+                          <div className="p-4">
+                            <h3 className="font-medium text-slate-800 dark:text-white">{type.name}</h3>
+                            <p className="mt-1 text-xs text-slate-400 dark:text-gray-500">
+                              {t('knowledge.viewHeadUnitDetails')}
+                            </p>
+                          </div>
+                        </button>
+                      )
+                    })}
                   </div>
                   <button
                     type="button"
@@ -245,11 +262,11 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
         )}
       </div>
 
-      {previewHeadUnitType?.image && (
+      {previewHeadUnitType && previewImages.length > 0 && (
         <ReferenceImageModal
           isOpen={Boolean(previewHeadUnitType)}
           onClose={() => setPreviewHeadUnitType(null)}
-          imageUrl={previewHeadUnitType.image}
+          images={previewImages}
           title={previewHeadUnitType.name}
           description={previewHeadUnitType.description}
           altText={previewHeadUnitType.name}
