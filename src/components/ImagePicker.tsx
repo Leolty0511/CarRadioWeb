@@ -22,7 +22,7 @@ interface ImagePickerProps {
   /** 是否显示上传功能 */
   showUpload?: boolean
   /** 上传文件�?*/
-  uploadFolder?: 'homepage' | 'vehicles' | 'documents' | 'uploads' | 'temp'
+  uploadFolder?: 'homepage' | 'vehicles' | 'documents' | 'knowledge' | 'uploads' | 'temp'
   /** 图片类型 */
   imageType?: 'hero' | 'installation' | 'vehicle-preview' | 'general' | 'structured-article' | 'general-document'
   /** 占位文本 */
@@ -32,6 +32,7 @@ interface ImagePickerProps {
 interface UploadedImage {
   id: string
   url: string
+  thumbnailUrl?: string
   name: string
   size: number
   uploadDate: string
@@ -228,7 +229,7 @@ const ImagePicker: React.FC<ImagePickerProps> = ({
                       onClick={() => handleImageSelect(image.url)}
                     >
                       <img
-                        src={image.url}
+                        src={image.thumbnailUrl || image.url}
                         alt={image.name}
                         className={viewMode === 'grid' ? 'w-full h-24 object-cover rounded' : 'w-16 h-16 object-cover rounded mr-3'}
                       />

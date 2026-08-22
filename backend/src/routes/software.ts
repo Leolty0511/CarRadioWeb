@@ -124,7 +124,8 @@ router.get('/:id', async (req, res) => {
 // 创建软件（需要指定资料体系）- 需要认证
 router.post('/', authenticateUser, requirePermission(PERMISSIONS.software.create), async (req, res) => {
   try {
-    const { name, categoryId, description, downloadUrl, importantNote, headUnitTypeId, language } = req.body;
+    const { name, categoryId, description, downloadUrl, importantNote, headUnitTypeId } = req.body;
+    const language = req.body.language || 'en';
     
     // 只验证最基本的必填字段
     if (!name || !language) {

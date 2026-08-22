@@ -9,6 +9,7 @@ import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
 import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
+import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
 
 interface VideoTutorialsProps {
   tutorialType?: 'installation' | 'device-operation'
@@ -168,7 +169,13 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
                         className="w-[min(78vw,280px)] flex-none snap-start overflow-hidden rounded-xl border border-slate-200 bg-slate-50 text-left transition hover:-translate-y-0.5 hover:border-cyan-400 hover:shadow-md dark:border-gray-700 dark:bg-gray-800 dark:hover:border-cyan-600"
                       >
                         {type.image ? (
-                          <img src={type.image} alt={type.name} className="h-36 w-full object-cover" />
+                          <img
+                            src={getKnowledgeImageThumbnailUrl(type.image)}
+                            alt={type.name}
+                            className="h-36 w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         ) : (
                           <div className="flex h-36 items-center justify-center bg-slate-100 text-sm text-slate-400 dark:bg-gray-700 dark:text-gray-500">
                             {t('knowledge.noHeadUnitImage')}

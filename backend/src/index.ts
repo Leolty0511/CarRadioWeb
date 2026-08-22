@@ -404,7 +404,7 @@ app.use(sitemapRouter);
 app.get('/', (req, res) => {
   res.json({
     message: 'Knowledge Base Backend API',
-    version: '1.2.5',
+    version: '1.4.0',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     endpoints: {
       health: '/health',
@@ -413,6 +413,12 @@ app.get('/', (req, res) => {
       documents: '/api/documents'
     }
   });
+});
+
+// 兼容已印刷说明书中的旧二维码地址，直接回到官网首页。
+// 仅匹配这个历史路径，不影响 API、后台路由或其他未知请求。
+app.get('/product.html', (_req, res) => {
+  res.redirect(302, '/');
 });
 
 // ==================== 认证中间件导入 ====================

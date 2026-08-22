@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import DocumentFeedback from '@/components/DocumentFeedback'
 import ImageGallery, { GalleryImage } from '@/components/ImageGallery'
 import { sanitizeHTMLForReact } from '@/utils/sanitize'
+import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
 
 interface GeneralDocumentViewerProps {
   document: any
@@ -72,7 +73,10 @@ const GeneralDocumentViewer: React.FC<GeneralDocumentViewerProps> = ({ document,
   const processContentImages = (content: string) => {
     if (!content) {return ''}
     return content.replace(/<img([^>]*)>/g, (_, attrs) => {
-      return `<img${attrs} style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" loading="lazy" decoding="async" class="clickable-image">`
+      const optimizedAttrs = attrs.replace(/(src=["'])([^"']+)(["'])/i, (_match: string, prefix: string, url: string, suffix: string) => (
+        `${prefix}${getKnowledgeImageThumbnailUrl(url)}${suffix}`
+      ))
+      return `<img${optimizedAttrs} style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); cursor: pointer;" loading="lazy" decoding="async" class="clickable-image">`
     })
   }
 
@@ -151,7 +155,7 @@ const GeneralDocumentViewer: React.FC<GeneralDocumentViewerProps> = ({ document,
         <Card className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50 backdrop-blur-sm shadow-xl overflow-hidden cursor-pointer hover:scale-[1.01] transition-transform"
           onClick={() => openGallery(0)}>
           <img
-            src={heroImage}
+            src={getKnowledgeImageThumbnailUrl(heroImage)}
             alt={heroImageAlt}
             className="w-full h-auto"
             loading="lazy"
@@ -238,7 +242,7 @@ const GeneralDocumentViewer: React.FC<GeneralDocumentViewerProps> = ({ document,
                   onClick={() => openGalleryByUrl(img.url || img.imageUrl || img)}
                 >
                   <img
-                    src={img.url || img.imageUrl || img}
+                    src={getKnowledgeImageThumbnailUrl(img.url || img.imageUrl || img)}
                     alt={img.alt || img.imageAlt || `${t('admin.images.title')} ${index + 2}`}
                     className="w-full h-64 object-cover"
                     loading="lazy"
@@ -274,7 +278,7 @@ const GeneralDocumentViewer: React.FC<GeneralDocumentViewerProps> = ({ document,
                   {section.imageUrl && (
                     <div className="w-full md:w-1/2 flex-shrink-0">
                       <img
-                        src={section.imageUrl}
+                        src={getKnowledgeImageThumbnailUrl(section.imageUrl)}
                         alt={section.imageAlt || section.heading || `${t('admin.documents.section')} ${index + 1}`}
                         className="w-full h-64 md:h-80 object-cover rounded-lg shadow-lg cursor-pointer hover:scale-[1.02] transition-transform"
                         loading="lazy"

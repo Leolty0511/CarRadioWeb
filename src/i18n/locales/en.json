@@ -265,6 +265,7 @@
       "vehicle": "Vehicle Image"
     },
     "viewDetails": "View Details",
+    "commonResource": "Common resource",
     "scrollToExplore": "Scroll to Explore",
     "badges": {
       "professional": "Professional Platform",
@@ -476,9 +477,10 @@
     "technicalTeam": "Technical Team",
     "headUnitTypeSelectorTitle": "Identify Your Head Unit Type",
     "headUnitTypeSelectorDescription": "Review the product image and description to identify your head unit. Then use the model tags below to view the matching operation tutorials.",
-    "sharedHeadUnitTypeSelectorDescription": "Review the images and description to identify your product head unit. You will return to this page with matching content shown automatically.",
+    "sharedHeadUnitTypeSelectorDescription": "Review the images and description to identify your head unit type.",
     "identifyHeadUnitType": "Identify My Head Unit",
     "useThisHeadUnitType": "Use This Head Unit Type",
+    "headUnitImageLabel": "Reference image",
     "currentHeadUnitType": "Current head unit type",
     "resourceHeadUnitTypeHint": "Identify your head unit first to prioritize the manuals that apply to your device.",
     "resourceSoftwareHeadUnitTypeHint": "Identify your head unit first to prioritize software and updates that apply to your device.",

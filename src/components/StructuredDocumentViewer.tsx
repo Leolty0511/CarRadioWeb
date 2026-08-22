@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/Card'
 import ImageGallery, { type GalleryImage } from '@/components/ImageGallery'
 import DocumentFeedback from '@/components/DocumentFeedback'
 import { sanitizeHTMLForReact } from '@/utils/sanitize'
+import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
 
 interface StructuredDocumentViewerProps {
   document: any
@@ -69,7 +70,7 @@ const StructuredDocumentViewer: React.FC<StructuredDocumentViewerProps> = ({ doc
     <section aria-labelledby="basic-information-title">
       <h2 id="basic-information-title" className="mb-4 text-2xl font-semibold text-slate-900 dark:text-white">{t('knowledge.vehicleResearch.basicInfo')}</h2>
       <Card><CardContent className="space-y-6 p-6 md:p-8">
-        {vehicleImage && <button type="button" className="block w-full overflow-hidden rounded-md border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800" onClick={() => openGallery(vehicleImage)}><img src={vehicleImage} alt={`${brand} ${model}`.trim()} className="mx-auto max-h-[560px] w-full object-contain" loading="lazy" /></button>}
+        {vehicleImage && <button type="button" className="block w-full overflow-hidden rounded-md border border-slate-200 bg-slate-100 dark:border-slate-700 dark:bg-slate-800" onClick={() => openGallery(vehicleImage)}><img src={getKnowledgeImageThumbnailUrl(vehicleImage)} alt={`${brand} ${model}`.trim()} className="mx-auto max-h-[560px] w-full object-contain" loading="lazy" decoding="async" /></button>}
         {introduction && <div className="prose prose-slate max-w-none dark:prose-invert" dangerouslySetInnerHTML={sanitizeHTMLForReact(introduction)} />}
         {importantNotes && <div className="rounded-md border border-red-200 bg-red-50 p-5 text-red-900 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-200"><h3 className="mb-3 text-base font-semibold">{t('common.importantNotes')}</h3><div className="prose max-w-none text-current dark:prose-invert" dangerouslySetInnerHTML={sanitizeHTMLForReact(importantNotes)} /></div>}
       </CardContent></Card>
@@ -80,7 +81,7 @@ const StructuredDocumentViewer: React.FC<StructuredDocumentViewerProps> = ({ doc
       {tutorialSections.length > 0 ? <div className="space-y-6">
         {tutorialSections.map((section: any, index: number) => <Card key={section.id || index}><CardContent className="p-6 md:p-8">
           <div className={`flex flex-col gap-6 ${section.layout === 'imageRight' ? 'md:flex-row-reverse' : 'md:flex-row'}`}>
-            {section.imageUrl && <button type="button" onClick={() => openGallery(section.imageUrl)} className="w-full flex-shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 md:w-1/2 dark:border-slate-700 dark:bg-slate-800"><img src={section.imageUrl} alt={section.imageAlt || section.heading} className="h-auto max-h-[440px] w-full object-contain" loading="lazy" />{section.imageAlt && <span className="block border-t border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">{section.imageAlt}</span>}</button>}
+            {section.imageUrl && <button type="button" onClick={() => openGallery(section.imageUrl)} className="w-full flex-shrink-0 overflow-hidden rounded-md border border-slate-200 bg-slate-100 md:w-1/2 dark:border-slate-700 dark:bg-slate-800"><img src={getKnowledgeImageThumbnailUrl(section.imageUrl)} alt={section.imageAlt || section.heading} className="h-auto max-h-[440px] w-full object-contain" loading="lazy" decoding="async" />{section.imageAlt && <span className="block border-t border-slate-200 px-3 py-2 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">{section.imageAlt}</span>}</button>}
             <div className={section.imageUrl ? 'w-full md:w-1/2' : 'w-full'}><p className="mb-2 text-sm font-medium text-blue-600 dark:text-blue-400">{t('knowledge.wiringStep', { index: index + 1 })}</p><h3 className="mb-4 text-xl font-semibold text-slate-900 dark:text-white">{section.heading}</h3><div className="prose prose-slate max-w-none dark:prose-invert" dangerouslySetInnerHTML={sanitizeHTMLForReact(section.content || '')} /></div>
           </div>
         </CardContent></Card>)}
@@ -89,7 +90,7 @@ const StructuredDocumentViewer: React.FC<StructuredDocumentViewerProps> = ({ doc
 
     <section aria-labelledby="faq-title">
       <h2 id="faq-title" className="mb-4 text-2xl font-semibold text-slate-900 dark:text-white">{t('knowledge.cardSections.faqs')}</h2>
-      {faqs.length > 0 ? <div className="space-y-3">{faqs.map((faq: any, index: number) => <details key={faq.id || index} className="group rounded-md border border-slate-200 bg-white open:shadow-sm dark:border-slate-700 dark:bg-slate-900"><summary className="cursor-pointer list-none px-5 py-4 font-medium text-slate-900 dark:text-white">{faq.title}</summary><div className="border-t border-slate-200 px-5 py-5 dark:border-slate-700"><div className="prose prose-slate max-w-none dark:prose-invert" dangerouslySetInnerHTML={sanitizeHTMLForReact(faq.description || '')} />{faq.images?.[0] && <button type="button" onClick={() => openGallery(faq.images[0])} className="mt-4 block max-w-xl overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"><img src={faq.images[0]} alt={faq.title} className="h-auto w-full" loading="lazy" /></button>}</div></details>)}</div> : <p className="text-sm text-slate-500 dark:text-slate-400">{t('knowledge.noFaqs')}</p>}
+      {faqs.length > 0 ? <div className="space-y-3">{faqs.map((faq: any, index: number) => <details key={faq.id || index} className="group rounded-md border border-slate-200 bg-white open:shadow-sm dark:border-slate-700 dark:bg-slate-900"><summary className="cursor-pointer list-none px-5 py-4 font-medium text-slate-900 dark:text-white">{faq.title}</summary><div className="border-t border-slate-200 px-5 py-5 dark:border-slate-700"><div className="prose prose-slate max-w-none dark:prose-invert" dangerouslySetInnerHTML={sanitizeHTMLForReact(faq.description || '')} />{faq.images?.[0] && <button type="button" onClick={() => openGallery(faq.images[0])} className="mt-4 block max-w-xl overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"><img src={getKnowledgeImageThumbnailUrl(faq.images[0])} alt={faq.title} className="h-auto w-full" loading="lazy" decoding="async" /></button>}</div></details>)}</div> : <p className="text-sm text-slate-500 dark:text-slate-400">{t('knowledge.noFaqs')}</p>}
     </section>
 
     <DocumentFeedback documentId={document._id || document.id} documentType="structured" className="mt-6" />

@@ -2,6 +2,12 @@ import { storageFactory } from './storage/StorageFactory';
 import { StorageSettings } from '../models/StorageSettings';
 import { createLogger } from '../utils/logger';
 import configService from './config/ConfigService';
+import { processImage } from '../utils/imageProcessor';
+import {
+  getKnowledgeThumbnailKey,
+  KNOWLEDGE_IMAGE_FOLDER,
+  sanitizeKnowledgeImageStem,
+} from '../utils/knowledgeImage';
 
 const logger = createLogger('upload');
 
@@ -13,7 +19,7 @@ export interface UploadResult {
 }
 
 export interface UploadOptions {
-  folder?: 'homepage' | 'vehicles' | 'documents' | 'uploads' | 'temp';
+  folder?: 'homepage' | 'vehicles' | 'documents' | 'knowledge' | 'uploads' | 'temp';
   customPath?: string;
   fileName?: string;
 }
@@ -23,6 +29,7 @@ const FOLDER_PATHS: Record<string, string> = {
   homepage: 'images/homepage/',
   vehicles: 'images/vehicles/',
   documents: 'images/documents/',
+  knowledge: KNOWLEDGE_IMAGE_FOLDER,
   uploads: 'images/uploads/',
   temp: 'temp/',
   'site-images': 'images/site-images/',
@@ -32,7 +39,7 @@ const FOLDER_PATHS: Record<string, string> = {
 /**
  * 获取存储服务（从数据库加载配置，支持本地存储与云存储）
  */
-const getStorageService = async () => {
+export const getStorageService = async () => {
   // Resolve settings for every request so PM2 workers cannot keep a stale
   // local/OSS provider after an administrator changes storage configuration.
   let service;
@@ -60,8 +67,93 @@ const getStorageService = async () => {
   return service;
 };
 
+export interface KnowledgeImageUploadResult extends UploadResult {
+  thumbnailUrl?: string;
+  thumbnailFileName?: string;
+}
+
+/**
+ * 上传知识库图片的高清图和缩略图。
+ *
+ * 该流程只由知识库上传入口调用，其他业务图片仍走原有上传逻辑。
+ * 原图会被转换为 WebP，高清图用于弹窗查看，缩略图用于列表和卡片。
+ */
+export const uploadKnowledgeImage = async (
+  buffer: Buffer,
+  originalName: string,
+  fileName?: string,
+): Promise<KnowledgeImageUploadResult> => {
+  try {
+    const sourceName = fileName || originalName;
+    const randomSuffix = Math.random().toString(36).slice(2, 8);
+    const stem = `${Date.now()}-${randomSuffix}-${sanitizeKnowledgeImageStem(sourceName)}`;
+    const displayKey = `${KNOWLEDGE_IMAGE_FOLDER}${stem}.webp`;
+    const thumbnailKey = getKnowledgeThumbnailKey(displayKey);
+
+    const display = await processImage(buffer, {
+      maxWidth: 4096,
+      maxHeight: 4096,
+      quality: 88,
+      format: 'webp',
+      preserveMetadata: false,
+    });
+    const thumbnail = await processImage(buffer, {
+      maxWidth: 640,
+      maxHeight: 640,
+      quality: 80,
+      format: 'webp',
+      preserveMetadata: false,
+    });
+
+    const maxStoredSize = 10 * 1024 * 1024;
+    if (display.buffer.length > maxStoredSize) {
+      return {
+        success: false,
+        error: `知识库图片处理后仍超过 10MB（当前 ${(display.buffer.length / 1024 / 1024).toFixed(2)}MB），请降低原图分辨率后重试`,
+      };
+    }
+
+    const storageService = await getStorageService();
+    const uploadOptions = {
+      contentType: 'image/webp',
+      cacheControl: 'public, max-age=31536000, immutable',
+    };
+
+    const displayResult = await storageService.uploadFile(display.buffer, displayKey, uploadOptions);
+    if (!displayResult.success || !displayResult.fileInfo?.url) {
+      return {
+        success: false,
+        error: displayResult.error || '知识库高清图片上传失败',
+      };
+    }
+
+    const thumbnailResult = await storageService.uploadFile(thumbnail.buffer, thumbnailKey, uploadOptions);
+    if (!thumbnailResult.success || !thumbnailResult.fileInfo?.url) {
+      await storageService.deleteFile(displayKey).catch(() => false);
+      return {
+        success: false,
+        error: thumbnailResult.error || '知识库缩略图上传失败',
+      };
+    }
+
+    return {
+      success: true,
+      url: displayResult.fileInfo.url,
+      thumbnailUrl: thumbnailResult.fileInfo.url,
+      fileName: `${stem}.webp`,
+      thumbnailFileName: `${stem}-thumb.webp`,
+    };
+  } catch (error) {
+    logger.error({ error, originalName }, '知识库图片处理或上传失败');
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '知识库图片上传失败',
+    };
+  }
+};
+
 /** 从图片 URL 解析存储 key（本地存储需去掉 baseUrl 前缀） */
-const getKeyFromImageUrl = async (imageUrl: string): Promise<string> => {
+export const getKeyFromImageUrl = async (imageUrl: string): Promise<string> => {
   let pathname: string;
   try {
     const url = new URL(imageUrl);
@@ -237,10 +329,15 @@ export const getUploadedImages = async () => {
 
           // 提取文件名
           const fileName = file.key.split('/').pop() || file.key;
+          // 知识库缩略图由对应的高清图按需派生，不作为独立素材展示。
+          if (folderName === 'knowledge' && /-thumb\.webp$/i.test(fileName)) continue;
 
           images.push({
             id: file.key, // 使用OSS对象名作为ID
             url: file.url,
+            ...(folderName === 'knowledge' ? {
+              thumbnailUrl: file.url.replace(/\.webp(?=([?#]|$))/i, '-thumb.webp'),
+            } : {}),
             name: fileName,
             size: file.size || 0,
             uploadDate: file.lastModified?.toISOString() || new Date().toISOString(),

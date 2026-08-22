@@ -2,7 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ISoftware extends Document {
   name: string;
-  categoryId: mongoose.Types.ObjectId;
+  categoryId?: mongoose.Types.ObjectId;
   headUnitTypeId?: mongoose.Types.ObjectId;
   description: string;
   downloadUrl: string;
@@ -21,7 +21,6 @@ const softwareSchema = new Schema<ISoftware>({
   categoryId: {
     type: Schema.Types.ObjectId,
     ref: 'SoftwareCategory',
-    required: true
   },
   headUnitTypeId: {
     type: Schema.Types.ObjectId,

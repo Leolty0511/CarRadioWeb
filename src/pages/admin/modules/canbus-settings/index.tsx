@@ -367,7 +367,7 @@ const CANBoxTypeManager: React.FC = () => {
                   setShowImagePicker(false)
                 }}
                 showUpload={true}
-                uploadFolder="uploads"
+                uploadFolder="knowledge"
               />
             </div>
           </div>
@@ -591,7 +591,7 @@ const HeadUnitTypeManager: React.FC = () => {
                   setShowImagePicker(false)
                 }}
                 showUpload
-                uploadFolder="uploads"
+                uploadFolder="knowledge"
               />
             </div>
           </div>
@@ -904,7 +904,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                   setShowImagePicker(false)
                 }}
                 showUpload={true}
-                uploadFolder="uploads"
+                uploadFolder="knowledge"
               />
             </div>
           </div>

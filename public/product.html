@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="0;url=/" />
+    <title>正在打开官网</title>
+  </head>
+  <body>
+    <script>
+      // 兼容已印刷的旧二维码地址，保留查询参数和锚点后回到官网首页。
+      window.location.replace('/' + window.location.search + window.location.hash);
+    </script>
+    <p><a href="/">进入官网首页</a></p>
+  </body>
+</html>

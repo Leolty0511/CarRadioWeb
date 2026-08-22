@@ -11,7 +11,7 @@ export interface SoftwareCategory {
 export interface Software {
   _id: string;
   name: string;
-  categoryId: string;
+  categoryId?: string;
   headUnitTypeId?: string | { _id: string; name: string } | null;
   description: string;
   downloadUrl: string;

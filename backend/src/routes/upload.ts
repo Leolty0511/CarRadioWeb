@@ -1,7 +1,12 @@
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { uploadImageToOSS, deleteImageFromOSS, getImageInfo } from '../services/uploadService';
+import {
+  uploadImageToOSS,
+  uploadKnowledgeImage,
+  deleteImageFromOSS,
+  getImageInfo,
+} from '../services/uploadService';
 import { createLogger } from '../utils/logger';
 import { requireAnyPermission, requirePermission } from '../middleware/auth';
 import { PERMISSIONS } from '../config/permissions';
@@ -120,6 +125,30 @@ router.post('/image', requireAnyPermission(
     // 获取上传参数
     const folder = req.body.folder as string || 'uploads';
     const customFileName = req.body.fileName as string;
+
+    // 知识库图片使用独立的 WebP 高清图 + 缩略图处理流程。
+    // 其他上传目录保持原有行为，避免影响首页、新闻和会员头像等模块。
+    if (folder === 'knowledge') {
+      const result = await uploadKnowledgeImage(
+        validation.processed!,
+        req.file.originalname,
+        customFileName,
+      );
+
+      if (result.success) {
+        res.json({
+          success: true,
+          url: result.url,
+          thumbnailUrl: result.thumbnailUrl,
+          fileName: result.fileName,
+          thumbnailFileName: result.thumbnailFileName,
+          message: '知识库图片上传成功',
+        });
+      } else {
+        res.status(400).json({ success: false, error: result.error || '知识库图片上传失败' });
+      }
+      return;
+    }
 
     // 使用处理后的 buffer（已剥离 EXIF）
     const processedFile = {

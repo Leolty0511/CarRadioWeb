@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import ReferenceImageModal from '@/components/ReferenceImageModal'
 import canbusSettingsService, { type CANBoxType, type HeadUnitType } from '@/services/canbusSettingsService'
 import { getVehicles } from '@/services/vehicleService'
+import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
 
 /** 文档语言固定英文 */
 const mapUILanguageToDocLanguage = (_uiLang: string): 'en' => 'en'
@@ -249,9 +250,11 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                           onClick={() => setPreviewImage({ url: canbox.image, title: canbox.name })}
                         >
                           <img
-                            src={canbox.image}
+                            src={getKnowledgeImageThumbnailUrl(canbox.image)}
                             alt={canbox.name}
                             className="aspect-square h-full w-full object-cover"
+                            loading="lazy"
+                            decoding="async"
                           />
                         </button>
                       ) : (
@@ -419,9 +422,11 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
             <div className="mt-4 flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:flex-row sm:items-center">
               {selectedHeadUnitType.image && (
                 <img
-                  src={selectedHeadUnitType.image}
+                  src={getKnowledgeImageThumbnailUrl(selectedHeadUnitType.image)}
                   alt={selectedHeadUnitType.name}
                   className="h-24 w-full rounded-lg object-cover sm:h-20 sm:w-32"
+                  loading="lazy"
+                  decoding="async"
                 />
               )}
               <div className="min-w-0">
@@ -492,6 +497,8 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                     src={settingData.settingImage}
                     alt={`${selectedBrand} ${selectedModel} ${selectedYear} CANBus ${t('canbus.settingImage')}`}
                     className="max-h-64 w-full object-contain"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <span className="block border-t border-slate-200 px-4 py-2 text-center text-sm text-slate-600 dark:border-gray-700 dark:text-gray-300">
                     {t('canbus.clickToEnlarge')}

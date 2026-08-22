@@ -4,7 +4,8 @@ import Modal from '@/components/ui/Modal'
 interface ReferenceImageModalProps {
   isOpen: boolean
   onClose: () => void
-  imageUrl: string
+  imageUrl?: string
+  images?: Array<{ url: string; label?: string }>
   title: string
   description?: string
   altText?: string
@@ -18,6 +19,7 @@ const ReferenceImageModal: React.FC<ReferenceImageModalProps> = ({
   isOpen,
   onClose,
   imageUrl,
+  images,
   title,
   description,
   altText,
@@ -31,12 +33,24 @@ const ReferenceImageModal: React.FC<ReferenceImageModalProps> = ({
     overlayClassName="bg-slate-900/20 backdrop-blur-[2px] dark:bg-black/35"
   >
     <div className="space-y-4">
-      <div className="flex min-h-[220px] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-gray-700 dark:bg-gray-900/70">
-        <img
-          src={imageUrl}
-          alt={altText || title}
-          className="max-h-[65vh] w-auto max-w-full rounded-lg object-contain"
-        />
+      <div className={`grid gap-4 ${images && images.length > 1 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1'}`}>
+        {(images?.length ? images : imageUrl ? [{ url: imageUrl }] : []).map((image, index) => (
+          <div
+            key={`${image.url}-${index}`}
+            className="flex min-h-[260px] items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-gray-700 dark:bg-gray-900/70"
+          >
+            <div className="w-full">
+              <img
+                src={image.url}
+                alt={altText || title}
+                className="mx-auto max-h-[58vh] w-auto max-w-full rounded-lg object-contain"
+              />
+              {image.label && (
+                <p className="mt-3 text-center text-sm text-slate-500 dark:text-gray-400">{image.label}</p>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
       {description?.trim() && (
         <p className="whitespace-pre-wrap text-sm leading-7 text-slate-600 dark:text-gray-300">

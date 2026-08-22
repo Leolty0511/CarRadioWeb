@@ -16,10 +16,10 @@ interface ImageUploadProps {
   /** 自定义容器类名 */
   className?: string
   /** 上传目录（与后端 folder 保持一致） */
-  uploadFolder?: 'homepage' | 'vehicles' | 'documents' | 'uploads' | 'temp'
+  uploadFolder?: 'homepage' | 'vehicles' | 'documents' | 'knowledge' | 'uploads' | 'temp'
   /** 自定义文件名（含扩展名） */
   fileName?: string
-  /** 图片类型，用于决定是否压缩 */
+  /** 图片类型，保留用于区分知识库等业务场景 */
   imageType?: 'hero' | 'installation' | 'vehicle-preview' | 'general' | 'structured-article' | 'general-document'
 }
 
@@ -61,19 +61,14 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
     }
   }
 
-  /**
-   * 处理文件选择：根据图片类型决定是否压缩
-   */
+  /** 处理文件选择，知识库图片由服务端生成高清图和缩略图 */
   const handleFileSelect = useCallback(async (file: File) => {
     if (file && file.type.startsWith('image/')) {
       try {
         setIsUploading(true)
 
-        // 不压缩，保持原图上传
-        const uploadFile = file
-
         // 上传并获取 URL
-        const url = await uploadToBackend(uploadFile, uploadFolder, fileName)
+        const url = await uploadToBackend(file, uploadFolder, fileName)
         // 回传 URL
         onChange(url)
         showToast({

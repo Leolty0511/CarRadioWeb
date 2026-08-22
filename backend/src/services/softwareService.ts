@@ -60,7 +60,7 @@ export class SoftwareService {
 
   async createSoftware(softwareData: {
     name: string;
-    categoryId: string;
+    categoryId?: string;
     description: string;
     downloadUrl: string;
     importantNote?: string;

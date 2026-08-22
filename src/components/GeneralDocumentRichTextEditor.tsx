@@ -15,7 +15,6 @@ import {
   AlignRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { compressImage } from '@/utils/imageCompression'
 import { useToast } from '@/components/ui/Toast'
 import { apiClient } from '@/services/apiClient'
 
@@ -118,18 +117,6 @@ const GeneralDocumentRichTextEditor: React.FC<GeneralDocumentRichTextEditorProps
     ensureFocus()
   }, [])
 
-  // 将 dataURL 转为 File
-  const dataURLToFile = (dataUrl: string, name: string): File => {
-    const arr = dataUrl.split(',')
-    const mimeMatch = arr[0].match(/:(.*?);/)
-    const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg'
-    const bstr = atob(arr[1])
-    let n = bstr.length
-    const u8arr = new Uint8Array(n)
-    while (n--) {u8arr[n] = bstr.charCodeAt(n)}
-    return new File([u8arr], name, { type: mime })
-  }
-
   // 上传到后端
   const uploadToBackend = async (file: File, folder?: string): Promise<string> => {
     const formData = new FormData()
@@ -144,7 +131,7 @@ const GeneralDocumentRichTextEditor: React.FC<GeneralDocumentRichTextEditorProps
     return url
   }
 
-  // 处理文件 → 高质量压缩 → 上传 → 插入
+  // 原图上传到知识库专用处理流程，由服务端生成 WebP 高清图和缩略图。
   const handleFilesAndInsert = useCallback(async (files: FileList | File[]) => {
     const list = Array.from(files).filter(f => f.type.startsWith('image/'))
     if (list.length === 0) {return}
@@ -152,16 +139,7 @@ const GeneralDocumentRichTextEditor: React.FC<GeneralDocumentRichTextEditorProps
     try {
       restoreSelection()
       for (const file of list) {
-        // 为通用文档中的图片使用高质量压缩，确保清晰可辨
-        const compressedDataUrl = await compressImage(file, {
-          compressionLevel: 'low', // 高质量压缩：1200x900, 90%质量
-          format: 'jpeg'
-        })
-        const uploadFile = dataURLToFile(
-          compressedDataUrl,
-          file.name.replace(/\.[^.]+$/, '.jpg')
-        )
-        const url = await uploadToBackend(uploadFile, 'documents')
+        const url = await uploadToBackend(file, 'knowledge')
         restoreSelection()
         execCommand('insertImage', url)
         execCommand('insertHTML', '<br/>')

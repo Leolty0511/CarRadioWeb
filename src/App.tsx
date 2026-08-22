@@ -42,6 +42,9 @@ const AppRoutes = () => {
 
   return (
     <Routes>
+      {/* 兼容旧说明书二维码：即使服务器将旧地址回退到 SPA，也直接进入首页 */}
+      <Route path="/product.html" element={<Navigate to="/" replace />} />
+
       {/* 兼容旧链接：剥离 /en /ru 前缀后跳转 */}
       <Route path="/en/*" element={<StripContentPrefixRedirect />} />
       <Route path="/ru/*" element={<StripContentPrefixRedirect />} />

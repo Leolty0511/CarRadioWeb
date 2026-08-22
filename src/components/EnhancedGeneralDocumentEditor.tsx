@@ -421,7 +421,7 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
           onChange={(imageUrl) => setFormData(prev => ({ ...prev, heroImageUrl: imageUrl }))}
           placeholder={t('admin.images.uploadImage')}
           className="h-48 md:h-64"
-          uploadFolder="documents"
+          uploadFolder="knowledge"
           imageType="hero"
         />
         {formData.heroImageUrl && (
@@ -512,7 +512,7 @@ const EnhancedGeneralDocumentEditor: React.FC<EnhancedGeneralDocumentEditorProps
                   onChange={(imageUrl) => updateSection(section.id, 'imageUrl', imageUrl)}
                   placeholder={t('admin.images.uploadImage')}
                   className="h-32 overflow-hidden"
-                  uploadFolder="documents"
+                  uploadFolder="knowledge"
                   imageType="general"
                 />
                 {section.imageUrl && (
