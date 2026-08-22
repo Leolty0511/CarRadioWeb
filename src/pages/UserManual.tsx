@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import SEOHead from '@/components/seo/SEOHead'
+import HeadUnitTypeIdentifier from '@/components/knowledge/HeadUnitTypeIdentifier'
+import { useHeadUnitTypes } from '@/contexts/HeadUnitTypeContext'
 
 interface Category {
   _id: string
@@ -27,6 +29,7 @@ interface Manual {
 
 const UserManual: React.FC = () => {
   const { t } = useTranslation()
+  const { selectedHeadUnitType, selectedHeadUnitTypeId } = useHeadUnitTypes()
   const [categories, setCategories] = useState<Category[]>([])
   const [manuals, setManuals] = useState<Manual[]>([])
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
@@ -35,21 +38,32 @@ const UserManual: React.FC = () => {
   const [iframeLoading, setIframeLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/user-manual/categories')
+    const query = selectedHeadUnitTypeId
+      ? `?headUnitTypeId=${encodeURIComponent(selectedHeadUnitTypeId)}`
+      : ''
+    fetch(`/api/user-manual/categories${query}`)
       .then(response => response.json())
       .then(data => {
         if (data.success) {setCategories(data.categories || [])}
       })
       .catch(console.error)
       .finally(() => setLoading(false))
-  }, [])
+  }, [selectedHeadUnitTypeId])
+
+  useEffect(() => {
+    setSelectedCategory(null)
+    setSelectedManual(null)
+    setManuals([])
+  }, [selectedHeadUnitTypeId])
 
   const openCategory = async (category: Category) => {
     setLoading(true)
     setSelectedCategory(category)
     setSelectedManual(null)
     try {
-      const response = await fetch(`/api/user-manual?categoryId=${encodeURIComponent(category._id)}`)
+      const params = new URLSearchParams({ categoryId: category._id })
+      if (selectedHeadUnitTypeId) {params.set('headUnitTypeId', selectedHeadUnitTypeId)}
+      const response = await fetch(`/api/user-manual?${params.toString()}`)
       const data = await response.json()
       if (data.success) {setManuals(data.manuals || [])}
     } catch (error) {
@@ -77,6 +91,20 @@ const UserManual: React.FC = () => {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('userManual.title')}</h1>
           <p className="mx-auto mt-2 max-w-2xl text-gray-600 dark:text-gray-300">{t('userManual.description')}</p>
         </header>
+
+        <section className="mb-8 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/70 p-5 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-left">
+            <h2 className="text-base font-semibold text-slate-800 dark:text-white">
+              {t('knowledge.headUnitTypeSelectorTitle')}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-gray-300">
+              {selectedHeadUnitType
+                ? `${t('knowledge.currentHeadUnitType')}: ${selectedHeadUnitType.name}`
+                : t('knowledge.resourceHeadUnitTypeHint')}
+            </p>
+          </div>
+          <HeadUnitTypeIdentifier compact className="shrink-0" />
+        </section>
 
         {loading && (
           <div className="flex justify-center py-16">

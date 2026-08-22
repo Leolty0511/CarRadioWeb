@@ -65,12 +65,26 @@ function serializeManual(manual: any) {
     downloadUrl: `/api/user-manual/download/${encodeURIComponent(value.filename)}`,
     categoryId: value.categoryId ? String(value.categoryId._id || value.categoryId) : null,
     category: value.categoryId && typeof value.categoryId === 'object' ? value.categoryId : undefined,
+    headUnitTypeId: value.headUnitTypeId
+      ? String(value.headUnitTypeId._id || value.headUnitTypeId)
+      : null,
+    headUnitType: value.headUnitTypeId && typeof value.headUnitTypeId === 'object'
+      ? value.headUnitTypeId
+      : undefined,
   }
 }
 
-async function listCategories(includeEmpty = false) {
+async function listCategories(includeEmpty = false, headUnitTypeId?: string) {
   const categories = await ManualCategory.find({ ...(includeEmpty ? {} : { isActive: true }) }).sort({ order: 1, name: 1 }).lean()
-  const counts = await UserManual.aggregate([{ $match: { isPublished: true } }, { $group: { _id: '$categoryId', count: { $sum: 1 } } }])
+  const manualMatch: Record<string, any> = { isPublished: true }
+  if (headUnitTypeId && mongoose.isValidObjectId(headUnitTypeId)) {
+    manualMatch.$or = [
+      { headUnitTypeId: new mongoose.Types.ObjectId(headUnitTypeId) },
+      { headUnitTypeId: { $exists: false } },
+      { headUnitTypeId: null },
+    ]
+  }
+  const counts = await UserManual.aggregate([{ $match: manualMatch }, { $group: { _id: '$categoryId', count: { $sum: 1 } } }])
   const countMap = new Map(counts.map(item => [String(item._id), item.count]))
   const categoriesWithCounts = categories.map(category => ({ ...category, manualCount: countMap.get(String(category._id)) || 0 }))
   return includeEmpty ? categoriesWithCounts : categoriesWithCounts.filter(category => category.manualCount > 0)
@@ -79,7 +93,7 @@ async function listCategories(includeEmpty = false) {
 router.get('/categories', async (_req, res) => {
   try {
     await syncLegacyFiles()
-    res.json({ success: true, categories: await listCategories(false) })
+    res.json({ success: true, categories: await listCategories(false, _req.query.headUnitTypeId as string | undefined) })
   } catch (error) {
     logger.error({ error }, 'Failed to list manual categories')
     res.status(500).json({ success: false, message: '获取用户手册分类失败' })
@@ -91,7 +105,18 @@ router.get('/', async (req, res) => {
     await syncLegacyFiles()
     const filter: Record<string, any> = { isPublished: true }
     if (req.query.categoryId && mongoose.isValidObjectId(req.query.categoryId)) filter.categoryId = req.query.categoryId
-    const manuals = await UserManual.find(filter).populate('categoryId', 'name slug description').sort({ sortOrder: 1, updatedAt: -1 }).lean()
+    if (req.query.headUnitTypeId && mongoose.isValidObjectId(req.query.headUnitTypeId)) {
+      filter.$or = [
+        { headUnitTypeId: req.query.headUnitTypeId },
+        { headUnitTypeId: { $exists: false } },
+        { headUnitTypeId: null },
+      ]
+    }
+    const manuals = await UserManual.find(filter)
+      .populate('categoryId', 'name slug description')
+      .populate('headUnitTypeId', 'name')
+      .sort({ sortOrder: 1, updatedAt: -1 })
+      .lean()
     res.json({ success: true, manuals: manuals.map(serializeManual) })
   } catch (error) {
     logger.error({ error }, 'Failed to list user manuals')
@@ -103,7 +128,11 @@ router.get('/admin', authenticateUser, requireAnyPermission(PERMISSIONS.resource
   try {
     await syncLegacyFiles()
     const [manuals, categories] = await Promise.all([
-      UserManual.find().populate('categoryId', 'name slug description').sort({ sortOrder: 1, updatedAt: -1 }).lean(),
+      UserManual.find()
+        .populate('categoryId', 'name slug description')
+        .populate('headUnitTypeId', 'name')
+        .sort({ sortOrder: 1, updatedAt: -1 })
+        .lean(),
       listCategories(true),
     ])
     res.json({ success: true, manuals: manuals.map(serializeManual), categories })
@@ -164,9 +193,10 @@ router.post('/upload', authenticateUser, requireAnyPermission(PERMISSIONS.resour
       return res.status(400).json({ success: false, message: '请填写手册标题和产品型号' })
     }
     const categoryId = req.body.categoryId && mongoose.isValidObjectId(req.body.categoryId) ? req.body.categoryId : undefined
+    const headUnitTypeId = req.body.headUnitTypeId && mongoose.isValidObjectId(req.body.headUnitTypeId) ? req.body.headUnitTypeId : undefined
     const existing = await UserManual.findOne({ filename: req.file.filename })
     if (existing) await UserManual.deleteOne({ _id: existing._id })
-    const manual = await UserManual.create({ filename: req.file.filename, title, productModel, categoryId, description: String(req.body.description || ''), version: String(req.body.version || ''), sortOrder: Number(req.body.sortOrder) || 0, isPublished: req.body.isPublished !== 'false', size: req.file.size })
+    const manual = await UserManual.create({ filename: req.file.filename, title, productModel, categoryId, headUnitTypeId, description: String(req.body.description || ''), version: String(req.body.version || ''), sortOrder: Number(req.body.sortOrder) || 0, isPublished: req.body.isPublished !== 'false', size: req.file.size })
     res.status(201).json({ success: true, manual: serializeManual(manual) })
   } catch (error) {
     if (req.file) await fsp.unlink(req.file.path).catch(() => undefined)
@@ -181,6 +211,7 @@ router.put('/:id', authenticateUser, requireAnyPermission(PERMISSIONS.resources.
     const updates: Record<string, any> = {}
     for (const key of ['title', 'productModel', 'description', 'version']) if (req.body[key] !== undefined) updates[key] = String(req.body[key]).trim()
     if (req.body.categoryId !== undefined) updates.categoryId = mongoose.isValidObjectId(req.body.categoryId) ? req.body.categoryId : null
+    if (req.body.headUnitTypeId !== undefined) updates.headUnitTypeId = mongoose.isValidObjectId(req.body.headUnitTypeId) ? req.body.headUnitTypeId : null
     if (req.body.sortOrder !== undefined) updates.sortOrder = Number(req.body.sortOrder) || 0
     if (req.body.isPublished !== undefined) updates.isPublished = Boolean(req.body.isPublished)
     const manual = await UserManual.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true }).populate('categoryId', 'name slug description')

@@ -476,6 +476,12 @@
     "technicalTeam": "Technical Team",
     "headUnitTypeSelectorTitle": "Identify Your Head Unit Type",
     "headUnitTypeSelectorDescription": "Review the product image and description to identify your head unit. Then use the model tags below to view the matching operation tutorials.",
+    "sharedHeadUnitTypeSelectorDescription": "Review the images and description to identify your product head unit. You will return to this page with matching content shown automatically.",
+    "identifyHeadUnitType": "Identify My Head Unit",
+    "useThisHeadUnitType": "Use This Head Unit Type",
+    "currentHeadUnitType": "Current head unit type",
+    "resourceHeadUnitTypeHint": "Identify your head unit first to prioritize the manuals that apply to your device.",
+    "resourceSoftwareHeadUnitTypeHint": "Identify your head unit first to prioritize software and updates that apply to your device.",
     "changeHeadUnitType": "Change Head Unit Type",
     "headUnitTypeFilterLabel": "View Tutorials by Head Unit Type",
     "viewHeadUnitDetails": "Click to view the image and model description",
@@ -828,8 +834,8 @@
       "description": "The community forum is not open yet. Please check back later.",
       "hint": "We will announce when the forum is ready."
     },
-    "notConfigured": "The forum is not configured yet. Please enable it in the admin settings.",
-    "redirectingHint": "If the forum does not load, check Docker or try redeploying in Backend → Function Settings → Forum.",
+    "notConfigured": "The forum is not available yet. Please try again later.",
+    "redirectingHint": "Opening the forum. If it does not load, please try again later.",
     "oauthRedirecting": "Signing you in to the forum...",
     "features": {
       "discussions": {

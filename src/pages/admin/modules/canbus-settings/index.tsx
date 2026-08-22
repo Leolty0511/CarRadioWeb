@@ -397,8 +397,9 @@ const HeadUnitTypeManager: React.FC = () => {
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<HeadUnitTypeInput>({ name: '', image: '', description: '', sortOrder: 0, isActive: true })
+  const [formData, setFormData] = useState<HeadUnitTypeInput>({ name: '', image: '', images: [], description: '', sortOrder: 0, isActive: true })
   const [showImagePicker, setShowImagePicker] = useState(false)
+  const [imagePickerTarget, setImagePickerTarget] = useState<0 | 1>(0)
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string }>({ show: false, id: '' })
 
   const loadTypes = useCallback(async () => {
@@ -416,7 +417,7 @@ const HeadUnitTypeManager: React.FC = () => {
 
   const handleAdd = () => {
     setEditingId(null)
-    setFormData({ name: '', image: '', description: '', sortOrder: 0, isActive: true })
+    setFormData({ name: '', image: '', images: [], description: '', sortOrder: 0, isActive: true })
     setShowForm(true)
   }
 
@@ -425,6 +426,7 @@ const HeadUnitTypeManager: React.FC = () => {
     setFormData({
       name: item.name,
       image: item.image || '',
+      images: (item.images?.length ? item.images : [item.image]).filter(Boolean).slice(0, 2),
       description: item.description || '',
       sortOrder: item.sortOrder || 0,
       isActive: item.isActive
@@ -499,7 +501,15 @@ const HeadUnitTypeManager: React.FC = () => {
                   {types.map(item => (
                     <tr key={item._id}>
                       <td className="px-4 py-3 text-sm text-slate-800 dark:text-gray-100">{item.name}</td>
-                      <td className="px-4 py-3">{item.image ? <img src={item.image} alt="" className="h-12 w-20 rounded object-cover bg-slate-100 dark:bg-gray-700" /> : <span className="text-sm text-slate-400">未设置</span>}</td>
+                      <td className="px-4 py-3">
+                        {(item.images?.length ? item.images : [item.image]).filter(Boolean).slice(0, 2).length > 0 ? (
+                          <div className="flex gap-1">
+                            {(item.images?.length ? item.images : [item.image]).filter(Boolean).slice(0, 2).map(image => (
+                              <img key={image} src={image} alt="" className="h-12 w-16 rounded object-contain bg-slate-100 dark:bg-gray-700" />
+                            ))}
+                          </div>
+                        ) : <span className="text-sm text-slate-400">未设置</span>}
+                      </td>
                       <td className="max-w-md px-4 py-3 text-sm text-slate-600 dark:text-gray-300">{item.description || '—'}</td>
                       <td className="px-4 py-3 text-sm">{item.isActive ? <span className="text-green-600 dark:text-green-400">启用</span> : <span className="text-slate-400">停用</span>}</td>
                       <td className="px-4 py-3 text-right">
@@ -521,7 +531,44 @@ const HeadUnitTypeManager: React.FC = () => {
             <CardHeader><div className="flex items-center justify-between"><CardTitle>{editingId ? '编辑主机型号' : '新增主机型号'}</CardTitle><Button variant="ghost" size="sm" onClick={() => setShowForm(false)}><X className="h-5 w-5" /></Button></div></CardHeader>
             <CardContent className="space-y-4">
               <div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">名称 *</label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="例如：Brand A、Series X" className="bg-slate-50 dark:bg-gray-700" /></div>
-              <div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">产品图片</label><div className="flex items-center gap-4">{formData.image ? <div className="relative h-20 w-20 overflow-hidden rounded-lg border"><img src={formData.image} alt="" className="h-full w-full object-cover" /><button type="button" onClick={() => setFormData({ ...formData, image: '' })} className="absolute right-1 top-1 rounded bg-red-500 px-1 text-xs text-white">移除</button></div> : <div className="flex h-20 w-20 items-center justify-center rounded-lg border-2 border-dashed border-slate-300"><ImageIcon className="h-6 w-6 text-slate-400" /></div>}<Button variant="outline" onClick={() => setShowImagePicker(true)}>选择图片</Button></div></div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">主机识别图片</label>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {[0, 1].map(index => {
+                    const image = (formData.images || [formData.image || ''])[index] || ''
+                    return (
+                      <div key={index} className="rounded-lg border border-slate-200 p-3 dark:border-gray-700">
+                        <p className="mb-2 text-xs text-slate-500 dark:text-gray-400">识别图片 {index + 1}</p>
+                        <div className="flex items-center gap-3">
+                          {image ? (
+                            <div className="relative h-20 w-24 overflow-hidden rounded-lg border">
+                              <img src={image} alt="" className="h-full w-full object-contain bg-slate-50 dark:bg-gray-900" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const images = [...(formData.images || [formData.image || ''])]
+                                  images[index] = ''
+                                  setFormData({ ...formData, image: images[0] || '', images })
+                                }}
+                                className="absolute right-1 top-1 rounded bg-red-500 px-1 text-xs text-white"
+                              >
+                                移除
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex h-20 w-24 items-center justify-center rounded-lg border-2 border-dashed border-slate-300">
+                              <ImageIcon className="h-6 w-6 text-slate-400" />
+                            </div>
+                          )}
+                          <Button variant="outline" onClick={() => { setImagePickerTarget(index as 0 | 1); setShowImagePicker(true) }}>
+                            选择图片
+                          </Button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
               <div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">型号说明</label><textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={4} placeholder="可填写屏幕尺寸、产品系列、适用范围等说明" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100" /></div>
               <div className="grid grid-cols-2 gap-4"><div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">排序</label><Input type="number" value={formData.sortOrder ?? 0} onChange={e => setFormData({ ...formData, sortOrder: Number(e.target.value) || 0 })} className="bg-slate-50 dark:bg-gray-700" /></div><label className="flex items-center gap-2 pt-7 text-sm text-slate-600 dark:text-gray-300"><input type="checkbox" checked={formData.isActive ?? true} onChange={e => setFormData({ ...formData, isActive: e.target.checked })} />启用</label></div>
               <div className="flex gap-3 pt-2"><Button onClick={handleSave} disabled={saving} className="flex-1 bg-orange-500 hover:bg-orange-600">{saving ? '保存中...' : '保存'}</Button><Button variant="outline" onClick={() => setShowForm(false)} className="flex-1">取消</Button></div>
@@ -534,7 +581,19 @@ const HeadUnitTypeManager: React.FC = () => {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-white dark:bg-gray-800">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-gray-700"><h3 className="text-lg font-semibold text-slate-900 dark:text-white">选择图片</h3><Button variant="ghost" size="sm" onClick={() => setShowImagePicker(false)}><X className="h-5 w-5" /></Button></div>
-            <div className="p-6"><ImagePicker value={formData.image} onChange={url => { setFormData({ ...formData, image: url }); setShowImagePicker(false) }} showUpload uploadFolder="uploads" /></div>
+            <div className="p-6">
+              <ImagePicker
+                value={(formData.images || [formData.image || ''])[imagePickerTarget] || ''}
+                onChange={url => {
+                  const images = [...(formData.images || [formData.image || ''])]
+                  images[imagePickerTarget] = url
+                  setFormData({ ...formData, image: images[0] || '', images })
+                  setShowImagePicker(false)
+                }}
+                showUpload
+                uploadFolder="uploads"
+              />
+            </div>
           </div>
         </div>
       )}

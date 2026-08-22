@@ -14,6 +14,7 @@ export interface HeadUnitType {
   _id: string
   name: string
   image: string
+  images?: string[]
   description: string
   sortOrder: number
   isActive: boolean
@@ -24,6 +25,7 @@ export interface HeadUnitType {
 export interface HeadUnitTypeInput {
   name: string
   image?: string
+  images?: string[]
   description?: string
   sortOrder?: number
   isActive?: boolean

@@ -19,6 +19,7 @@ import {
   type SoftwareCategory,
   type Software,
 } from '@/services/softwareService'
+import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
 
 // ==================== Category Form ====================
 
@@ -78,7 +79,17 @@ function SoftwareForm({ categories, initial, defaultCategoryId, onSave, onCancel
   const [downloadUrl, setDownloadUrl] = useState(initial?.downloadUrl ?? '')
   const [importantNote, setImportantNote] = useState(initial?.importantNote ?? '')
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? defaultCategoryId ?? '')
+  const [headUnitTypeId, setHeadUnitTypeId] = useState(
+    typeof initial?.headUnitTypeId === 'string'
+      ? initial.headUnitTypeId
+      : initial?.headUnitTypeId?._id || ''
+  )
+  const [headUnitTypes, setHeadUnitTypes] = useState<HeadUnitType[]>([])
   const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    canbusSettingsService.getAllHeadUnitTypes().then(setHeadUnitTypes).catch(() => setHeadUnitTypes([]))
+  }, [])
 
   const handleSubmit = async () => {
     if (!name.trim() || !downloadUrl.trim() || !categoryId) {return}
@@ -90,6 +101,7 @@ function SoftwareForm({ categories, initial, defaultCategoryId, onSave, onCancel
         downloadUrl: downloadUrl.trim(),
         importantNote: importantNote.trim(),
         categoryId,
+        headUnitTypeId: headUnitTypeId || null,
       })
     } finally { setSaving(false) }
   }
@@ -101,6 +113,16 @@ function SoftwareForm({ categories, initial, defaultCategoryId, onSave, onCancel
           <label className="block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1">软件名称 *</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="例如：CarPlay 固件 v2.1"
             className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-slate-800 dark:text-white" />
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-600 dark:text-gray-400 mb-1">适用主机型号</label>
+          <select value={headUnitTypeId} onChange={e => setHeadUnitTypeId(e.target.value)}
+            className="w-full px-3 py-2 text-sm rounded-md border border-slate-200 dark:border-gray-600 bg-white dark:bg-gray-700 text-slate-800 dark:text-white">
+            <option value="">通用资源</option>
+            {headUnitTypes.filter(type => type.isActive || type._id === headUnitTypeId).map(type => (
+              <option key={type._id} value={type._id}>{type.name}</option>
+            ))}
+          </select>
         </div>
         <div className="flex gap-3">
           <div className="flex-1">

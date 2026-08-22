@@ -3,6 +3,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 export interface ISoftware extends Document {
   name: string;
   categoryId: mongoose.Types.ObjectId;
+  headUnitTypeId?: mongoose.Types.ObjectId;
   description: string;
   downloadUrl: string;
   importantNote: string;
@@ -21,6 +22,10 @@ const softwareSchema = new Schema<ISoftware>({
     type: Schema.Types.ObjectId,
     ref: 'SoftwareCategory',
     required: true
+  },
+  headUnitTypeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'HeadUnitType',
   },
   description: {
     type: String,
@@ -49,5 +54,6 @@ const softwareSchema = new Schema<ISoftware>({
 
 // 索引
 softwareSchema.index({ language: 1, categoryId: 1 });
+softwareSchema.index({ language: 1, headUnitTypeId: 1, categoryId: 1 });
 
 export default mongoose.model<ISoftware>('Software', softwareSchema);

@@ -14,6 +14,7 @@ interface CANBoxTypeInput {
 interface HeadUnitTypeInput {
   name: string
   image?: string
+  images?: string[]
   description?: string
   sortOrder?: number
   isActive?: boolean
@@ -89,6 +90,10 @@ class CANBusSettingsService {
     return new HeadUnitType({
       name: data.name,
       image: data.image || '',
+      images: Array.from(new Set([
+        ...(Array.isArray(data.images) ? data.images : []),
+        data.image || '',
+      ].map(item => String(item || '').trim()).filter(Boolean))).slice(0, 2),
       description: data.description || '',
       sortOrder: data.sortOrder ?? 0,
       isActive: data.isActive ?? true,

@@ -14,6 +14,7 @@ import { apiClient } from '@/services/apiClient'
 import Modal from '@/components/ui/Modal'
 import { FormModal } from '../../components/FormModal'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
+import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
 
 interface Category {
   _id: string
@@ -35,17 +36,19 @@ interface Manual {
   url: string
   downloadUrl: string
   categoryId?: string
+  headUnitTypeId?: string | null
+  headUnitType?: { _id: string; name: string }
   category?: Category
   sortOrder?: number
   isPublished?: boolean
 }
 
 type CategoryForm = { name: string; description: string; order: string; isActive: boolean }
-type ManualForm = { title: string; productModel: string; categoryId: string; description: string; version: string; sortOrder: string; isPublished: boolean }
+type ManualForm = { title: string; productModel: string; categoryId: string; headUnitTypeId: string; description: string; version: string; sortOrder: string; isPublished: boolean }
 type DeleteTarget = { type: 'category'; id: string; name: string; manualCount: number } | { type: 'manual'; id: string; name: string }
 
 const emptyCategory: CategoryForm = { name: '', description: '', order: '0', isActive: true }
-const emptyManual: ManualForm = { title: '', productModel: '', categoryId: '', description: '', version: '', sortOrder: '0', isPublished: true }
+const emptyManual: ManualForm = { title: '', productModel: '', categoryId: '', headUnitTypeId: '', description: '', version: '', sortOrder: '0', isPublished: true }
 const panelClass = 'rounded-lg border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800'
 const labelClass = 'mb-1.5 block text-xs font-medium text-gray-600 dark:text-gray-300'
 
@@ -66,6 +69,7 @@ const UserManualManager: React.FC = () => {
   const [showManualModal, setShowManualModal] = useState(false)
   const [manualFile, setManualFile] = useState<File | null>(null)
   const [previewManual, setPreviewManual] = useState<Manual | null>(null)
+  const [headUnitTypes, setHeadUnitTypes] = useState<HeadUnitType[]>([])
 
   const load = async () => {
     setLoading(true)
@@ -80,7 +84,10 @@ const UserManualManager: React.FC = () => {
     setLoading(false)
   }
 
-  useEffect(() => { load() }, [])
+  useEffect(() => {
+    void load()
+    canbusSettingsService.getAllHeadUnitTypes().then(setHeadUnitTypes).catch(() => setHeadUnitTypes([]))
+  }, [])
 
   const filteredManuals = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -145,6 +152,7 @@ const UserManualManager: React.FC = () => {
     data.append('title', manualForm.title)
     data.append('productModel', manualForm.productModel)
     data.append('categoryId', manualForm.categoryId)
+    data.append('headUnitTypeId', manualForm.headUnitTypeId)
     data.append('description', manualForm.description)
     data.append('version', manualForm.version)
     data.append('sortOrder', manualForm.sortOrder)
@@ -186,6 +194,7 @@ const UserManualManager: React.FC = () => {
       title: manual.title,
       productModel: manual.productModel,
       categoryId: manual.categoryId || '',
+      headUnitTypeId: manual.headUnitTypeId || '',
       description: manual.description || '',
       version: manual.version || '',
       sortOrder: String(manual.sortOrder || 0),
@@ -409,6 +418,15 @@ const UserManualManager: React.FC = () => {
             <select value={manualForm.categoryId} onChange={event => setManualForm(current => ({ ...current, categoryId: event.target.value }))} className="input">
               <option value="">未分类</option>
               {categories.map(category => <option key={category._id} value={category._id}>{category.name}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className={labelClass}>适用主机型号</span>
+            <select value={manualForm.headUnitTypeId} onChange={event => setManualForm(current => ({ ...current, headUnitTypeId: event.target.value }))} className="input">
+              <option value="">通用手册</option>
+              {headUnitTypes.filter(type => type.isActive || type._id === manualForm.headUnitTypeId).map(type => (
+                <option key={type._id} value={type._id}>{type.name}</option>
+              ))}
             </select>
           </label>
           <label>

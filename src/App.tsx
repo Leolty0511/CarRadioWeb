@@ -19,6 +19,7 @@ import i18n from './i18n'
 import './styles/logo.css'
 import { LanguageRouter } from '@/components/LanguageRouter'
 import { ContentLanguageProvider } from '@/contexts/ContentLanguageContext'
+import { HeadUnitTypeProvider } from '@/contexts/HeadUnitTypeContext'
 import {
   commonRoutes,
   adminRoutes,
@@ -116,27 +117,29 @@ function App() {
               <UploadProvider>
                 <AIProvider>
                   <ContentLanguageProvider>
-                    <div className="min-h-screen transition-colors duration-300">
-                      <ErrorBoundary fallback={<div className="p-6 text-red-500">{t('errors.somethingWentWrong')}</div>}>
-                        <Suspense fallback={<div className="p-6 text-gray-500">{t('common.loading')}</div>}>
-                          <LanguageRouter>
-                            <AppRoutes />
-                          </LanguageRouter>
-                        </Suspense>
-                      </ErrorBoundary>
+                    <HeadUnitTypeProvider>
+                      <div className="min-h-screen transition-colors duration-300">
+                        <ErrorBoundary fallback={<div className="p-6 text-red-500">{t('errors.somethingWentWrong')}</div>}>
+                          <Suspense fallback={<div className="p-6 text-gray-500">{t('common.loading')}</div>}>
+                            <LanguageRouter>
+                              <AppRoutes />
+                            </LanguageRouter>
+                          </Suspense>
+                        </ErrorBoundary>
 
-                      {/* AI 助手 - 全局可用 */}
-                      <AIAssistant />
+                        {/* AI 助手 - 全局可用 */}
+                        <AIAssistant />
 
-                      {/* 全局搜索 (Cmd/Ctrl + K) */}
-                      <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
+                        {/* 全局搜索 (Cmd/Ctrl + K) */}
+                        <GlobalSearch isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
 
-                      {/* 返回顶部按钮 */}
-                      <BackToTop />
+                        {/* 返回顶部按钮 */}
+                        <BackToTop />
 
-                      {/* 全局上传进度 */}
-                      <GlobalUploadProgress />
-                    </div>
+                        {/* 全局上传进度 */}
+                        <GlobalUploadProgress />
+                      </div>
+                    </HeadUnitTypeProvider>
                   </ContentLanguageProvider>
                 </AIProvider>
               </UploadProvider>

@@ -484,6 +484,12 @@
     "technicalTeam": "技术团队",
     "headUnitTypeSelectorTitle": "识别您的主机型号",
     "headUnitTypeSelectorDescription": "查看主机图片和说明，确认您使用的产品型号。确认后，再通过下方型号标签查看对应的操作教程。",
+    "sharedHeadUnitTypeSelectorDescription": "查看图片和说明，确认您使用的产品主机型号。确认后将返回当前页面，并自动显示适用的内容。",
+    "identifyHeadUnitType": "识别我的主机型号",
+    "useThisHeadUnitType": "使用此主机型号",
+    "currentHeadUnitType": "当前主机型号",
+    "resourceHeadUnitTypeHint": "先确认您的主机型号，页面将优先显示适用的用户手册。",
+    "resourceSoftwareHeadUnitTypeHint": "先确认您的主机型号，页面将优先显示适用的软件和升级资源。",
     "changeHeadUnitType": "更换主机型号",
     "headUnitTypeFilterLabel": "按主机型号查看教程",
     "viewHeadUnitDetails": "点击查看图片和型号说明",
@@ -1764,8 +1770,8 @@
       "description": "社区论坛尚未开放，请稍后再试。",
       "hint": "论坛开放时将另行通知，敬请期待。"
     },
-    "notConfigured": "论坛尚未配置，请在管理后台的功能设置中启用论坛入口。",
-    "redirectingHint": "若无法连接，请到 管理后台 → 功能设置 → 论坛 检查 Docker 或尝试重新部署。",
+    "notConfigured": "论坛暂未开放，请稍后再试。",
+    "redirectingHint": "正在打开论坛，如果页面未能打开，请稍后重试。",
     "oauthRedirecting": "正在使用会员账号登录论坛...",
     "features": {
       "discussions": {

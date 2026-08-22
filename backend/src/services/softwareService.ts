@@ -32,24 +32,30 @@ export class SoftwareService {
   }
 
   // 软件管理（按资料体系）
-  async getAllSoftware(language?: 'en' | 'ru'): Promise<ISoftware[]> {
+  async getAllSoftware(language?: 'en' | 'ru', headUnitTypeId?: string): Promise<ISoftware[]> {
     const filter: any = {};
     if (language) {
       filter.language = language;
     }
-    return await Software.find(filter).populate('categoryId').sort({ createdAt: -1 });
+    if (headUnitTypeId) {
+      filter.$or = [{ headUnitTypeId }, { headUnitTypeId: { $exists: false } }, { headUnitTypeId: null }];
+    }
+    return await Software.find(filter).populate('categoryId').populate('headUnitTypeId', 'name').sort({ createdAt: -1 });
   }
 
-  async getSoftwareByCategory(categoryId: string, language?: 'en' | 'ru'): Promise<ISoftware[]> {
+  async getSoftwareByCategory(categoryId: string, language?: 'en' | 'ru', headUnitTypeId?: string): Promise<ISoftware[]> {
     const filter: any = { categoryId };
     if (language) {
       filter.language = language;
     }
-    return await Software.find(filter).populate('categoryId').sort({ createdAt: -1 });
+    if (headUnitTypeId) {
+      filter.$or = [{ headUnitTypeId }, { headUnitTypeId: { $exists: false } }, { headUnitTypeId: null }];
+    }
+    return await Software.find(filter).populate('categoryId').populate('headUnitTypeId', 'name').sort({ createdAt: -1 });
   }
 
   async getSoftwareById(id: string): Promise<ISoftware | null> {
-    return await Software.findById(id).populate('categoryId');
+    return await Software.findById(id).populate('categoryId').populate('headUnitTypeId', 'name');
   }
 
   async createSoftware(softwareData: {
@@ -58,6 +64,7 @@ export class SoftwareService {
     description: string;
     downloadUrl: string;
     importantNote?: string;
+    headUnitTypeId?: string;
     language: 'en' | 'ru';
   }): Promise<ISoftware> {
     const software = new Software(softwareData);
@@ -70,9 +77,10 @@ export class SoftwareService {
     description?: string;
     downloadUrl?: string;
     importantNote?: string;
+    headUnitTypeId?: string;
     language?: 'en' | 'ru';
   }): Promise<ISoftware | null> {
-    return await Software.findByIdAndUpdate(id, softwareData, { new: true }).populate('categoryId');
+    return await Software.findByIdAndUpdate(id, softwareData, { new: true }).populate('categoryId').populate('headUnitTypeId', 'name');
   }
 
   async deleteSoftware(id: string): Promise<boolean> {

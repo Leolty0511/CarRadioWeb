@@ -3,6 +3,7 @@ import { Document, Schema, Types, model } from 'mongoose'
 export interface IHeadUnitType extends Document {
   name: string
   image: string
+  images: string[]
   description: string
   sortOrder: number
   isActive: boolean
@@ -13,6 +14,7 @@ export interface IHeadUnitType extends Document {
 const headUnitTypeSchema = new Schema<IHeadUnitType>({
   name: { type: String, required: true, unique: true, trim: true },
   image: { type: String, default: '', trim: true },
+  images: { type: [String], default: [] },
   description: { type: String, default: '', trim: true },
   sortOrder: { type: Number, default: 0 },
   isActive: { type: Boolean, default: true },

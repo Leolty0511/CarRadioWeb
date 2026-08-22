@@ -81,16 +81,20 @@ router.delete('/categories/:id', authenticateUser, requirePermission(PERMISSIONS
 // 获取所有软件（按资料体系）
 router.get('/', async (req, res) => {
   try {
-    const { categoryId, language } = req.query;
+    const { categoryId, language, headUnitTypeId } = req.query;
     let software;
     
     if (categoryId) {
       software = await softwareService.getSoftwareByCategory(
         categoryId as string, 
-        language as 'en' | 'ru' | undefined
+        language as 'en' | 'ru' | undefined,
+        headUnitTypeId as string | undefined
       );
     } else {
-      software = await softwareService.getAllSoftware(language as 'en' | 'ru' | undefined);
+      software = await softwareService.getAllSoftware(
+        language as 'en' | 'ru' | undefined,
+        headUnitTypeId as string | undefined
+      );
     }
     
     res.json({ success: true, data: { items: software, total: software.length } });
@@ -120,7 +124,7 @@ router.get('/:id', async (req, res) => {
 // 创建软件（需要指定资料体系）- 需要认证
 router.post('/', authenticateUser, requirePermission(PERMISSIONS.software.create), async (req, res) => {
   try {
-    const { name, categoryId, description, downloadUrl, importantNote, language } = req.body;
+    const { name, categoryId, description, downloadUrl, importantNote, headUnitTypeId, language } = req.body;
     
     // 只验证最基本的必填字段
     if (!name || !language) {
@@ -136,6 +140,7 @@ router.post('/', authenticateUser, requirePermission(PERMISSIONS.software.create
       description,
       downloadUrl,
       importantNote,
+      headUnitTypeId,
       language
     });
     
@@ -150,7 +155,7 @@ router.post('/', authenticateUser, requirePermission(PERMISSIONS.software.create
 router.put('/:id', authenticateUser, requirePermission(PERMISSIONS.software.update), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, categoryId, description, downloadUrl, importantNote, language } = req.body;
+    const { name, categoryId, description, downloadUrl, importantNote, headUnitTypeId, language } = req.body;
     
     const software = await softwareService.updateSoftware(id, {
       name,
@@ -158,6 +163,7 @@ router.put('/:id', authenticateUser, requirePermission(PERMISSIONS.software.upda
       description,
       downloadUrl,
       importantNote,
+      headUnitTypeId,
       language
     });
     

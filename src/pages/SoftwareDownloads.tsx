@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next';
 
 import { Download, ExternalLink, AlertTriangle, X } from 'lucide-react';
 import SEOHead from '@/components/seo/SEOHead';
+import HeadUnitTypeIdentifier from '@/components/knowledge/HeadUnitTypeIdentifier';
+import { useHeadUnitTypes } from '@/contexts/HeadUnitTypeContext';
 
 interface SoftwareCategory {
   _id: string;
@@ -23,6 +25,7 @@ interface Software {
 
 const SoftwareDownloads: React.FC = () => {
   const { t } = useTranslation();
+  const { selectedHeadUnitType, selectedHeadUnitTypeId } = useHeadUnitTypes();
   const [categories, setCategories] = useState<SoftwareCategory[]>([]);
   const [software, setSoftware] = useState<Software[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -45,9 +48,11 @@ const SoftwareDownloads: React.FC = () => {
   // 加载软件列表
   const loadSoftware = async (categoryId?: string) => {
     try {
-      const url = categoryId && categoryId !== 'all'
-        ? `/api/software?categoryId=${categoryId}`
-        : '/api/software';
+      const params = new URLSearchParams();
+      if (categoryId && categoryId !== 'all') {params.set('categoryId', categoryId);}
+      if (selectedHeadUnitTypeId) {params.set('headUnitTypeId', selectedHeadUnitTypeId);}
+      const query = params.toString();
+      const url = query ? `/api/software?${query}` : '/api/software';
 
       const response = await fetch(url);
       const data = await response.json();
@@ -64,7 +69,7 @@ const SoftwareDownloads: React.FC = () => {
   // 处理分类选择
   const handleCategoryChange = (categoryId: string) => {
     setSelectedCategory(categoryId);
-    loadSoftware(categoryId);
+    void loadSoftware(categoryId);
   };
 
   // 处理软件下载
@@ -83,9 +88,10 @@ const SoftwareDownloads: React.FC = () => {
   };
 
   useEffect(() => {
-    loadCategories();
-    loadSoftware();
-  }, []);
+    void loadCategories();
+    void loadSoftware();
+    setSelectedCategory('all');
+  }, [selectedHeadUnitTypeId]);
 
   const filteredSoftware = selectedCategory === 'all'
     ? software
@@ -101,6 +107,20 @@ const SoftwareDownloads: React.FC = () => {
             {t('softwareDownloads.title')}
           </h1>
         </div>
+
+        <section className="mb-10 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/70 p-5 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0 text-left">
+            <h2 className="text-base font-semibold text-slate-800 dark:text-white">
+              {t('knowledge.headUnitTypeSelectorTitle')}
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-gray-300">
+              {selectedHeadUnitType
+                ? `${t('knowledge.currentHeadUnitType')}: ${selectedHeadUnitType.name}`
+                : t('knowledge.resourceSoftwareHeadUnitTypeHint')}
+            </p>
+          </div>
+          <HeadUnitTypeIdentifier compact className="shrink-0" />
+        </section>
 
         {/* 分类筛选 - 优化版 */}
         <div className="flex flex-wrap justify-center gap-3 mb-12">
