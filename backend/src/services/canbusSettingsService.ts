@@ -29,13 +29,13 @@ interface CANBusSettingInput {
 }
 
 function normalizeSettingImages(data: { settingImage?: string; settingImages?: string[] }): string[] {
-  const images = [
-    ...(Array.isArray(data.settingImages) ? data.settingImages : []),
+  const image = [
     data.settingImage || '',
+    ...(Array.isArray(data.settingImages) ? data.settingImages : []),
   ]
     .map(item => String(item || '').trim())
-    .filter(Boolean)
-  return [...new Set(images)]
+    .find(Boolean) || ''
+  return image ? [image] : []
 }
 
 interface PopulatedSetting extends Omit<ICANBusSetting, 'vehicleId' | 'headUnitTypeId'> {

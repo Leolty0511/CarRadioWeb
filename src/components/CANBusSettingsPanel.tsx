@@ -138,6 +138,13 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
         if (selectedHeadUnitTypeId) {
           const data = await canbusSettingsService.getSettingByVehicle(vehicleId, selectedHeadUnitTypeId)
           setSettingData(data)
+          if (data?.settingImage) {
+            setPreviewImage({
+              url: data.settingImage,
+              title: `${selectedBrand} ${selectedModel} ${selectedYear} - ${t('canbus.settingImage')}`,
+              description: data.description,
+            })
+          }
         }
       } catch (error) {
         console.error('Failed to load setting:', error)
@@ -147,7 +154,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
       }
     }
     loadSetting()
-  }, [selectedBrand, selectedModel, selectedYear, selectedHeadUnitTypeId, vehicleData])
+  }, [selectedBrand, selectedModel, selectedYear, selectedHeadUnitTypeId, vehicleData, t])
 
   const handleBrandSelect = (brand: string) => {
     setSelectedBrand(brand)
@@ -470,26 +477,27 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                 </div>
               )}
 
-              {/* 设置图片 */}
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {(settingData.settingImages?.length ? settingData.settingImages : [settingData.settingImage]).filter(Boolean).map((url, index) => (
-                  <button
-                    key={url}
-                    type="button"
-                    className="relative overflow-hidden rounded-xl"
-                    onClick={() => setPreviewImage({ url, title: `${selectedBrand} ${selectedModel} ${selectedYear} - CANBus Settings ${index + 1}` })}
-                  >
-                    <img
-                      src={url}
-                      alt={`${selectedBrand} ${selectedModel} ${selectedYear} CANBus Settings ${index + 1}`}
-                      className="h-auto w-full object-contain bg-slate-100 dark:bg-gray-800"
-                    />
-                    <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/0 text-sm text-white opacity-0 transition hover:bg-black/20 hover:opacity-100">
-                      {t('canbus.clickToEnlarge')}
-                    </span>
-                  </button>
-                ))}
-              </div>
+              {/* 单张设置图片：选择完成后已自动打开弹窗，这里保留一个重新查看入口 */}
+              {settingData.settingImage && (
+                <button
+                  type="button"
+                  className="relative block w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-left dark:border-gray-700 dark:bg-gray-800"
+                  onClick={() => setPreviewImage({
+                    url: settingData.settingImage,
+                    title: `${selectedBrand} ${selectedModel} ${selectedYear} - ${t('canbus.settingImage')}`,
+                    description: settingData.description,
+                  })}
+                >
+                  <img
+                    src={settingData.settingImage}
+                    alt={`${selectedBrand} ${selectedModel} ${selectedYear} CANBus ${t('canbus.settingImage')}`}
+                    className="max-h-64 w-full object-contain"
+                  />
+                  <span className="block border-t border-slate-200 px-4 py-2 text-center text-sm text-slate-600 dark:border-gray-700 dark:text-gray-300">
+                    {t('canbus.clickToEnlarge')}
+                  </span>
+                </button>
+              )}
 
               {/* 选择信息摘要 */}
               <div className="p-4 bg-slate-50 dark:bg-gray-800 rounded-lg">

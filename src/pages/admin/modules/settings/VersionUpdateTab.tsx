@@ -103,7 +103,9 @@ export function VersionUpdateTab() {
         getProjectUpdateStatus(),
       ])
       setInfo(nextInfo)
-      setStatus(nextStatus)
+      // 更新完成状态会由后端暂存，刷新页面时不应再次显示已完成的进度条。
+      // 更新过程中的 running/restarting/failed 状态仍保留，便于继续观察任务结果。
+      setStatus(nextStatus.state === 'completed' ? null : nextStatus)
     } catch (error) {
       if (!silent) {
         showToast({

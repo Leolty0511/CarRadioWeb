@@ -588,12 +588,12 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   }
 
   const handleEdit = (setting: CANBusSetting) => {
-    const settingImages = [...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))]
+    const settingImage = setting.settingImage || setting.settingImages?.[0] || ''
     setFormData({
       vehicleId: setting.vehicleId._id,
       headUnitTypeId: typeof setting.headUnitTypeId === 'string' ? setting.headUnitTypeId : setting.headUnitTypeId?._id || '',
-      settingImage: settingImages[0] || '',
-      settingImages,
+      settingImage,
+      settingImages: settingImage ? [settingImage] : [],
       description: setting.description || '',
       isActive: setting.isActive
     })
@@ -602,8 +602,8 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   }
 
   const handleSave = async () => {
-    if (!formData.vehicleId || !formData.headUnitTypeId || (formData.settingImages || []).length === 0) {
-      showToast({ type: 'warning', title: '请选择车型、主机型号并至少添加一张设置图片', description: '' })
+    if (!formData.vehicleId || !formData.headUnitTypeId || !formData.settingImage) {
+      showToast({ type: 'warning', title: '请选择车型、主机型号并添加设置图片', description: '' })
       return
     }
 
@@ -611,8 +611,8 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
     try {
       const payload = {
         ...formData,
-        settingImages: formData.settingImages || [],
-        settingImage: (formData.settingImages || [])[0] || formData.settingImage,
+        settingImage: formData.settingImage,
+        settingImages: [formData.settingImage],
       }
       if (editingId) {
         await canbusSettingsService.updateSetting(editingId, payload)
@@ -692,11 +692,8 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          {([...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))].slice(0, 3)).map((url) => (
-                            <img key={url} src={url} alt="" className="h-10 w-16 rounded object-cover" />
-                          ))}
-                          {([...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))].length > 3) && (
-                            <span className="text-xs text-slate-500">+{[...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))].length - 3}</span>
+                          {(setting.settingImage || setting.settingImages?.[0]) && (
+                            <img src={setting.settingImage || setting.settingImages?.[0]} alt="" className="h-10 w-16 rounded object-cover" />
                           )}
                         </div>
                       </td>
@@ -775,23 +772,16 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
               <div>
                 <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">设置图片 *</label>
                 <div className="space-y-2">
-                  {(formData.settingImages || []).length > 0 ? (
-                    <div className="grid grid-cols-2 gap-2">
-                      {(formData.settingImages || []).map((url) => (
-                        <div key={url} className="relative overflow-hidden rounded-lg border">
-                          <img src={url} alt="" className="h-28 w-full object-cover bg-slate-100 dark:bg-gray-700" />
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const settingImages = (formData.settingImages || []).filter(item => item !== url)
-                              setFormData({ ...formData, settingImages, settingImage: settingImages[0] || '' })
-                            }}
-                            className="absolute top-2 right-2 rounded-full bg-red-500 p-1 text-white"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                      ))}
+                  {formData.settingImage ? (
+                    <div className="relative overflow-hidden rounded-lg border">
+                      <img src={formData.settingImage} alt="" className="h-40 w-full object-contain bg-slate-100 dark:bg-gray-700" />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, settingImage: '', settingImages: [] })}
+                        className="absolute right-2 top-2 rounded-full bg-red-500 p-1 text-white"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   ) : (
                     <div className="h-24 rounded-lg border-2 border-dashed border-slate-300 flex items-center justify-center">
@@ -799,7 +789,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                     </div>
                   )}
                   <Button variant="outline" onClick={() => setShowImagePicker(true)} className="w-full">
-                    添加设置图片
+                    {formData.settingImage ? '更换设置图片' : '选择设置图片'}
                   </Button>
                 </div>
               </div>
@@ -849,10 +839,9 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
             </div>
             <div className="p-6">
               <ImagePicker
-                value={(formData.settingImages || [])[0]}
+                value={formData.settingImage}
                 onChange={(url: string) => {
-                  const settingImages = [...new Set([...(formData.settingImages || []), url].filter(Boolean))]
-                  setFormData({ ...formData, settingImages, settingImage: settingImages[0] || '' })
+                  setFormData({ ...formData, settingImage: url, settingImages: url ? [url] : [] })
                   setShowImagePicker(false)
                 }}
                 showUpload={true}
