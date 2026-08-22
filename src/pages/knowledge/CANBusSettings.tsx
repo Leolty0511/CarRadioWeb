@@ -4,6 +4,7 @@ import { Settings } from 'lucide-react'
 import CANBusSettingsPanel from '@/components/CANBusSettingsPanel'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
+import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
 import canbusSettingsService from '@/services/canbusSettingsService'
 
@@ -50,6 +51,7 @@ const CANBusSettings: React.FC = () => {
       ]} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <KnowledgeHomeLink className="mb-5" />
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">

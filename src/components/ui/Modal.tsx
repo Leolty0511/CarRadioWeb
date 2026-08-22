@@ -17,6 +17,7 @@ export interface ModalProps {
   closeOnEscape?: boolean
   showCloseButton?: boolean
   className?: string
+  overlayClassName?: string
 }
 
 /**
@@ -33,7 +34,8 @@ const Modal: React.FC<ModalProps> = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
   showCloseButton = true,
-  className
+  className,
+  overlayClassName
 }) => {
   // 每个 Modal 实例拥有稳定的 aria 关联 id
   const titleIdRef = useRef<string>(`modal-title-${++modalTitleCounter}`)
@@ -101,7 +103,10 @@ const Modal: React.FC<ModalProps> = ({
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       {/* 背景遮罩 */}
       <div
-        className="absolute inset-0 z-0 bg-black/50 backdrop-blur-sm animate-fade-in-smooth"
+        className={cn(
+          'absolute inset-0 z-0 animate-fade-in-smooth',
+          overlayClassName || 'bg-black/50 backdrop-blur-sm'
+        )}
         onClick={handleOverlayClick}
         aria-hidden
       />

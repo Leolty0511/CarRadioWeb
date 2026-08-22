@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Settings, ChevronDown, Image, Loader2, Info } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Settings, ChevronDown, ChevronLeft, ChevronRight, Image, Loader2, Info } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
-import EnhancedImageModal from '@/components/EnhancedImageModal'
-import canbusSettingsService, { type CANBoxType } from '@/services/canbusSettingsService'
+import ReferenceImageModal from '@/components/ReferenceImageModal'
+import canbusSettingsService, { type CANBoxType, type HeadUnitType } from '@/services/canbusSettingsService'
 import { getVehicles } from '@/services/vehicleService'
 
 /** 文档语言固定英文 */
@@ -28,6 +29,7 @@ interface CANBusSettingsPanelProps {
  */
 const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const documentLanguage = mapUILanguageToDocLanguage(i18n.language)
 
   // 选择状态
@@ -35,17 +37,28 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
   const [selectedModel, setSelectedModel] = useState('')
   const [selectedYear, setSelectedYear] = useState('')
   const [selectedVehicleId, setSelectedVehicleId] = useState('')
+  const [selectedHeadUnitTypeId, setSelectedHeadUnitTypeId] = useState('')
 
   // 数据状态
   const [canboxTypes, setCanboxTypes] = useState<CANBoxType[]>([])
+  const [headUnitTypes, setHeadUnitTypes] = useState<HeadUnitType[]>([])
   const [internalVehicleData, setInternalVehicleData] = useState<VehicleData>({})
   const [settingData, setSettingData] = useState<{ settingImage: string; settingImages: string[]; description: string } | null>(null)
+  const selectedHeadUnitType = headUnitTypes.find(type => type._id === selectedHeadUnitTypeId)
+  const canboxCarouselRef = React.useRef<HTMLDivElement>(null)
 
   // UI 状态
   const [loading, setLoading] = useState(false)
   const [loadingVehicles, setLoadingVehicles] = useState(false)
-  const [showDropdown, setShowDropdown] = useState<'brand' | 'model' | 'year' | null>(null)
-  const [previewImage, setPreviewImage] = useState<{ url: string; title: string } | null>(null)
+  const [showDropdown, setShowDropdown] = useState<'brand' | 'model' | 'year' | 'headUnit' | null>(null)
+  const [previewImage, setPreviewImage] = useState<{ url: string; title: string; description?: string } | null>(null)
+
+  const scrollCanboxTypes = (direction: 'left' | 'right') => {
+    canboxCarouselRef.current?.scrollBy({
+      left: direction === 'left' ? -360 : 360,
+      behavior: 'smooth'
+    })
+  }
 
   // 加载 CANBox 类型列表（仅展示用）
   useEffect(() => {
@@ -58,6 +71,12 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
       }
     }
     loadCANBoxTypes()
+  }, [])
+
+  useEffect(() => {
+    canbusSettingsService.getHeadUnitTypes()
+      .then(setHeadUnitTypes)
+      .catch(() => setHeadUnitTypes([]))
   }, [])
 
   // 始终自己加载车型数据，按语言隔离
@@ -91,6 +110,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
     if (!selectedBrand || !selectedModel || !selectedYear) {
       setSettingData(null)
       setSelectedVehicleId('')
+      setSelectedHeadUnitTypeId('')
       return
     }
 
@@ -114,8 +134,11 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
         }
 
         setSelectedVehicleId(vehicleId)
-        const data = await canbusSettingsService.getSettingByVehicle(vehicleId)
-        setSettingData(data)
+        setSettingData(null)
+        if (selectedHeadUnitTypeId) {
+          const data = await canbusSettingsService.getSettingByVehicle(vehicleId, selectedHeadUnitTypeId)
+          setSettingData(data)
+        }
       } catch (error) {
         console.error('Failed to load setting:', error)
         setSettingData(null)
@@ -124,12 +147,13 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
       }
     }
     loadSetting()
-  }, [selectedBrand, selectedModel, selectedYear, vehicleData])
+  }, [selectedBrand, selectedModel, selectedYear, selectedHeadUnitTypeId, vehicleData])
 
   const handleBrandSelect = (brand: string) => {
     setSelectedBrand(brand)
     setSelectedModel('')
     setSelectedYear('')
+    setSelectedHeadUnitTypeId('')
     setSettingData(null)
     setShowDropdown(null)
   }
@@ -137,12 +161,19 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
   const handleModelSelect = (model: string) => {
     setSelectedModel(model)
     setSelectedYear('')
+    setSelectedHeadUnitTypeId('')
     setSettingData(null)
     setShowDropdown(null)
   }
 
   const handleYearSelect = (year: string) => {
     setSelectedYear(year)
+    setSelectedHeadUnitTypeId('')
+    setShowDropdown(null)
+  }
+
+  const handleHeadUnitTypeSelect = (typeId: string) => {
+    setSelectedHeadUnitTypeId(typeId)
     setShowDropdown(null)
   }
 
@@ -185,34 +216,57 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
               <h4 className="text-sm font-medium text-slate-700 dark:text-gray-300">
                 {t('canbus.canboxReference')}
               </h4>
-              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-4">
-                {canboxTypes.map((canbox) => (
-                  <div
-                    key={canbox._id}
-                    className="p-3 rounded-xl border border-gray-200 dark:border-gray-600 bg-slate-50 dark:bg-gray-800/50"
-                  >
-                    {canbox.image ? (
-                      <button
-                        type="button"
-                        className="block w-full overflow-hidden rounded-lg bg-white dark:bg-gray-900"
-                        onClick={() => setPreviewImage({ url: canbox.image, title: canbox.name })}
-                      >
-                        <img
-                          src={canbox.image}
-                          alt={canbox.name}
-                          className="h-full w-full aspect-square object-cover"
-                        />
-                      </button>
-                    ) : (
-                      <div className="w-full aspect-square bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                        <Settings className="h-8 w-8 text-gray-400" />
-                      </div>
-                    )}
-                    <p className="mt-2 text-xs font-medium text-center text-slate-700 dark:text-gray-300 truncate">
-                      {canbox.name}
-                    </p>
-                  </div>
-                ))}
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label={t('common.previous')}
+                  title={t('common.previous')}
+                  onClick={() => scrollCanboxTypes('left')}
+                  className="absolute left-0 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-600 shadow-sm dark:border-gray-600 dark:bg-gray-800/95 dark:text-gray-200"
+                >
+                  <ChevronLeft className="h-5 w-5" />
+                </button>
+                <div
+                  ref={canboxCarouselRef}
+                  className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-11 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                >
+                  {canboxTypes.map((canbox) => (
+                    <div
+                      key={canbox._id}
+                      className="w-[75%] min-w-[75%] snap-start rounded-xl border border-gray-200 bg-slate-50 p-3 dark:border-gray-600 dark:bg-gray-800/50 sm:w-[48%] sm:min-w-[48%] md:w-[31%] md:min-w-[31%]"
+                    >
+                      {canbox.image ? (
+                        <button
+                          type="button"
+                          className="block w-full overflow-hidden rounded-lg bg-white dark:bg-gray-900"
+                          onClick={() => setPreviewImage({ url: canbox.image, title: canbox.name })}
+                        >
+                          <img
+                            src={canbox.image}
+                            alt={canbox.name}
+                            className="aspect-square h-full w-full object-cover"
+                          />
+                        </button>
+                      ) : (
+                        <div className="flex aspect-square w-full items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700">
+                          <Settings className="h-8 w-8 text-gray-400" />
+                        </div>
+                      )}
+                      <p className="mt-2 truncate text-center text-xs font-medium text-slate-700 dark:text-gray-300">
+                        {canbox.name}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  aria-label={t('common.next')}
+                  title={t('common.next')}
+                  onClick={() => scrollCanboxTypes('right')}
+                  className="absolute right-0 top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-600 dark:border-gray-600 dark:bg-gray-800/95 dark:text-gray-200"
+                >
+                  <ChevronRight className="h-5 w-5" />
+                </button>
               </div>
             </div>
           )}
@@ -232,7 +286,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                 <p className="text-slate-500 dark:text-gray-400">{t('canbus.noVehiclesAvailable')}</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
                 {/* 品牌选择 */}
                 <div className="relative">
                   <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
@@ -321,9 +375,76 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                     </div>
                   )}
                 </div>
+
+                {/* 主机型号选择：必须在车型完成后选择 */}
+                <div className="relative md:col-span-2 xl:col-span-1">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+                    {t('canbus.headUnitType')}
+                  </label>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between border border-slate-300 dark:border-gray-600 text-slate-700 dark:text-gray-300 hover:bg-slate-100 dark:hover:bg-gray-700 bg-white dark:bg-transparent"
+                    onClick={() => setShowDropdown(showDropdown === 'headUnit' ? null : 'headUnit')}
+                    disabled={!selectedYear || headUnitTypes.length === 0}
+                  >
+                    {headUnitTypes.find(type => type._id === selectedHeadUnitTypeId)?.name || t('canbus.selectHeadUnitType')}
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  {showDropdown === 'headUnit' && selectedYear && (
+                    <div className="absolute z-20 mt-1 w-full max-h-60 overflow-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-gray-600 dark:bg-gray-800">
+                      {headUnitTypes.map(type => (
+                        <button
+                          key={type._id}
+                          className="w-full px-4 py-2 text-left text-slate-700 hover:bg-slate-100 dark:text-gray-300 dark:hover:bg-gray-700"
+                          onClick={() => handleHeadUnitTypeSelect(type._id)}
+                        >
+                          {type.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
+
+          {selectedHeadUnitType && (
+            <div className="mt-4 flex flex-col gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-gray-700 dark:bg-gray-800/60 sm:flex-row sm:items-center">
+              {selectedHeadUnitType.image && (
+                <img
+                  src={selectedHeadUnitType.image}
+                  alt={selectedHeadUnitType.name}
+                  className="h-24 w-full rounded-lg object-cover sm:h-20 sm:w-32"
+                />
+              )}
+              <div className="min-w-0">
+                <h4 className="font-medium text-slate-800 dark:text-white">{selectedHeadUnitType.name}</h4>
+                {selectedHeadUnitType.description && (
+                  <p className="mt-1 text-sm leading-relaxed text-slate-600 dark:text-gray-300">
+                    {selectedHeadUnitType.description}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedYear && (
+            <div className="flex flex-col gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 dark:border-blue-800/60 dark:bg-blue-950/25 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <Info className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" />
+                <p className="text-sm leading-relaxed text-blue-800 dark:text-blue-200">
+                  {t('canbus.headUnitTypeHint')}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                className="flex-shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                onClick={() => navigate(selectedHeadUnitTypeId ? `/knowledge/device-operation-videos?headUnitTypeId=${encodeURIComponent(selectedHeadUnitTypeId)}` : '/knowledge/device-operation-videos')}
+              >
+                {t('canbus.viewHeadUnitOperationTutorials')}
+              </Button>
+            </div>
+          )}
 
           {/* 加载状态 */}
           {loading && (
@@ -384,7 +505,7 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
           )}
 
           {/* 无数据提示 */}
-          {selectedVehicleId && !settingData && !loading && (
+          {selectedVehicleId && selectedHeadUnitTypeId && !settingData && !loading && (
             <div className="text-center py-8">
               <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Image className="h-8 w-8 text-gray-400" />
@@ -395,13 +516,14 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
         </CardContent>
       </Card>
 
-      {/* 图片放大弹窗 */}
+      {/* 参考图普通弹窗 */}
       {previewImage && (
-        <EnhancedImageModal
+        <ReferenceImageModal
           isOpen={Boolean(previewImage)}
           onClose={() => setPreviewImage(null)}
           imageUrl={previewImage.url}
           title={previewImage.title}
+          description={previewImage.description}
         />
       )}
     </div>

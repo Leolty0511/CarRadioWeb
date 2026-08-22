@@ -1,7 +1,7 @@
 /**
  * 文档管理模块主页面
  * 完全恢复原有核心功能
- * 支持图文教程、安装视频教程、设备操作视频教程和主机接线教程
+ * 支持图文教程、安装视频教程、主机操作教程和原车主机接线指南
  */
 
 import { useState, useEffect, useCallback } from 'react'
@@ -25,16 +25,18 @@ import {
   updateDocument,
   deleteDocument
 } from '@/services/documentApi'
+import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
 import { getCategoriesByDocumentType, type Category } from '@/services/categoryService'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
 
 interface DocumentManagementProps {
   dataLanguage: DataLanguage
+  onNavigate?: (tab: string) => void
 }
 
 type DocumentTypeFilter = 'all' | 'structured' | 'installation-video' | 'device-operation-video' | 'general'
 
-export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLanguage }) => {
+export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLanguage, onNavigate }) => {
   const { showToast } = useToast()
 
   const [documents, setDocuments] = useState<any[]>([])
@@ -54,6 +56,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
 
   // 视频分类列表
   const [videoCategories, setVideoCategories] = useState<Category[]>([])
+  const [headUnitTypes, setHeadUnitTypes] = useState<HeadUnitType[]>([])
 
   // 视频教程草稿自动保存
   const [videoAutoSaveTimer, setVideoAutoSaveTimer] = useState<NodeJS.Timeout | null>(null)
@@ -117,6 +120,13 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
     }
     loadVideoCategories()
   }, [showVideoEditModal, dataLanguage])
+
+  useEffect(() => {
+    if (!showVideoEditModal) {
+      return
+    }
+    canbusSettingsService.getAllHeadUnitTypes().then(setHeadUnitTypes).catch(() => setHeadUnitTypes([]))
+  }, [showVideoEditModal])
 
   // 视频教程草稿自动保存（debounce 3秒）
   useEffect(() => {
@@ -280,7 +290,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
     },
     {
       filter: 'device-operation-video' as const,
-      title: '设备操作视频教程',
+      title: '主机操作教程',
       documents: deviceOperationVideoDocs,
       accentClass: 'text-cyan-400',
     },
@@ -315,7 +325,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">主机接线教程</p>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">原车主机接线指南</p>
               <p className="text-3xl font-bold text-slate-800 dark:text-white">{structuredDocs.length}</p>
             </div>
             <div className="p-3 bg-green-600/20 rounded-xl border border-green-500/30">
@@ -339,7 +349,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
         <div className="bg-white dark:bg-gray-800/50 backdrop-blur-sm rounded-xl border border-slate-200 dark:border-gray-700/50 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">设备操作视频教程</p>
+              <p className="text-sm text-slate-500 dark:text-gray-400 mb-1">主机操作教程</p>
               <p className="text-3xl font-bold text-slate-800 dark:text-white">{deviceOperationVideoDocs.length}</p>
             </div>
             <div className="p-3 bg-cyan-600/20 rounded-xl border border-cyan-500/30">
@@ -385,7 +395,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
               }`}
             >
               <Car className="h-4 w-4" />
-              主机接线教程 <span className="ml-1 opacity-75">({structuredDocs.length})</span>
+              原车主机接线指南 <span className="ml-1 opacity-75">({structuredDocs.length})</span>
             </button>
             <button
               onClick={() => setTypeFilter('installation-video')}
@@ -407,7 +417,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
               }`}
             >
               <Video className="h-4 w-4" />
-              设备操作视频教程 <span className="ml-1 opacity-75">({deviceOperationVideoDocs.length})</span>
+              主机操作教程 <span className="ml-1 opacity-75">({deviceOperationVideoDocs.length})</span>
             </button>
             <button
               onClick={() => setTypeFilter('general')}
@@ -432,7 +442,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
             }}
             className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600"
           >
-            创建主机接线教程
+            创建原车主机接线指南
           </Button>
           <Button
             onClick={() => {
@@ -462,7 +472,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
             }}
             className="bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-700 hover:to-cyan-600"
           >
-            创建设备操作视频教程
+            创建主机操作教程
           </Button>
           <Button
             onClick={() => {
@@ -507,13 +517,13 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
 
       {/* 文档列表 */}
       <div className="space-y-6">
-        {/* 主机接线教程 - 车辆层级结构 */}
+        {/* 原车主机接线指南 - 车辆层级结构 */}
         {structuredDocs.length > 0 && (typeFilter === 'all' || typeFilter === 'structured') && (
           <Card className="bg-white/80 dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
             <CardHeader>
               <CardTitle className="text-slate-800 dark:text-white flex items-center">
                 <Car className="h-5 w-5 mr-2 text-blue-400" />
-                主机接线教程
+                原车主机接线指南
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -741,7 +751,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
             setShowStructuredArticleEditor(false)
             setEditingStructuredArticle(null)
           }}
-          title={editingStructuredArticle ? '编辑主机接线教程' : '创建主机接线教程'}
+          title={editingStructuredArticle ? '编辑原车主机接线指南' : '创建原车主机接线指南'}
           size="xl"
         >
           <StructuredArticleEditor
@@ -762,7 +772,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
           setShowVideoEditModal(false)
           setEditingDocument(null)
         }}
-        title={`${editingDocument?._id ? '编辑' : '创建'}${editingDocument?.tutorialType === 'device-operation' ? '设备操作视频教程' : '安装视频教程'}`}
+        title={`${editingDocument?._id ? '编辑' : '创建'}${editingDocument?.tutorialType === 'device-operation' ? '主机操作教程' : '安装视频教程'}`}
         size="xl"
       >
         <div className="relative flex flex-col min-h-0">
@@ -777,9 +787,43 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                 aria-label="选择视频教程类型"
               >
                 <option value="installation">安装视频教程</option>
-                <option value="device-operation">设备操作视频教程</option>
+                <option value="device-operation">主机操作教程</option>
               </select>
             </div>
+
+            {editingDocument?.tutorialType === 'device-operation' && (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">主机型号 *</label>
+                  {onNavigate && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onNavigate('canbus-settings')}
+                    >
+                      管理主机型号
+                    </Button>
+                  )}
+                </div>
+                {headUnitTypes.length === 0 ? (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-200">
+                    暂无主机型号，请先在 CANBus 设置中添加。
+                  </div>
+                ) : (
+                  <select
+                    value={editingDocument?.headUnitTypeId || ''}
+                    onChange={(e) => setEditingDocument({ ...editingDocument, headUnitTypeId: e.target.value })}
+                    className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-600/50 dark:bg-slate-700/50 dark:text-white"
+                  >
+                    <option value="">请选择主机型号</option>
+                    {headUnitTypes.filter(item => item.isActive || item._id === editingDocument?.headUnitTypeId).map(item => (
+                      <option key={item._id} value={item._id}>{item.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+            )}
 
             {/* 标题 */}
             <div>
@@ -955,6 +999,11 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                     return
                   }
 
+                  if (editingDocument?.tutorialType === 'device-operation' && !editingDocument?.headUnitTypeId) {
+                    showToast({ type: 'warning', title: '请选择主机型号' })
+                    return
+                  }
+
                   if (!editingDocument?.videos || editingDocument.videos.length === 0) {
                     showToast({ type: 'warning', title: '请至少添加一个视频' })
                     return
@@ -989,6 +1038,7 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                     summary: editingDocument.summary || editingDocument.title,
                     category: editingDocument.category || '',
                     tutorialType: editingDocument.tutorialType || 'installation',
+                    headUnitTypeId: editingDocument.tutorialType === 'device-operation' ? (editingDocument.headUnitTypeId || undefined) : undefined,
                     author: 'admin',
                     documentType: 'video' as const,
                     language: dataLanguage

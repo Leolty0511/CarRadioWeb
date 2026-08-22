@@ -15,7 +15,9 @@ import canbusSettingsService, {
   type CANBoxType,
   type CANBusSetting,
   type CANBoxTypeInput,
-  type CANBusSettingInput
+  type CANBusSettingInput,
+  type HeadUnitType,
+  type HeadUnitTypeInput
 } from '@/services/canbusSettingsService'
 import { getVehicles, type Vehicle } from '@/services/vehicleService'
 import ImagePicker from '@/components/ImagePicker'
@@ -25,7 +27,7 @@ interface CANBusSettingsManagementProps {
   dataLanguage: DataLanguage
 }
 
-type TabType = 'canbox-types' | 'settings'
+type TabType = 'canbox-types' | 'head-unit-types' | 'settings'
 
 function PageIntroEditor() {
   const { showToast } = useToast()
@@ -108,10 +110,19 @@ export const CANBusSettingsManagement: React.FC<CANBusSettingsManagementProps> =
         >
           设置图片
         </Button>
+        <Button
+          variant={activeTab === 'head-unit-types' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('head-unit-types')}
+          className={activeTab === 'head-unit-types' ? 'bg-orange-500 hover:bg-orange-600' : ''}
+        >
+          主机型号
+        </Button>
       </div>
 
       {activeTab === 'canbox-types' ? (
         <CANBoxTypeManager />
+      ) : activeTab === 'head-unit-types' ? (
+        <HeadUnitTypeManager />
       ) : (
         <SettingsManager dataLanguage={dataLanguage} />
       )}
@@ -377,6 +388,162 @@ const CANBoxTypeManager: React.FC = () => {
   )
 }
 
+// ==================== 主机型号管理 ====================
+
+const HeadUnitTypeManager: React.FC = () => {
+  const { showToast } = useToast()
+  const [types, setTypes] = useState<HeadUnitType[]>([])
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [showForm, setShowForm] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [formData, setFormData] = useState<HeadUnitTypeInput>({ name: '', image: '', description: '', sortOrder: 0, isActive: true })
+  const [showImagePicker, setShowImagePicker] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string }>({ show: false, id: '' })
+
+  const loadTypes = useCallback(async () => {
+    setLoading(true)
+    try {
+      setTypes(await canbusSettingsService.getAllHeadUnitTypes())
+    } catch {
+      showToast({ type: 'error', title: '加载主机型号失败', description: '' })
+    } finally {
+      setLoading(false)
+    }
+  }, [showToast])
+
+  useEffect(() => { loadTypes() }, [loadTypes])
+
+  const handleAdd = () => {
+    setEditingId(null)
+    setFormData({ name: '', image: '', description: '', sortOrder: 0, isActive: true })
+    setShowForm(true)
+  }
+
+  const handleEdit = (item: HeadUnitType) => {
+    setEditingId(item._id)
+    setFormData({
+      name: item.name,
+      image: item.image || '',
+      description: item.description || '',
+      sortOrder: item.sortOrder || 0,
+      isActive: item.isActive
+    })
+    setShowForm(true)
+  }
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      showToast({ type: 'warning', title: '请输入主机型号名称', description: '' })
+      return
+    }
+    setSaving(true)
+    try {
+      if (editingId) {
+        await canbusSettingsService.updateHeadUnitType(editingId, formData)
+      } else {
+        await canbusSettingsService.createHeadUnitType(formData)
+      }
+      showToast({ type: 'success', title: editingId ? '更新成功' : '创建成功', description: '' })
+      setShowForm(false)
+      await loadTypes()
+    } catch {
+      showToast({ type: 'error', title: '保存主机型号失败', description: '' })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    try {
+      await canbusSettingsService.deleteHeadUnitType(id)
+      showToast({ type: 'success', title: '删除成功', description: '' })
+      await loadTypes()
+    } catch {
+      showToast({ type: 'error', title: '删除失败，请先移除关联的 CANBus 设置', description: '' })
+    } finally {
+      setDeleteConfirm({ show: false, id: '' })
+    }
+  }
+
+  return (
+    <>
+      <Card className="bg-white dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
+        <CardHeader>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <CardTitle className="text-slate-800 dark:text-white">主机型号管理</CardTitle>
+              <p className="mt-2 text-sm text-slate-500 dark:text-gray-400">维护产品安卓主机的品牌或系列型号，可关联 CANBus 设置和主机操作教程。</p>
+            </div>
+            <Button onClick={handleAdd} className="bg-orange-500 hover:bg-orange-600">新增主机型号</Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-orange-500" /></div>
+          ) : types.length === 0 ? (
+            <div className="py-12 text-center text-slate-500 dark:text-gray-400">暂无主机型号，请先新增。</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 dark:bg-gray-700/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">名称</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">图片</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">说明</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">状态</th>
+                    <th className="px-4 py-3 text-right text-sm font-medium text-slate-600 dark:text-gray-300">操作</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200 dark:divide-gray-700">
+                  {types.map(item => (
+                    <tr key={item._id}>
+                      <td className="px-4 py-3 text-sm text-slate-800 dark:text-gray-100">{item.name}</td>
+                      <td className="px-4 py-3">{item.image ? <img src={item.image} alt="" className="h-12 w-20 rounded object-cover bg-slate-100 dark:bg-gray-700" /> : <span className="text-sm text-slate-400">未设置</span>}</td>
+                      <td className="max-w-md px-4 py-3 text-sm text-slate-600 dark:text-gray-300">{item.description || '—'}</td>
+                      <td className="px-4 py-3 text-sm">{item.isActive ? <span className="text-green-600 dark:text-green-400">启用</span> : <span className="text-slate-400">停用</span>}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" size="sm" onClick={() => handleEdit(item)} className="mr-1"><Edit2 className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="sm" onClick={() => setDeleteConfirm({ show: true, id: item._id })} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {showForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <Card className="w-full max-w-lg bg-white dark:bg-gray-800">
+            <CardHeader><div className="flex items-center justify-between"><CardTitle>{editingId ? '编辑主机型号' : '新增主机型号'}</CardTitle><Button variant="ghost" size="sm" onClick={() => setShowForm(false)}><X className="h-5 w-5" /></Button></div></CardHeader>
+            <CardContent className="space-y-4">
+              <div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">名称 *</label><Input value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="例如：Brand A、Series X" className="bg-slate-50 dark:bg-gray-700" /></div>
+              <div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">产品图片</label><div className="flex items-center gap-4">{formData.image ? <div className="relative h-20 w-20 overflow-hidden rounded-lg border"><img src={formData.image} alt="" className="h-full w-full object-cover" /><button type="button" onClick={() => setFormData({ ...formData, image: '' })} className="absolute right-1 top-1 rounded bg-red-500 px-1 text-xs text-white">移除</button></div> : <div className="flex h-20 w-20 items-center justify-center rounded-lg border-2 border-dashed border-slate-300"><ImageIcon className="h-6 w-6 text-slate-400" /></div>}<Button variant="outline" onClick={() => setShowImagePicker(true)}>选择图片</Button></div></div>
+              <div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">型号说明</label><textarea value={formData.description || ''} onChange={e => setFormData({ ...formData, description: e.target.value })} rows={4} placeholder="可填写屏幕尺寸、产品系列、适用范围等说明" className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100" /></div>
+              <div className="grid grid-cols-2 gap-4"><div><label className="mb-1 block text-sm font-medium text-slate-700 dark:text-gray-300">排序</label><Input type="number" value={formData.sortOrder ?? 0} onChange={e => setFormData({ ...formData, sortOrder: Number(e.target.value) || 0 })} className="bg-slate-50 dark:bg-gray-700" /></div><label className="flex items-center gap-2 pt-7 text-sm text-slate-600 dark:text-gray-300"><input type="checkbox" checked={formData.isActive ?? true} onChange={e => setFormData({ ...formData, isActive: e.target.checked })} />启用</label></div>
+              <div className="flex gap-3 pt-2"><Button onClick={handleSave} disabled={saving} className="flex-1 bg-orange-500 hover:bg-orange-600">{saving ? '保存中...' : '保存'}</Button><Button variant="outline" onClick={() => setShowForm(false)} className="flex-1">取消</Button></div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {showImagePicker && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-lg bg-white dark:bg-gray-800">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-gray-700"><h3 className="text-lg font-semibold text-slate-900 dark:text-white">选择图片</h3><Button variant="ghost" size="sm" onClick={() => setShowImagePicker(false)}><X className="h-5 w-5" /></Button></div>
+            <div className="p-6"><ImagePicker value={formData.image} onChange={url => { setFormData({ ...formData, image: url }); setShowImagePicker(false) }} showUpload uploadFolder="uploads" /></div>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog isOpen={deleteConfirm.show} onClose={() => setDeleteConfirm({ show: false, id: '' })} onConfirm={() => handleDelete(deleteConfirm.id)} title="删除确认" message="确定要删除这个主机型号吗？" confirmText="删除" cancelText="取消" type="danger" />
+    </>
+  )
+}
+
 // ==================== 设置图片管理 ====================
 
 const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguage }) => {
@@ -387,19 +554,22 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   const [saving, setSaving] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [formData, setFormData] = useState<CANBusSettingInput>({ vehicleId: '', settingImage: '', settingImages: [], description: '' })
+  const [headUnitTypes, setHeadUnitTypes] = useState<HeadUnitType[]>([])
+  const [formData, setFormData] = useState<CANBusSettingInput>({ vehicleId: '', headUnitTypeId: '', settingImage: '', settingImages: [], description: '' })
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string }>({ show: false, id: '' })
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      const [settingsData, vehiclesData] = await Promise.all([
+      const [settingsData, vehiclesData, headUnitTypesData] = await Promise.all([
         canbusSettingsService.getAllSettings(),
-        getVehicles(dataLanguage)
+        getVehicles(dataLanguage),
+        canbusSettingsService.getAllHeadUnitTypes()
       ])
       setSettings(settingsData)
       setVehicles(vehiclesData.filter(v => v._id !== undefined))
+      setHeadUnitTypes(headUnitTypesData)
     } catch {
       showToast({ type: 'error', title: '加载失败', description: '' })
     } finally {
@@ -412,7 +582,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   }, [loadData])
 
   const handleAdd = () => {
-    setFormData({ vehicleId: '', settingImage: '', settingImages: [], description: '', isActive: true })
+    setFormData({ vehicleId: '', headUnitTypeId: '', settingImage: '', settingImages: [], description: '', isActive: true })
     setEditingId(null)
     setShowForm(true)
   }
@@ -421,6 +591,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
     const settingImages = [...new Set([...(setting.settingImages || []), setting.settingImage].filter(Boolean))]
     setFormData({
       vehicleId: setting.vehicleId._id,
+      headUnitTypeId: typeof setting.headUnitTypeId === 'string' ? setting.headUnitTypeId : setting.headUnitTypeId?._id || '',
       settingImage: settingImages[0] || '',
       settingImages,
       description: setting.description || '',
@@ -431,8 +602,8 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   }
 
   const handleSave = async () => {
-    if (!formData.vehicleId || (formData.settingImages || []).length === 0) {
-      showToast({ type: 'warning', title: '请选择车型并至少添加一张设置图片', description: '' })
+    if (!formData.vehicleId || !formData.headUnitTypeId || (formData.settingImages || []).length === 0) {
+      showToast({ type: 'warning', title: '请选择车型、主机型号并至少添加一张设置图片', description: '' })
       return
     }
 
@@ -453,7 +624,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
       setShowForm(false)
       loadData()
     } catch {
-      showToast({ type: 'error', title: '保存失败，该车型可能已有设置', description: '' })
+      showToast({ type: 'error', title: '保存失败，该车型与主机型号可能已有设置', description: '' })
     } finally {
       setSaving(false)
     }
@@ -503,6 +674,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                 <thead className="bg-slate-50 dark:bg-gray-700/50">
                   <tr>
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">车型</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">主机型号</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">设置图片</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">描述</th>
                     <th className="px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-gray-300">状态</th>
@@ -514,6 +686,9 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                     <tr key={setting._id} className="hover:bg-slate-50 dark:hover:bg-gray-700/30">
                       <td className="px-4 py-3 text-sm text-slate-700 dark:text-gray-300">
                         {setting.vehicleId?.brand} {setting.vehicleId?.model || setting.vehicleId?.modelName} ({setting.vehicleId?.year})
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700 dark:text-gray-300">
+                        {typeof setting.headUnitTypeId === 'string' ? setting.headUnitTypeId : setting.headUnitTypeId?.name || '旧数据'}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
@@ -581,6 +756,19 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                     <option key={v._id} value={v._id}>
                       {v.brand} {v.model} ({v.year})
                     </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-1">主机型号 *</label>
+                <select
+                  value={formData.headUnitTypeId || ''}
+                  onChange={(e) => setFormData({ ...formData, headUnitTypeId: e.target.value })}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+                >
+                  <option value="">选择主机型号</option>
+                  {headUnitTypes.filter(item => item.isActive || item._id === formData.headUnitTypeId).map(item => (
+                    <option key={item._id} value={item._id}>{item.name}</option>
                   ))}
                 </select>
               </div>

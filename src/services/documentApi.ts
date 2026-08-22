@@ -16,6 +16,7 @@ export interface DocumentData {
   author: string;
   documentType: 'general' | 'video' | 'structured';
   tutorialType?: 'installation' | 'device-operation';
+  headUnitTypeId?: string;
   status?: 'draft' | 'published' | 'archived';
   language?: 'en' | 'ru';  // 文档语言
 
@@ -88,6 +89,7 @@ export interface DocumentListParams {
   search?: string;
   language?: string;  // 添加语言过滤
   tutorialType?: 'installation' | 'device-operation';
+  headUnitTypeId?: string;
 }
 
 export interface DocumentListResponse {
@@ -225,6 +227,7 @@ class DocumentService extends BaseCrudService<DocumentResponse, DocumentData, Pa
   async searchDocuments(query: string, options?: {
     documentType?: 'general' | 'video' | 'structured';
     tutorialType?: 'installation' | 'device-operation';
+    headUnitTypeId?: string;
     category?: string;
     limit?: number;
   }): Promise<DocumentResponse[]> {
@@ -379,7 +382,7 @@ export const updateDocument = (id: string, documentData: Partial<DocumentData>, 
   documentService.updateDocument(id, documentData, documentType);
 export const deleteDocument = (id: string, documentType?: 'general' | 'video' | 'structured') =>
   documentService.deleteDocument(id, documentType);
-export const searchDocuments = (query: string, options?: { documentType?: 'general' | 'video' | 'structured'; tutorialType?: 'installation' | 'device-operation'; category?: string; limit?: number; }) =>
+export const searchDocuments = (query: string, options?: { documentType?: 'general' | 'video' | 'structured'; tutorialType?: 'installation' | 'device-operation'; headUnitTypeId?: string; category?: string; limit?: number; }) =>
   documentService.searchDocuments(query, options);
 export const publishDocument = (id: string, documentType?: 'general' | 'video' | 'structured') =>
   documentService.publishDocument(id, documentType);

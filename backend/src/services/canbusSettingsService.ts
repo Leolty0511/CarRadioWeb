@@ -1,5 +1,6 @@
 import { CANBoxType, ICANBoxType } from '../models/CANBoxType'
 import { CANBusSetting, ICANBusSetting } from '../models/CANBusSetting'
+import { HeadUnitType, IHeadUnitType } from '../models/HeadUnitType'
 import { Types } from 'mongoose'
 import { ModuleSettings } from '../models/ModuleSettings'
 
@@ -10,8 +11,17 @@ interface CANBoxTypeInput {
   isActive?: boolean
 }
 
+interface HeadUnitTypeInput {
+  name: string
+  image?: string
+  description?: string
+  sortOrder?: number
+  isActive?: boolean
+}
+
 interface CANBusSettingInput {
   vehicleId: string
+  headUnitTypeId?: string
   settingImage?: string
   settingImages?: string[]
   description?: string
@@ -28,13 +38,14 @@ function normalizeSettingImages(data: { settingImage?: string; settingImages?: s
   return [...new Set(images)]
 }
 
-interface PopulatedSetting extends Omit<ICANBusSetting, 'vehicleId'> {
+interface PopulatedSetting extends Omit<ICANBusSetting, 'vehicleId' | 'headUnitTypeId'> {
   vehicleId: {
     _id: Types.ObjectId
     brand: string
     modelName: string
     year: string
   }
+  headUnitTypeId?: IHeadUnitType | null
 }
 
 class CANBusSettingsService {
@@ -68,10 +79,40 @@ class CANBusSettingsService {
     return !!result
   }
 
+  // ==================== 主机型号管理 ====================
+
+  async getAllHeadUnitTypes(activeOnly = false): Promise<IHeadUnitType[]> {
+    return HeadUnitType.find(activeOnly ? { isActive: true } : {}).sort({ sortOrder: 1, name: 1 })
+  }
+
+  async createHeadUnitType(data: HeadUnitTypeInput): Promise<IHeadUnitType> {
+    return new HeadUnitType({
+      name: data.name,
+      image: data.image || '',
+      description: data.description || '',
+      sortOrder: data.sortOrder ?? 0,
+      isActive: data.isActive ?? true,
+    }).save()
+  }
+
+  async updateHeadUnitType(id: string, data: Partial<HeadUnitTypeInput>): Promise<IHeadUnitType | null> {
+    return HeadUnitType.findByIdAndUpdate(id, data, { new: true, runValidators: true })
+  }
+
+  async deleteHeadUnitType(id: string): Promise<boolean> {
+    const settingsCount = await CANBusSetting.countDocuments({ headUnitTypeId: id })
+    if (settingsCount > 0) {
+      throw new Error(`Cannot delete: ${settingsCount} settings are using this head unit type`)
+    }
+    const result = await HeadUnitType.findByIdAndDelete(id)
+    return !!result
+  }
+
   // ==================== CANBus 设置管理 ====================
 
   async getAllSettings(filters?: {
     vehicleId?: string
+    headUnitTypeId?: string
     isActive?: boolean
   }): Promise<PopulatedSetting[]> {
     const query: Record<string, unknown> = {}
@@ -79,24 +120,30 @@ class CANBusSettingsService {
     if (filters?.vehicleId) {
       query.vehicleId = new Types.ObjectId(filters.vehicleId)
     }
+    if (filters?.headUnitTypeId) {
+      query.headUnitTypeId = new Types.ObjectId(filters.headUnitTypeId)
+    }
     if (filters?.isActive !== undefined) {
       query.isActive = filters.isActive
     }
 
     return CANBusSetting.find(query)
       .populate('vehicleId', 'brand modelName year')
+      .populate('headUnitTypeId', 'name image description sortOrder isActive')
       .sort({ createdAt: -1 }) as unknown as Promise<PopulatedSetting[]>
   }
 
   async getSettingById(id: string): Promise<PopulatedSetting | null> {
     return CANBusSetting.findById(id)
-      .populate('vehicleId', 'brand modelName year') as unknown as Promise<PopulatedSetting | null>
+      .populate('vehicleId', 'brand modelName year')
+      .populate('headUnitTypeId', 'name image description sortOrder isActive') as unknown as Promise<PopulatedSetting | null>
   }
 
   async createSetting(data: CANBusSettingInput): Promise<ICANBusSetting> {
     const settingImages = normalizeSettingImages(data)
     const setting = new CANBusSetting({
       vehicleId: new Types.ObjectId(data.vehicleId),
+      ...(data.headUnitTypeId ? { headUnitTypeId: new Types.ObjectId(data.headUnitTypeId) } : {}),
       settingImage: settingImages[0] || '',
       settingImages,
       description: data.description || '',
@@ -110,6 +157,9 @@ class CANBusSettingsService {
     
     if (data.vehicleId) {
       updateData.vehicleId = new Types.ObjectId(data.vehicleId)
+    }
+    if (data.headUnitTypeId !== undefined) {
+      updateData.headUnitTypeId = data.headUnitTypeId ? new Types.ObjectId(data.headUnitTypeId) : null
     }
     if (data.settingImage !== undefined || data.settingImages !== undefined) {
       const settingImages = normalizeSettingImages({
@@ -140,11 +190,22 @@ class CANBusSettingsService {
    * 根据车型获取设置信息
    * @param vehicleId 车型 ID
    */
-  async getSettingByVehicle(vehicleId: string): Promise<{ settingImage: string; settingImages: string[]; description: string } | null> {
-    const setting = await CANBusSetting.findOne({
+  async getSettingByVehicle(vehicleId: string, headUnitTypeId?: string): Promise<{
+    settingImage: string
+    settingImages: string[]
+    description: string
+    headUnitTypeId?: string
+  } | null> {
+    const query: Record<string, unknown> = {
       vehicleId: new Types.ObjectId(vehicleId),
       isActive: true
-    })
+    }
+    if (headUnitTypeId) {
+      query.headUnitTypeId = new Types.ObjectId(headUnitTypeId)
+    } else {
+      query.$or = [{ headUnitTypeId: { $exists: false } }, { headUnitTypeId: null }]
+    }
+    const setting = await CANBusSetting.findOne(query)
     if (!setting) return null
     const settingImages = normalizeSettingImages({
       settingImage: setting.settingImage,
@@ -153,7 +214,8 @@ class CANBusSettingsService {
     return {
       settingImage: settingImages[0] || '',
       settingImages,
-      description: setting.description
+      description: setting.description,
+      ...(setting.headUnitTypeId ? { headUnitTypeId: String(setting.headUnitTypeId) } : {}),
     }
   }
 

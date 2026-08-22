@@ -138,10 +138,11 @@ const GeneralDocumentViewer: React.FC<GeneralDocumentViewerProps> = ({ document,
       <div className="flex justify-start">
         <button
           onClick={onBack}
-          className="px-4 py-2 border-2 border-gray-300 dark:border-gray-600 text-slate-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-all duration-300 rounded-lg"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border-2 border-gray-300 text-slate-600 transition-all duration-300 hover:border-gray-400 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:border-gray-500 dark:hover:bg-gray-700"
+          aria-label={t('knowledge.video.backToDocuments')}
+          title={t('knowledge.video.backToDocuments')}
         >
-          <ArrowLeft className="h-4 w-4 mr-2 inline" />
-          {t('knowledge.video.backToDocuments')}
+          <ArrowLeft className="h-4 w-4" />
         </button>
       </div>
 

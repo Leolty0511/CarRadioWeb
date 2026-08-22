@@ -44,10 +44,11 @@ const IncompatibleModelsDetail: React.FC<IncompatibleModelsDetailProps> = ({
       <Button
         onClick={onBack}
         variant="outline"
-        className="bg-white/10 border-white/20 text-white hover:bg-white/20"
+        className="h-10 w-10 p-0 bg-white/10 border-white/20 text-white hover:bg-white/20"
+        aria-label={t('knowledge.cardSections.backToOverview')}
+        title={t('knowledge.cardSections.backToOverview')}
       >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        {t('knowledge.cardSections.backToOverview')}
+        <ArrowLeft className="h-4 w-4" />
       </Button>
 
       {/* 警告提示 */}

@@ -20,6 +20,7 @@ const mapUILanguageToDocLanguage = (_uiLang: string): 'en' => {
 interface CategoryBrowserProps {
   documentType: 'video' | 'general';
   tutorialType?: 'installation' | 'device-operation';
+  headUnitTypeId?: string;
   onViewDocument: (doc: any) => void;
   className?: string;
 }
@@ -27,6 +28,7 @@ interface CategoryBrowserProps {
 const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   documentType,
   tutorialType,
+  headUnitTypeId,
   onViewDocument,
   className = ''
 }) => {
@@ -67,6 +69,51 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
     loadCategories();
   }, [documentType, documentLanguage, tutorialType]);
 
+  // 从 CANBus 页面带主机型号进入时，直接展示该型号的主机操作教程。
+  // 不要求教程必须绑定分类，避免新建教程后因未选择分类而无法在前台看到。
+  useEffect(() => {
+    if (documentType !== 'video' || !headUnitTypeId) {
+      return
+    }
+
+    let cancelled = false
+    const loadHeadUnitDocuments = async () => {
+      setDocumentsLoading(true)
+      try {
+        const result = await getDocuments({
+          documentType: 'video',
+          tutorialType,
+          headUnitTypeId,
+          status: 'published',
+          language: documentLanguage,
+          limit: 1000
+        })
+        if (cancelled) {
+          return
+        }
+        setDocuments(result.documents)
+        setSelectedCategory({
+          _id: `head-unit-${headUnitTypeId}`,
+          name: t('knowledge.sections.deviceOperationVideos'),
+          description: '',
+          color: '#06b6d4',
+          documentTypes: ['video'],
+        } as Category)
+      } catch {
+        if (!cancelled) {
+          setDocuments([])
+        }
+      } finally {
+        if (!cancelled) {
+          setDocumentsLoading(false)
+        }
+      }
+    }
+
+    loadHeadUnitDocuments()
+    return () => { cancelled = true }
+  }, [documentType, documentLanguage, tutorialType, headUnitTypeId, t])
+
   // 加载分类下的文档
   const loadCategoryDocuments = async (category: Category) => {
     try {
@@ -77,6 +124,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
       const result = await getDocuments({
         documentType,
         tutorialType: documentType === 'video' ? tutorialType : undefined,
+        headUnitTypeId: documentType === 'video' ? headUnitTypeId : undefined,
         category: category.name,
         status: 'published',
         language: documentLanguage,  // 根据用户界面语言过滤文档
@@ -112,6 +160,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
       const results = await searchDocuments(query, {
         documentType,
         tutorialType: documentType === 'video' ? tutorialType : undefined,
+        headUnitTypeId: documentType === 'video' ? headUnitTypeId : undefined,
         limit: 50
       });
       // 过滤语言
@@ -127,7 +176,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
     } finally {
       setIsSearching(false);
     }
-  }, [searchQuery, documentType, documentLanguage, tutorialType]);
+  }, [searchQuery, documentType, documentLanguage, tutorialType, headUnitTypeId]);
 
   // 清除搜索
   const clearSearch = () => {
@@ -199,10 +248,11 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
           <Button
             variant="outline"
             onClick={clearSearch}
-            className="mr-4"
+            className="mr-4 h-10 w-10 p-0"
+            aria-label={t('category.backToCategories')}
+            title={t('category.backToCategories')}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('category.backToCategories')}
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">
             {t('category.searchResultsFor', { query: searchQuery })} ({searchResults.length})
@@ -277,10 +327,11 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
           <Button
             variant="outline"
             onClick={handleBackToCategories}
-            className="mr-4"
+            className="mr-4 h-10 w-10 p-0"
+            aria-label={t('category.backToCategories')}
+            title={t('category.backToCategories')}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('category.backToCategories')}
+            <ArrowLeft className="h-4 w-4" />
           </Button>
           <div className="flex items-center">
             <div

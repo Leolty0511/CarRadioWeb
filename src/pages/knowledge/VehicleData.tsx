@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Car, Shield } from 'lucide-react'
+import { ArrowLeft, Car, Shield } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import VehicleSelector from '@/components/VehicleSelector'
 import PasswordProtection from '@/components/PasswordProtection'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
+import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
 import { getDocuments } from '@/services/documentApi'
 import { findVehicleByBrandModelYear } from '@/services/vehicleService'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
@@ -155,6 +156,7 @@ const VehicleData: React.FC = () => {
       ]} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <KnowledgeHomeLink className="mb-5" />
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
@@ -192,8 +194,14 @@ const VehicleData: React.FC = () => {
               <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 {selectedVehicle.brand} {selectedVehicle.model} {selectedVehicle.year}
               </p>
-              <Button variant="outline" onClick={() => { setSelectedVehicle(null); setVehicleDocuments([]) }}>
-                {t('knowledge.backToSelect')}
+              <Button
+                variant="outline"
+                onClick={() => { setSelectedVehicle(null); setVehicleDocuments([]) }}
+                className="h-10 w-10 p-0"
+                aria-label={t('knowledge.backToSelect')}
+                title={t('knowledge.backToSelect')}
+              >
+                <ArrowLeft className="h-4 w-4" />
               </Button>
             </div>
             {vehicleDocuments.length > 0 ? (

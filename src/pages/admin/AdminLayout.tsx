@@ -279,7 +279,7 @@ export const AdminLayout: React.FC = () => {
       case 'vehicles':
         return <VehicleManagement dataLanguage={scopedLang('vehicles')} />
       case 'documents':
-        return <DocumentManagement dataLanguage={scopedLang('documents')} />
+        return <DocumentManagement dataLanguage={scopedLang('documents')} onNavigate={handleTabChange} />
       case 'categories':
         return <CategoriesManagement dataLanguage={dataLanguage} />
       case 'canbus-settings':

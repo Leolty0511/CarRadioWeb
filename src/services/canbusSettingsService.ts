@@ -10,6 +10,25 @@ export interface CANBoxType {
   updatedAt: string
 }
 
+export interface HeadUnitType {
+  _id: string
+  name: string
+  image: string
+  description: string
+  sortOrder: number
+  isActive: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HeadUnitTypeInput {
+  name: string
+  image?: string
+  description?: string
+  sortOrder?: number
+  isActive?: boolean
+}
+
 export interface CANBusSetting {
   _id: string
   vehicleId: {
@@ -19,6 +38,7 @@ export interface CANBusSetting {
     modelName?: string  // 后端原始字段
     year: string
   }
+  headUnitTypeId?: HeadUnitType | string | null
   settingImage: string
   settingImages?: string[]
   description: string
@@ -36,6 +56,7 @@ export interface CANBoxTypeInput {
 
 export interface CANBusSettingInput {
   vehicleId: string
+  headUnitTypeId?: string
   settingImage: string
   settingImages?: string[]
   description?: string
@@ -75,13 +96,20 @@ class CANBusSettingsService {
     return response.data || []
   }
 
+  async getHeadUnitTypes(): Promise<HeadUnitType[]> {
+    const response = await apiClient.get<HeadUnitType[]>(`${this.baseUrl}/head-unit-types`)
+    return response.data || []
+  }
+
   /**
    * 根据车型获取设置信息
    */
-  async getSettingByVehicle(vehicleId: string): Promise<{ settingImage: string; settingImages: string[]; description: string } | null> {
+  async getSettingByVehicle(vehicleId: string, headUnitTypeId?: string): Promise<{ settingImage: string; settingImages: string[]; description: string; headUnitTypeId?: string } | null> {
     try {
+      const params = new URLSearchParams({ vehicleId })
+      if (headUnitTypeId) {params.set('headUnitTypeId', headUnitTypeId)}
       const response = await apiClient.get<{ settingImage: string; settingImages?: string[]; description: string }>(
-        `${this.baseUrl}/setting?vehicleId=${vehicleId}`
+        `${this.baseUrl}/setting?${params.toString()}`
       )
       if (!response.data) {return null}
       const settingImages = [
@@ -107,6 +135,27 @@ class CANBusSettingsService {
       `${this.baseUrl}/admin/canbox-types`
     )
     return response.data || []
+  }
+
+  async getAllHeadUnitTypes(): Promise<HeadUnitType[]> {
+    const response = await apiClient.get<HeadUnitType[]>(`${this.baseUrl}/admin/head-unit-types`)
+    return response.data || []
+  }
+
+  async createHeadUnitType(data: HeadUnitTypeInput): Promise<HeadUnitType> {
+    const response = await apiClient.post<HeadUnitType>(`${this.baseUrl}/admin/head-unit-types`, data)
+    if (!response.success || !response.data) {throw new Error(response.error || 'Failed to create head unit type')}
+    return response.data
+  }
+
+  async updateHeadUnitType(id: string, data: Partial<HeadUnitTypeInput>): Promise<HeadUnitType> {
+    const response = await apiClient.put<HeadUnitType>(`${this.baseUrl}/admin/head-unit-types/${id}`, data)
+    if (!response.success || !response.data) {throw new Error(response.error || 'Failed to update head unit type')}
+    return response.data
+  }
+
+  async deleteHeadUnitType(id: string): Promise<void> {
+    await apiClient.delete(`${this.baseUrl}/admin/head-unit-types/${id}`)
   }
 
   async createCANBoxType(data: CANBoxTypeInput): Promise<CANBoxType> {
@@ -139,10 +188,12 @@ class CANBusSettingsService {
 
   async getAllSettings(filters?: {
     vehicleId?: string
+    headUnitTypeId?: string
     isActive?: boolean
   }): Promise<CANBusSetting[]> {
     const params = new URLSearchParams()
     if (filters?.vehicleId) {params.append('vehicleId', filters.vehicleId)}
+    if (filters?.headUnitTypeId) {params.append('headUnitTypeId', filters.headUnitTypeId)}
     if (filters?.isActive !== undefined) {params.append('isActive', String(filters.isActive))}
 
     const url = params.toString()

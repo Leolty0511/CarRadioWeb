@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Edit, Trash2, Tag, FileText, Video, BarChart3 } from 'lucide-react';
+import { Edit, Trash2, Tag, FileText, Video, BookOpen, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -155,7 +155,7 @@ const CategoryManager: React.FC = () => {
       name: category.name,
       description: category.description || '',
       color: category.color || '#3B82F6',
-      documentTypes: category.documentTypes || ['general', 'video']
+      documentTypes: category.documentTypes || ['general', 'video', 'structured']
     });
     setShowCreateModal(true);
   };
@@ -284,6 +284,11 @@ const CategoryManager: React.FC = () => {
                             <Video className="h-3 w-3 text-slate-500 dark:text-gray-500" />
                           </span>
                         )}
+                        {Array.isArray(category.documentTypes) && category.documentTypes.includes('structured') && (
+                          <span title={t('category.structuredTutorials')}>
+                            <BookOpen className="h-3 w-3 text-slate-500 dark:text-gray-500" />
+                          </span>
+                        )}
                         {Array.isArray(category.documentTypes) && category.documentTypes.includes('product') && (
                           <span title="产品分类">
                             <Tag className="h-3 w-3 text-slate-500 dark:text-gray-500" />
@@ -395,6 +400,16 @@ const CategoryManager: React.FC = () => {
                 />
                 <Video className="h-4 w-4 mr-1" />
                 <span className="ml-2">{t('category.videoTutorials')}</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.documentTypes.includes('structured')}
+                  onChange={(e) => handleDocumentTypeChange('structured', e.target.checked)}
+                  className="mr-2"
+                />
+                <BookOpen className="h-4 w-4 mr-1" />
+                <span className="ml-2">{t('category.structuredTutorials')}</span>
               </label>
               <label className="flex items-center">
                 <input

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { ArrowLeft } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/Card'
 import ImageGallery, { type GalleryImage } from '@/components/ImageGallery'
 import DocumentFeedback from '@/components/DocumentFeedback'
@@ -56,7 +57,7 @@ const StructuredDocumentViewer: React.FC<StructuredDocumentViewerProps> = ({ doc
         <h1 className="mt-1 text-3xl font-bold text-slate-900 dark:text-white">{document.title}</h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{[brand, model, yearRange].filter(Boolean).join(' / ')}</p>
       </div>
-      <button type="button" onClick={onBack} className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">{t('knowledge.backToSelect')}</button>
+      <button type="button" onClick={onBack} className="flex h-10 w-10 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-700 transition-colors hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800" aria-label={t('knowledge.backToSelect')} title={t('knowledge.backToSelect')}><ArrowLeft className="h-4 w-4" /></button>
     </div>
 
     <div className="flex flex-wrap gap-x-5 gap-y-2 border-y border-slate-200 py-3 text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400">

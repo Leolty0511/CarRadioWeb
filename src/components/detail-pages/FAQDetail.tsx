@@ -46,10 +46,11 @@ const FAQDetail: React.FC<FAQDetailProps> = ({
         <Button
           onClick={onBack}
           variant="outline"
-          className="mb-6 bg-white/10 border-white/20 text-white hover:bg-white/20"
+          className="mb-6 h-10 w-10 p-0 bg-white/10 border-white/20 text-white hover:bg-white/20"
+          aria-label={t('knowledge.cardSections.backToOverview')}
+          title={t('knowledge.cardSections.backToOverview')}
         >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          {t('knowledge.cardSections.backToOverview')}
+          <ArrowLeft className="h-4 w-4" />
         </Button>
 
         {/* 页面标题和操作 */}

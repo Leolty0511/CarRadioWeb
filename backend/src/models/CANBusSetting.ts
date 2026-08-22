@@ -2,6 +2,7 @@ import mongoose, { Document, Schema, Types } from 'mongoose'
 
 export interface ICANBusSetting extends Document {
   vehicleId: Types.ObjectId
+  headUnitTypeId?: Types.ObjectId
   settingImage: string
   settingImages: string[]
   description: string
@@ -14,8 +15,12 @@ const canBusSettingSchema = new Schema<ICANBusSetting>({
   vehicleId: {
     type: Schema.Types.ObjectId,
     ref: 'Vehicle',
-    required: true,
-    unique: true
+    required: true
+  },
+  headUnitTypeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'HeadUnitType',
+    required: false,
   },
   settingImage: {
     type: String,
@@ -39,6 +44,6 @@ const canBusSettingSchema = new Schema<ICANBusSetting>({
   timestamps: true
 })
 
-canBusSettingSchema.index({ vehicleId: 1 })
+canBusSettingSchema.index({ vehicleId: 1, headUnitTypeId: 1 }, { unique: true, sparse: true })
 
 export const CANBusSetting = mongoose.model<ICANBusSetting>('CANBusSetting', canBusSettingSchema)

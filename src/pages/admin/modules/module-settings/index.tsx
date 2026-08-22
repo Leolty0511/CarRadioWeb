@@ -271,9 +271,9 @@ function ExternalLinksPanel({ dataLanguage, showToast, refreshSiteSettings }: Pa
 // ---------- Knowledge Panel ----------
 
 const KNOWLEDGE_SECTIONS: { key: keyof KnowledgeSectionSettings; label: string; desc: string }[] = [
-  { key: 'vehicleDataEnabled', label: '主机接线教程', desc: '知识库入口页显示「主机接线教程」板块' },
+  { key: 'vehicleDataEnabled', label: '原车主机接线指南', desc: '知识库入口页显示「原车主机接线指南」板块' },
   { key: 'videoTutorialsEnabled', label: '安装视频教程', desc: '知识库入口页显示「安装视频教程」板块' },
-  { key: 'deviceOperationVideosEnabled', label: '设备操作视频教程', desc: '知识库入口页显示「设备操作视频教程」板块' },
+  { key: 'deviceOperationVideosEnabled', label: '主机操作教程', desc: '知识库入口页显示「主机操作教程」板块' },
   { key: 'tutorialsEnabled', label: '图文教程', desc: '知识库入口页显示「图文教程」板块' },
   { key: 'canbusSettingsEnabled', label: 'CAN 总线设置', desc: '知识库入口页显示「CAN 总线设置」板块' },
 ]

@@ -52,6 +52,7 @@ export interface IVideoTutorial extends Document {
   authorId: mongoose.Types.ObjectId;
   category: string;          // 分类
   tutorialType: 'installation' | 'device-operation'; // 教程用途
+  headUnitTypeId?: mongoose.Types.ObjectId;
   language: 'en' | 'ru';     // 内容语言（保留兼容，仅使用 en）
   duration?: string;         // 视频时长
   thumbnail?: string;        // 缩略图 (OSS 链接)
@@ -250,6 +251,11 @@ const VideoTutorialSchema = new Schema<IVideoTutorial>({
     type: String,
     enum: ['installation', 'device-operation'],
     default: 'installation'
+  },
+  headUnitTypeId: {
+    type: Schema.Types.ObjectId,
+    ref: 'HeadUnitType',
+    required: false,
   },
   language: { 
     type: String, 

@@ -33,7 +33,7 @@ router.get('/admin/:type',
         return res.status(400).json({ success: false, error: 'invalid_document_type' });
       }
 
-      const { page = 1, limit = 10, category, author, search, language, status, tutorialType, brand, model } = req.query;
+      const { page = 1, limit = 10, category, author, search, language, status, tutorialType, headUnitTypeId, brand, model } = req.query;
       if (tutorialType && !['installation', 'device-operation'].includes(String(tutorialType))) {
         return res.status(400).json({ success: false, error: 'invalid_tutorial_type' });
       }
@@ -45,6 +45,7 @@ router.get('/admin/:type',
         search: search as string,
         language: language as string,
         tutorialType: tutorialType as 'installation' | 'device-operation' | undefined,
+        headUnitTypeId: headUnitTypeId as string,
         brand: brand as string,
         model: model as string,
       }, {
@@ -245,7 +246,7 @@ router.post('/video',
 // 获取视频教程列表
 router.get('/video', async (req, res) => {
   try {
-    const { page = 1, limit = 10, category, author, search, language, tutorialType } = req.query;
+    const { page = 1, limit = 10, category, author, search, language, tutorialType, headUnitTypeId } = req.query;
 
     if (tutorialType && !['installation', 'device-operation'].includes(tutorialType as string)) {
       res.status(400).json({ success: false, error: '无效的视频教程类型' });
@@ -263,7 +264,8 @@ router.get('/video', async (req, res) => {
       author: author as string,
       search: search as string,
       language: language as string,
-      tutorialType: resolvedTutorialType
+      tutorialType: resolvedTutorialType,
+      headUnitTypeId: headUnitTypeId as string
     }, {
       page: Math.min(Math.max(parseInt(page as string), 1), 1000),
       limit: Math.min(Math.max(parseInt(limit as string), 1), 100)
@@ -639,7 +641,7 @@ router.patch('/:type/:id/archive',
 // 搜索文档
 router.get('/search', async (req, res) => {
   try {
-    const { q, type, category, tutorialType } = req.query;
+    const { q, type, category, tutorialType, headUnitTypeId } = req.query;
     
     if (!q) {
       res.status(400).json({
@@ -673,6 +675,7 @@ router.get('/search', async (req, res) => {
           category: category as string,
           status: 'published',
           tutorialType: resolvedTutorialType,
+          headUnitTypeId: headUnitTypeId as string,
         })
       );
     }

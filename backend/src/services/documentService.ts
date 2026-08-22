@@ -358,6 +358,7 @@ export class DocumentService {
       model?: string;
       language?: string;  // 新增语言过滤
       tutorialType?: 'installation' | 'device-operation';
+      headUnitTypeId?: string;
     } = {},
     pagination: {
       page: number;
@@ -402,6 +403,9 @@ export class DocumentService {
         } else {
           query.tutorialType = filters.tutorialType;
         }
+      }
+      if (documentType === 'video' && filters.headUnitTypeId) {
+        query.headUnitTypeId = new mongoose.Types.ObjectId(filters.headUnitTypeId);
       }
       
       // 对于结构化文章，brand和model存储在basicInfo中
