@@ -1,7 +1,28 @@
 import SoftwareCategory, { ISoftwareCategory } from '../models/SoftwareCategory';
 import Software, { ISoftware } from '../models/Software';
+import mongoose from 'mongoose';
+import { toContentSlug } from '../utils/contentSlug';
 
 export class SoftwareService {
+  private async ensureSoftwareSlug(software: ISoftware): Promise<ISoftware> {
+    if (software.slug) return software;
+
+    const baseSlug = toContentSlug(software.name, 'software');
+    let slug = baseSlug;
+    let suffix = 2;
+    while (await Software.exists({ slug, _id: { $ne: software._id } })) {
+      slug = `${baseSlug}-${suffix++}`;
+    }
+    software.slug = slug;
+    await software.save();
+    return software;
+  }
+
+  private async ensureSoftwareSlugs(software: ISoftware[]): Promise<ISoftware[]> {
+    for (const item of software) await this.ensureSoftwareSlug(item);
+    return software;
+  }
+
   // 软件分类管理（按资料体系）
   async getAllCategories(language?: 'en' | 'ru'): Promise<ISoftwareCategory[]> {
     const filter: any = {};
@@ -40,7 +61,8 @@ export class SoftwareService {
     if (headUnitTypeId) {
       filter.$or = [{ headUnitTypeId }, { headUnitTypeId: { $exists: false } }, { headUnitTypeId: null }];
     }
-    return await Software.find(filter).populate('categoryId').populate('headUnitTypeId', 'name').sort({ createdAt: -1 });
+    const software = await Software.find(filter).populate('categoryId').populate('headUnitTypeId', 'name').sort({ createdAt: -1 });
+    return this.ensureSoftwareSlugs(software);
   }
 
   async getSoftwareByCategory(categoryId: string, language?: 'en' | 'ru', headUnitTypeId?: string): Promise<ISoftware[]> {
@@ -51,11 +73,17 @@ export class SoftwareService {
     if (headUnitTypeId) {
       filter.$or = [{ headUnitTypeId }, { headUnitTypeId: { $exists: false } }, { headUnitTypeId: null }];
     }
-    return await Software.find(filter).populate('categoryId').populate('headUnitTypeId', 'name').sort({ createdAt: -1 });
+    const software = await Software.find(filter).populate('categoryId').populate('headUnitTypeId', 'name').sort({ createdAt: -1 });
+    return this.ensureSoftwareSlugs(software);
   }
 
-  async getSoftwareById(id: string): Promise<ISoftware | null> {
-    return await Software.findById(id).populate('categoryId').populate('headUnitTypeId', 'name');
+  async getSoftwareById(idOrSlug: string): Promise<ISoftware | null> {
+    const software = await (mongoose.isValidObjectId(idOrSlug)
+      ? Software.findById(idOrSlug)
+      : Software.findOne({ slug: idOrSlug }))
+      .populate('categoryId')
+      .populate('headUnitTypeId', 'name');
+    return software ? this.ensureSoftwareSlug(software) : null;
   }
 
   async createSoftware(softwareData: {
@@ -67,7 +95,11 @@ export class SoftwareService {
     headUnitTypeId?: string;
     language: 'en' | 'ru';
   }): Promise<ISoftware> {
-    const software = new Software(softwareData);
+    const baseSlug = toContentSlug(softwareData.name, 'software');
+    let slug = baseSlug;
+    let suffix = 2;
+    while (await Software.exists({ slug })) slug = `${baseSlug}-${suffix++}`;
+    const software = new Software({ ...softwareData, slug });
     return await software.save();
   }
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { AlertTriangle, Download, ExternalLink, X } from 'lucide-react'
+import { Download } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import SEOHead from '@/components/seo/SEOHead'
 import HeadUnitTypeIdentifier from '@/components/knowledge/HeadUnitTypeIdentifier'
@@ -7,6 +8,7 @@ import { useHeadUnitTypes } from '@/contexts/HeadUnitTypeContext'
 
 interface Software {
   _id: string
+  slug?: string
   name: string
   description: string
   downloadUrl: string
@@ -18,10 +20,10 @@ interface Software {
 
 const SoftwareDownloads: React.FC = () => {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { selectedHeadUnitType, selectedHeadUnitTypeId } = useHeadUnitTypes()
   const [software, setSoftware] = useState<Software[]>([])
   const [loading, setLoading] = useState(true)
-  const [selectedSoftware, setSelectedSoftware] = useState<Software | null>(null)
 
   useEffect(() => {
     const loadSoftware = async () => {
@@ -38,12 +40,11 @@ const SoftwareDownloads: React.FC = () => {
       } catch (error) {
         console.error('Failed to load software list:', error)
         setSoftware([])
-      } finally {
+    } finally {
         setLoading(false)
       }
     }
     void loadSoftware()
-    setSelectedSoftware(null)
   }, [selectedHeadUnitTypeId])
 
   const handleDownload = (item: Software) => {
@@ -114,7 +115,7 @@ const SoftwareDownloads: React.FC = () => {
                 <div className="mt-auto flex gap-2 pt-5">
                   <button
                     type="button"
-                    onClick={() => setSelectedSoftware(item)}
+                    onClick={() => navigate(`/software-downloads/${encodeURIComponent(item.slug || item._id)}`)}
                     className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
                   >
                     {t('softwareDownloads.viewDetails')}
@@ -132,67 +133,6 @@ const SoftwareDownloads: React.FC = () => {
           </div>
         )}
       </div>
-
-      {selectedSoftware && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-          onClick={() => setSelectedSoftware(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="flex items-start justify-between border-b border-gray-200 p-6 dark:border-gray-700">
-              <div>
-                <h2 className="pr-4 text-2xl font-bold text-slate-800 dark:text-white">{selectedSoftware.name}</h2>
-                <p className="mt-2 text-sm text-slate-500 dark:text-gray-400">
-                  {selectedHeadUnitType
-                    ? `${t('knowledge.currentHeadUnitType')}: ${selectedHeadUnitType.name}`
-                    : t('softwareDownloads.commonResource')}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedSoftware(null)}
-                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-gray-800 dark:hover:text-white"
-                aria-label={t('softwareDownloads.close')}
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="max-h-[calc(90vh-190px)] overflow-y-auto p-6">
-              <p className="whitespace-pre-wrap text-base leading-7 text-slate-600 dark:text-gray-300">
-                {selectedSoftware.description}
-              </p>
-              {selectedSoftware.importantNote && (
-                <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-amber-600 dark:text-amber-400" />
-                    <p className="text-sm leading-6 text-amber-700 dark:text-amber-200">{selectedSoftware.importantNote}</p>
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 p-6 dark:border-gray-700 dark:bg-gray-800/50 sm:flex-row">
-              <button
-                type="button"
-                onClick={() => handleDownload(selectedSoftware)}
-                className="flex-1 rounded-lg bg-cyan-600 px-4 py-3 text-sm font-medium text-white transition hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-400"
-              >
-                {t('softwareDownloads.download')}
-              </button>
-              <button
-                type="button"
-                onClick={() => window.open(selectedSoftware.downloadUrl, '_blank')}
-                className="flex-1 rounded-lg border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-white dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                <ExternalLink className="mr-2 inline h-4 w-4" />
-                {t('softwareDownloads.openInNewTab')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

@@ -23,7 +23,9 @@ const Feedback = lazy(() => import('@/pages/Feedback'));
 const AudioEqualizerPage = lazy(() => import('@/pages/AudioEqualizer'));
 const AudioGeneratorPage = lazy(() => import('@/pages/AudioGenerator'));
 const SoftwareDownloads = lazy(() => import('@/pages/SoftwareDownloads'));
+const SoftwareDownloadDetail = lazy(() => import('@/pages/SoftwareDownloadDetail'));
 const UserManual = lazy(() => import('@/pages/UserManual'));
+const UserManualDetail = lazy(() => import('@/pages/UserManualDetail'));
 const Privacy = lazy(() => import('@/pages/Privacy'));
 const Terms = lazy(() => import('@/pages/Terms'));
 const Disclaimer = lazy(() => import('@/pages/Disclaimer'));
@@ -74,7 +76,9 @@ export const commonRoutes: RouteConfig[] = [
   { path: 'audio-generator', component: AudioGeneratorPage },
   { path: 'contact', component: Contact },
   { path: 'software-downloads', component: SoftwareDownloads, protected: true },
+  { path: 'software-downloads/:slug', component: SoftwareDownloadDetail, protected: true },
   { path: 'user-manual', component: UserManual, protected: true },
+  { path: 'user-manual/:slug', component: UserManualDetail, protected: true },
   { path: 'products', component: Products },
   { path: 'news', component: News },
   { path: 'resources', component: Resources },

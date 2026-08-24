@@ -12,6 +12,7 @@ interface HeadUnitTypeIdentifierProps {
   onSelected?: (type: HeadUnitType) => void
   buttonLabel?: string
   compact?: boolean
+  viewOnly?: boolean
 }
 
 const getHeadUnitImages = (type: HeadUnitType) => Array.from(new Set([
@@ -24,6 +25,7 @@ const HeadUnitTypeIdentifier: React.FC<HeadUnitTypeIdentifierProps> = ({
   onSelected,
   buttonLabel,
   compact = false,
+  viewOnly = false,
 }) => {
   const { t } = useTranslation()
   const {
@@ -151,15 +153,17 @@ const HeadUnitTypeIdentifier: React.FC<HeadUnitTypeIdentifierProps> = ({
                           </p>
                         </div>
                       </button>
-                      <div className="border-t border-slate-200 p-3 dark:border-gray-700">
-                        <button
-                          type="button"
-                          onClick={() => handleSelect(type)}
-                          className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-400"
-                        >
-                          {isCurrent ? t('knowledge.currentHeadUnitType') : t('knowledge.useThisHeadUnitType')}
-                        </button>
-                      </div>
+                      {!viewOnly && (
+                        <div className="border-t border-slate-200 p-3 dark:border-gray-700">
+                          <button
+                            type="button"
+                            onClick={() => handleSelect(type)}
+                            className="w-full rounded-lg bg-cyan-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-cyan-700 dark:bg-cyan-500 dark:hover:bg-cyan-400"
+                          >
+                            {isCurrent ? t('knowledge.currentHeadUnitType') : t('knowledge.useThisHeadUnitType')}
+                          </button>
+                        </div>
+                      )}
                     </article>
                   )
                 })}

@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ISoftware extends Document {
   name: string;
+  slug?: string;
   categoryId?: mongoose.Types.ObjectId;
   headUnitTypeId?: mongoose.Types.ObjectId;
   description: string;
@@ -17,6 +18,13 @@ const softwareSchema = new Schema<ISoftware>({
     type: String,
     required: true,
     trim: true
+  },
+  slug: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true,
+    index: true
   },
   categoryId: {
     type: Schema.Types.ObjectId,

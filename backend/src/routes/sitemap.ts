@@ -6,6 +6,9 @@
 import { Router, Request, Response } from 'express'
 import mongoose from 'mongoose'
 import { createLogger } from '../utils/logger'
+import UserManual from '../models/UserManual'
+import Software from '../models/Software'
+import { toContentSlug } from '../utils/contentSlug'
 
 const logger = createLogger('sitemap-route')
 
@@ -65,6 +68,37 @@ async function fetchDocumentSlugs(): Promise<Array<{ type: string; slug: string;
   }
 }
 
+/** Fetch published user manuals and software resources with stable detail URLs. */
+async function fetchResourceUrls(): Promise<Array<{ path: string; updatedAt: string }>> {
+  try {
+    if (mongoose.connection.readyState !== 1) return []
+
+    const [manuals, software] = await Promise.all([
+      UserManual.find({ isPublished: true }, { slug: 1, title: 1, productModel: 1, updatedAt: 1 }).lean(),
+      Software.find({}, { slug: 1, name: 1, updatedAt: 1 }).lean(),
+    ])
+    const formatDate = (value?: Date) => value
+      ? new Date(value).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+
+    const manualUrls = manuals.map(manual => ({
+      path: `user-manual/${manual.slug || toContentSlug(`${manual.title}-${manual.productModel}`, 'user-manual')}`,
+      updatedAt: formatDate(manual.updatedAt),
+    }))
+    const softwareUrls = software.map(item => ({
+      path: `software-downloads/${item.slug || toContentSlug(item.name, 'software')}`,
+      updatedAt: formatDate(item.updatedAt),
+    }))
+
+    return [
+      ...manualUrls,
+      ...softwareUrls,
+    ]
+  } catch {
+    return []
+  }
+}
+
 /** GET /sitemap.xml */
 router.get('/sitemap.xml', async (_req: Request, res: Response) => {
   try {
@@ -85,6 +119,13 @@ router.get('/sitemap.xml', async (_req: Request, res: Response) => {
       for (const lang of SUPPORTED_LANGS) {
         const docPath = `/${lang}/knowledge/${doc.type}/${doc.slug}`
         entries.push(buildUrlEntry(`${SITE_URL}${docPath}`, doc.updatedAt, 'weekly', 0.6))
+      }
+    }
+
+    const resources = await fetchResourceUrls()
+    for (const resource of resources) {
+      for (const lang of SUPPORTED_LANGS) {
+        entries.push(buildUrlEntry(`${SITE_URL}/${lang}/${resource.path}`, resource.updatedAt, 'monthly', 0.6))
       }
     }
 

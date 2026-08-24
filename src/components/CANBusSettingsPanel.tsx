@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router-dom'
 import { Settings, ChevronDown, ChevronLeft, ChevronRight, Image, Loader2, Info } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import ReferenceImageModal from '@/components/ReferenceImageModal'
+import HeadUnitTypeIdentifier from '@/components/knowledge/HeadUnitTypeIdentifier'
 import canbusSettingsService, { type CANBoxType, type HeadUnitType } from '@/services/canbusSettingsService'
 import { getVehicles } from '@/services/vehicleService'
 import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
@@ -30,7 +30,6 @@ interface CANBusSettingsPanelProps {
  */
 const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
   const { t, i18n } = useTranslation()
-  const navigate = useNavigate()
   const documentLanguage = mapUILanguageToDocLanguage(i18n.language)
 
   // 选择状态
@@ -448,14 +447,11 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                   {t('canbus.headUnitTypeHint')}
                 </p>
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                className="flex-shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40"
-                onClick={() => navigate('/knowledge/device-operation-videos')}
-              >
-                {t('canbus.viewHeadUnitOperationTutorials')}
-              </Button>
+              <HeadUnitTypeIdentifier
+                compact
+                className="flex-shrink-0"
+                onSelected={type => handleHeadUnitTypeSelect(type._id)}
+              />
             </div>
           )}
 

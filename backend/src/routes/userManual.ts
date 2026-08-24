@@ -9,6 +9,7 @@ import { PERMISSIONS } from '../config/permissions'
 import ManualCategory from '../models/ManualCategory'
 import UserManual from '../models/UserManual'
 import logger from '../utils/logger'
+import { toContentSlug } from '../utils/contentSlug'
 
 const router = express.Router()
 const PDF_DIR = process.env.MANUAL_STORAGE_DIR
@@ -52,6 +53,17 @@ async function syncLegacyFiles() {
     const base = filename.replace(/\.pdf$/i, '')
     await UserManual.create({ filename, title: base, productModel: base, size: stats.size })
   }
+  const manualsWithoutSlug = await UserManual.find({ $or: [{ slug: { $exists: false } }, { slug: '' }] })
+  for (const manual of manualsWithoutSlug) {
+    const baseSlug = toContentSlug(`${manual.title}-${manual.productModel}`, 'user-manual')
+    let slug = baseSlug
+    let suffix = 2
+    while (await UserManual.exists({ slug, _id: { $ne: manual._id } })) {
+      slug = `${baseSlug}-${suffix++}`
+    }
+    manual.slug = slug
+    await manual.save()
+  }
 }
 
 function serializeManual(manual: any) {
@@ -59,6 +71,7 @@ function serializeManual(manual: any) {
   return {
     ...value,
     id: String(value._id),
+    slug: value.slug,
     name: value.filename,
     sizeFormatted: formatFileSize(value.size || 0),
     url: `/api/user-manual/view/${encodeURIComponent(value.filename)}`,
@@ -142,6 +155,25 @@ router.get('/admin', authenticateUser, requireAnyPermission(PERMISSIONS.resource
   }
 })
 
+/** 获取单个已发布用户手册，供前台详情页使用 */
+router.get('/:id', async (req, res) => {
+  try {
+    await syncLegacyFiles()
+    const manualQuery = mongoose.isValidObjectId(req.params.id)
+      ? { _id: req.params.id, isPublished: true }
+      : { slug: req.params.id, isPublished: true }
+    const manual = await UserManual.findOne(manualQuery)
+      .populate('categoryId', 'name slug description')
+      .populate('headUnitTypeId', 'name')
+
+    if (!manual) return res.status(404).json({ success: false, message: '手册不存在' })
+    res.json({ success: true, manual: serializeManual(manual) })
+  } catch (error) {
+    logger.error({ error, id: req.params.id }, 'Failed to load user manual detail')
+    res.status(500).json({ success: false, message: '获取用户手册详情失败' })
+  }
+})
+
 router.post('/categories', authenticateUser, requireAnyPermission(PERMISSIONS.resources.create, PERMISSIONS.resources.update), async (req: Request, res: Response) => {
   try {
     const name = String(req.body.name || '').trim()
@@ -196,7 +228,11 @@ router.post('/upload', authenticateUser, requireAnyPermission(PERMISSIONS.resour
     const headUnitTypeId = req.body.headUnitTypeId && mongoose.isValidObjectId(req.body.headUnitTypeId) ? req.body.headUnitTypeId : undefined
     const existing = await UserManual.findOne({ filename: req.file.filename })
     if (existing) await UserManual.deleteOne({ _id: existing._id })
-    const manual = await UserManual.create({ filename: req.file.filename, title, productModel, categoryId, headUnitTypeId, description: String(req.body.description || ''), version: String(req.body.version || ''), sortOrder: Number(req.body.sortOrder) || 0, isPublished: req.body.isPublished !== 'false', size: req.file.size })
+    const baseSlug = toContentSlug(`${title}-${productModel}`, 'user-manual')
+    let slug = baseSlug
+    let suffix = 2
+    while (await UserManual.exists({ slug })) slug = `${baseSlug}-${suffix++}`
+    const manual = await UserManual.create({ filename: req.file.filename, slug, title, productModel, categoryId, headUnitTypeId, description: String(req.body.description || ''), version: String(req.body.version || ''), sortOrder: Number(req.body.sortOrder) || 0, isPublished: req.body.isPublished !== 'false', size: req.file.size })
     res.status(201).json({ success: true, manual: serializeManual(manual) })
   } catch (error) {
     if (req.file) await fsp.unlink(req.file.path).catch(() => undefined)

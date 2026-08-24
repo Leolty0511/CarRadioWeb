@@ -2,6 +2,7 @@ import mongoose, { Document, Schema } from 'mongoose'
 
 export interface IUserManual extends Document {
   filename: string
+  slug?: string
   title: string
   productModel: string
   categoryId?: mongoose.Types.ObjectId
@@ -17,6 +18,7 @@ export interface IUserManual extends Document {
 
 const userManualSchema = new Schema<IUserManual>({
   filename: { type: String, required: true, trim: true, unique: true },
+  slug: { type: String, trim: true, unique: true, sparse: true, index: true },
   title: { type: String, required: true, trim: true, maxlength: 200 },
   productModel: { type: String, required: true, trim: true, maxlength: 120 },
   categoryId: { type: Schema.Types.ObjectId, ref: 'ManualCategory' },
