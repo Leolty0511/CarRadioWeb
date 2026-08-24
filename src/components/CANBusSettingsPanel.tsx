@@ -449,9 +449,10 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
                 </p>
               </div>
               <Button
+                type="button"
                 variant="outline"
                 className="flex-shrink-0 border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-900/40"
-                onClick={() => navigate(selectedHeadUnitTypeId ? `/knowledge/device-operation-videos?headUnitTypeId=${encodeURIComponent(selectedHeadUnitTypeId)}` : '/knowledge/device-operation-videos')}
+                onClick={() => navigate('/knowledge/device-operation-videos')}
               >
                 {t('canbus.viewHeadUnitOperationTutorials')}
               </Button>

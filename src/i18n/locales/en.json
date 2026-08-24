@@ -1435,6 +1435,14 @@
       "viewMore": "View {{count}} more related content →"
     }
   },
+  "pagination": {
+    "previous": "Previous",
+    "next": "Next",
+    "page": "Page {{page}}",
+    "totalPages": "{{total}} pages",
+    "itemsPerPage": "Per page",
+    "totalItems": "{{total}} items"
+  },
   "pages": {
     "services": "Services",
     "servicesDescription": "Professional technical support and services",

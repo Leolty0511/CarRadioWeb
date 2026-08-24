@@ -50,6 +50,8 @@ grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN)=' .env.fla
 rm -f .env.flarum.tmp
 
 FORUM_STATE_DIR="${FORUM_STATE_DIR:-.forum-state}"
+FORUM_ENABLED_STATE_FILE="$FORUM_STATE_DIR/enabled-extensions.json"
+PRESERVE_FORUM_ENABLED_STATE=0
 
 fix_forum_runtime_permissions() {
   docker exec flarum_app sh -lc '
@@ -69,6 +71,76 @@ save_forum_composer_state() {
   fi
 }
 
+save_forum_enabled_state() {
+  mkdir -p "$FORUM_STATE_DIR"
+  local state_tmp="${FORUM_ENABLED_STATE_FILE}.tmp"
+  if docker exec flarum_app php -r '
+    $host=getenv("DB_HOST") ?: "flarum_db";
+    $name=getenv("DB_NAME") ?: "flarum";
+    $user=getenv("DB_USER") ?: "flarum";
+    $password=getenv("DB_PASSWORD") ?: "";
+    $prefix=getenv("DB_PREFIX") ?: "flarum_";
+    if ($password === "") exit(1);
+    try {
+      $pdo=new PDO("mysql:host=".$host.";dbname=".$name.";charset=utf8mb4", $user, $password);
+      $query=$pdo->query("SELECT `value` FROM `".$prefix."settings` WHERE `key` = \"extensions_enabled\" LIMIT 1");
+      $row=$query ? $query->fetch(PDO::FETCH_ASSOC) : null;
+      $list=$row ? json_decode((string) $row["value"], true) : null;
+      if (!is_array($list)) exit(1);
+      echo json_encode(array_values(array_filter($list, "is_string")), JSON_UNESCAPED_SLASHES);
+    } catch (Throwable $error) {
+      exit(1);
+    }
+  ' > "$state_tmp" 2>/dev/null; then
+    mv "$state_tmp" "$FORUM_ENABLED_STATE_FILE"
+    echo "Saved the current forum extension enable state."
+  else
+    rm -f "$state_tmp"
+    echo "Could not save the current forum extension enable state; keeping the previous snapshot if available."
+  fi
+}
+
+restore_forum_enabled_state() {
+  if [[ ! -s "$FORUM_ENABLED_STATE_FILE" ]]; then
+    return 1
+  fi
+
+  local state_b64
+  state_b64="$(base64 < "$FORUM_ENABLED_STATE_FILE" | tr -d '\r\n')"
+  if [[ -z "$state_b64" ]]; then
+    return 1
+  fi
+
+  if docker exec -e EXTENSIONS_STATE_B64="$state_b64" flarum_app php -r '
+    $raw=base64_decode(getenv("EXTENSIONS_STATE_B64") ?: "", true);
+    $list=is_string($raw) ? json_decode($raw, true) : null;
+    if (!is_array($list)) exit(1);
+    $list=array_values(array_filter($list, "is_string"));
+    foreach (["fof-passport", "carradioweb-forum-bridge"] as $required) {
+      if (!in_array($required, $list, true)) $list[]=$required;
+    }
+    $host=getenv("DB_HOST") ?: "flarum_db";
+    $name=getenv("DB_NAME") ?: "flarum";
+    $user=getenv("DB_USER") ?: "flarum";
+    $password=getenv("DB_PASSWORD") ?: "";
+    $prefix=getenv("DB_PREFIX") ?: "flarum_";
+    if ($password === "") exit(1);
+    try {
+      $pdo=new PDO("mysql:host=".$host.";dbname=".$name.";charset=utf8mb4", $user, $password);
+      $update=$pdo->prepare("UPDATE `".$prefix."settings` SET `value`=? WHERE `key`=\"extensions_enabled\"");
+      $update->execute([json_encode($list, JSON_UNESCAPED_SLASHES)]);
+    } catch (Throwable $error) {
+      exit(1);
+    }
+  ' >/dev/null 2>&1; then
+    echo "Restored the forum extension enable state from the previous deployment."
+    return 0
+  fi
+
+  echo "Could not restore the saved forum extension enable state."
+  return 1
+}
+
 restore_forum_composer_state() {
   if [[ ! -s "$FORUM_STATE_DIR/composer.json" || ! -s "$FORUM_STATE_DIR/composer.lock" ]]; then
     return 1
@@ -86,6 +158,10 @@ restore_forum_composer_state() {
 # The image keeps Composer packages inside the container. Save the exact
 # dependency files before Compose has any chance to recreate that container.
 save_forum_composer_state
+save_forum_enabled_state
+if [[ -s "$FORUM_ENABLED_STATE_FILE" ]]; then
+  PRESERVE_FORUM_ENABLED_STATE=1
+fi
 
 # Older artifact updates replaced the bind-mounted directory inode. Docker
 # keeps serving that detached (and now empty) inode until the container is
@@ -151,8 +227,8 @@ if [[ ${#OAUTH_CLIENT_SECRET} -ge 32 && -n "$FRONTEND_URL" && -n "$OAUTH_REDIREC
         "fof-passport.app_token_url" => $base . "/api/member-auth/forum/oauth/token",
         "fof-passport.app_user_url" => $base . "/api/member-auth/forum/oauth/user",
         "fof-passport.app_oauth_scopes" => "read",
-        "fof-passport.button_title" => "Sign in with main site account",
-        "fof-passport.button_icon" => "fas fa-sign-in-alt",
+        "fof-passport.button_title" => "Main site login",
+        "fof-passport.button_icon" => "",
         "display_name_driver" => "nickname",
       ];
       foreach ($settings as $setting => $value) {
@@ -215,7 +291,9 @@ restore_project_extensions() {
   while IFS=$'\t' read -r extension_id composer_package vcs_url; do
     [[ -z "$extension_id" || -z "$composer_package" ]] && continue
     if docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show "$composer_package" >/dev/null 2>&1; then
-      docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+      if [[ "$PRESERVE_FORUM_ENABLED_STATE" != "1" ]]; then
+        docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+      fi
       continue
     fi
 
@@ -254,7 +332,9 @@ restore_project_extensions() {
   while IFS=$'\t' read -r extension_id composer_package vcs_url; do
     [[ -z "$extension_id" || -z "$composer_package" ]] && continue
     if docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show "$composer_package" >/dev/null 2>&1; then
-      docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+      if [[ "$PRESERVE_FORUM_ENABLED_STATE" != "1" ]]; then
+        docker exec flarum_app php flarum extension:enable "$extension_id" >/dev/null 2>&1 || true
+      fi
     fi
   done < "$manifest_file"
 
@@ -273,6 +353,11 @@ elif [[ "$CONTAINER_RECREATED" == "1" && "$COMPOSER_STATE_RESTORED" != "1" ]]; t
 else
   docker exec flarum_app php flarum cache:clear >/dev/null 2>&1 || true
 fi
+
+# Restoring Composer packages or running the fallback extension repair can
+# change Flarum's extensions_enabled setting. Put it back exactly as it was
+# before the update, while keeping the two extensions required for the bridge.
+restore_forum_enabled_state || true
 
 # Composer files restored with docker cp are owned by root. The Flarum web
 # process must be able to read them when it discovers extensions and compiles

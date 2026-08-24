@@ -12,7 +12,7 @@ import ForumOAuthAccessToken from '../models/ForumOAuthAccessToken'
 import ForumBridgeNonce from '../models/ForumBridgeNonce'
 import BaseDocument from '../models/Document'
 import { signTokenPair, verifyAccessToken, verifyRefreshToken } from '../utils/jwt'
-import { clearTokenCookie, clearRefreshTokenCookie } from '../utils/tokenCookie'
+import { clearTokenCookie, clearRefreshTokenCookie, setTokenCookie, setRefreshTokenCookie } from '../utils/tokenCookie'
 import { clearMemberTokenCookies, getMemberRefreshToken, getMemberToken, setMemberTokenCookies } from '../utils/memberTokenCookie'
 import emailVerificationService from '../services/emailVerificationService'
 import { getClientIP, getGeoLocationByIP } from '../services/geoLocationService'
@@ -406,7 +406,31 @@ router.post('/login', authLimiter, async (req, res) => {
   const member = await Member.findOne({
     $or: [{ email }, { nickname }],
   }).select('+passwordHash')
-  if (!member || !(await bcrypt.compare(password, member.passwordHash))) return res.status(401).json({ success: false, error: 'invalid_credentials' })
+  if (!member) {
+    const admin = await User.findOne({
+      provider: 'email',
+      $or: [
+        { email },
+        { loginUsername: email },
+        { nickname },
+      ],
+    }).select('+passwordHash')
+    if (!admin || !admin.passwordHash || !(await bcrypt.compare(password, admin.passwordHash))) {
+      return res.status(401).json({ success: false, error: 'invalid_credentials' })
+    }
+    if (!admin.isActive) return res.status(403).json({ success: false, error: 'account_inactive' })
+    admin.lastLoginAt = new Date()
+    await admin.save()
+    const tokens = signTokenPair({
+      userId: String(admin._id),
+      email: admin.email || admin.loginUsername || '',
+      role: admin.role,
+    })
+    setTokenCookie(res, tokens.accessToken)
+    setRefreshTokenCookie(res, tokens.refreshToken)
+    return res.json({ success: true, data: { type: 'admin', nickname: admin.nickname } })
+  }
+  if (!(await bcrypt.compare(password, member.passwordHash))) return res.status(401).json({ success: false, error: 'invalid_credentials' })
   if (member.status === 'pending' || member.status === 'rejected') {
     member.status = 'active'
     member.reviewNote = ''

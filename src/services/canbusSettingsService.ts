@@ -65,6 +65,14 @@ export interface CANBusSettingInput {
   isActive?: boolean
 }
 
+export interface CANBusSettingsPage {
+  items: CANBusSetting[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 class CANBusSettingsService {
   private baseUrl = '/canbus-settings'
 
@@ -192,18 +200,22 @@ class CANBusSettingsService {
     vehicleId?: string
     headUnitTypeId?: string
     isActive?: boolean
-  }): Promise<CANBusSetting[]> {
+    page?: number
+    pageSize?: number
+  }): Promise<CANBusSettingsPage> {
     const params = new URLSearchParams()
     if (filters?.vehicleId) {params.append('vehicleId', filters.vehicleId)}
     if (filters?.headUnitTypeId) {params.append('headUnitTypeId', filters.headUnitTypeId)}
     if (filters?.isActive !== undefined) {params.append('isActive', String(filters.isActive))}
+    if (filters?.page !== undefined) {params.append('page', String(filters.page))}
+    if (filters?.pageSize !== undefined) {params.append('pageSize', String(filters.pageSize))}
 
     const url = params.toString()
       ? `${this.baseUrl}/admin/settings?${params.toString()}`
       : `${this.baseUrl}/admin/settings`
 
-    const response = await apiClient.get<CANBusSetting[]>(url)
-    return response.data || []
+    const response = await apiClient.get<CANBusSettingsPage>(url)
+    return response.data || { items: [], total: 0, page: 1, pageSize: 20, totalPages: 1 }
   }
 
   async createSetting(data: CANBusSettingInput): Promise<CANBusSetting> {

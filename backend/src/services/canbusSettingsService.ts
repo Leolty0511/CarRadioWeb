@@ -29,6 +29,19 @@ interface CANBusSettingInput {
   isActive?: boolean
 }
 
+interface SettingsPagination {
+  page?: number
+  pageSize?: number
+}
+
+export interface SettingsPage {
+  items: PopulatedSetting[]
+  total: number
+  page: number
+  pageSize: number
+  totalPages: number
+}
+
 function normalizeSettingImages(data: { settingImage?: string; settingImages?: string[] }): string[] {
   const image = [
     data.settingImage || '',
@@ -119,7 +132,7 @@ class CANBusSettingsService {
     vehicleId?: string
     headUnitTypeId?: string
     isActive?: boolean
-  }): Promise<PopulatedSetting[]> {
+  }, pagination: SettingsPagination = {}): Promise<SettingsPage> {
     const query: Record<string, unknown> = {}
     
     if (filters?.vehicleId) {
@@ -132,10 +145,24 @@ class CANBusSettingsService {
       query.isActive = filters.isActive
     }
 
-    return CANBusSetting.find(query)
+    const page = Math.max(1, Math.floor(pagination.page || 1))
+    const pageSize = Math.min(100, Math.max(1, Math.floor(pagination.pageSize || 20)))
+    const [items, total] = await Promise.all([
+      CANBusSetting.find(query)
       .populate('vehicleId', 'brand modelName year')
       .populate('headUnitTypeId', 'name image description sortOrder isActive')
-      .sort({ createdAt: -1 }) as unknown as Promise<PopulatedSetting[]>
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * pageSize)
+      .limit(pageSize) as unknown as Promise<PopulatedSetting[]>,
+      CANBusSetting.countDocuments(query),
+    ])
+    return {
+      items,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    }
   }
 
   async getSettingById(id: string): Promise<PopulatedSetting | null> {

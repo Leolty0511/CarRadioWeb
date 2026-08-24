@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { useToast } from '@/components/ui/Toast'
+import { useTranslation } from 'react-i18next'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
 import canbusSettingsService, {
   type CANBoxType,
@@ -607,6 +608,7 @@ const HeadUnitTypeManager: React.FC = () => {
 
 const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguage }) => {
   const { showToast } = useToast()
+  const { t } = useTranslation()
   const [settings, setSettings] = useState<CANBusSetting[]>([])
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [loading, setLoading] = useState(true)
@@ -617,16 +619,23 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
   const [formData, setFormData] = useState<CANBusSettingInput>({ vehicleId: '', headUnitTypeId: '', settingImage: '', settingImages: [], description: '' })
   const [showImagePicker, setShowImagePicker] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string }>({ show: false, id: '' })
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (nextPage = 1) => {
     setLoading(true)
     try {
       const [settingsData, vehiclesData, headUnitTypesData] = await Promise.all([
-        canbusSettingsService.getAllSettings(),
+        canbusSettingsService.getAllSettings({ page: nextPage, pageSize }),
         getVehicles(dataLanguage),
         canbusSettingsService.getAllHeadUnitTypes()
       ])
-      setSettings(settingsData)
+      setSettings(settingsData.items)
+      setPage(settingsData.page)
+      setTotal(settingsData.total)
+      setTotalPages(settingsData.totalPages)
       setVehicles(vehiclesData.filter(v => v._id !== undefined))
       setHeadUnitTypes(headUnitTypesData)
     } catch {
@@ -634,11 +643,15 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
     } finally {
       setLoading(false)
     }
-  }, [showToast, dataLanguage])
+  }, [showToast, dataLanguage, pageSize])
 
   useEffect(() => {
-    loadData()
-  }, [loadData])
+    loadData(page)
+  }, [loadData, page])
+
+  useEffect(() => {
+    setPage(1)
+  }, [dataLanguage, pageSize])
 
   const handleAdd = () => {
     setFormData({ vehicleId: '', headUnitTypeId: '', settingImage: '', settingImages: [], description: '', isActive: true })
@@ -681,7 +694,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
         showToast({ type: 'success', title: '创建成功', description: '' })
       }
       setShowForm(false)
-      loadData()
+      loadData(page)
     } catch {
       showToast({ type: 'error', title: '保存失败，该车型与主机型号可能已有设置', description: '' })
     } finally {
@@ -693,7 +706,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
     try {
       await canbusSettingsService.deleteSetting(id)
       showToast({ type: 'success', title: '删除成功', description: '' })
-      loadData()
+      loadData(page)
     } catch {
       showToast({ type: 'error', title: '删除失败', description: '' })
     } finally {
@@ -728,6 +741,7 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
               <p className="text-slate-500">暂无设置数据</p>
             </div>
           ) : (
+            <div className="space-y-4">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-slate-50 dark:bg-gray-700/50">
@@ -782,6 +796,30 @@ const SettingsManager: React.FC<{ dataLanguage: DataLanguage }> = ({ dataLanguag
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-4 dark:border-gray-700">
+              <p className="text-sm text-slate-500 dark:text-gray-400">
+                {t('pagination.page', { page })} · {t('pagination.totalPages', { total: totalPages })} · {t('pagination.totalItems', { total })}
+              </p>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-slate-600 dark:text-gray-300">
+                  <span className="mr-2">{t('pagination.itemsPerPage')}</span>
+                  <select
+                    value={pageSize}
+                    onChange={event => setPageSize(Number(event.target.value))}
+                    className="rounded-md border border-slate-300 bg-white px-2 py-1.5 dark:border-gray-600 dark:bg-gray-800"
+                  >
+                    {[20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+                  </select>
+                </label>
+                <Button type="button" variant="outline" size="sm" disabled={page <= 1 || loading} onClick={() => setPage(current => Math.max(1, current - 1))}>
+                  {t('pagination.previous')}
+                </Button>
+                <Button type="button" variant="outline" size="sm" disabled={page >= totalPages || loading} onClick={() => setPage(current => Math.min(totalPages, current + 1))}>
+                  {t('pagination.next')}
+                </Button>
+              </div>
+            </div>
             </div>
           )}
         </CardContent>

@@ -218,6 +218,8 @@ router.delete('/admin/canbox-types/:id', authenticateUser, requirePermission(PER
 router.get('/admin/settings', authenticateUser, requirePermission(PERMISSIONS.canbus.read), async (req: Request, res: Response) => {
   try {
     const { vehicleId, headUnitTypeId, isActive } = req.query
+    const page = Number(req.query.page || 1)
+    const pageSize = Number(req.query.pageSize || 20)
     const filters: Record<string, unknown> = {}
     
     if (vehicleId) filters.vehicleId = vehicleId
@@ -228,7 +230,7 @@ router.get('/admin/settings', authenticateUser, requirePermission(PERMISSIONS.ca
       vehicleId?: string
       headUnitTypeId?: string
       isActive?: boolean
-    })
+    }, { page, pageSize })
     res.json({ success: true, data: settings })
   } catch (error) {
     logger.error({ err: error }, 'GET /admin/settings error')
