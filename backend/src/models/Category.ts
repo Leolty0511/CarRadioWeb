@@ -10,7 +10,7 @@ export interface ICategory extends Document {
   order: number;                   // 排序权重
   isActive: boolean;              // 是否启用
   language: 'en' | 'ru';          // 分类语言（保留兼容，仅使用 en）
-  documentTypes: string[];        // 适用的文档类型 ['general', 'video', 'structured']
+  documentTypes: string[];        // 适用的文档类型；视频可进一步区分安装教程和主机操作教程
   
   // 统计信息
   documentCount: number;          // 使用此分类的文档数量（总数）
@@ -89,7 +89,7 @@ const categorySchema = new Schema<ICategory>({
   },
   documentTypes: {
     type: [String],
-    enum: ['general', 'video', 'structured', 'product'],
+    enum: ['general', 'video', 'video-installation', 'video-device-operation', 'structured', 'product'],
     default: ['general', 'video', 'structured'] // 默认适用于所有类型
   },
   createdBy: {

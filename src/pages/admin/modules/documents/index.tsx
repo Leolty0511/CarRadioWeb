@@ -15,9 +15,10 @@ import { ConfirmDialog } from '../../components/ConfirmDialog'
 import EnhancedGeneralDocumentEditor from '@/components/EnhancedGeneralDocumentEditor'
 import StructuredArticleEditor from '@/components/StructuredArticleEditor'
 import StructuredDocumentViewer from '@/components/StructuredDocumentViewer'
+import GeneralDocumentViewer from '@/components/GeneralDocumentViewer'
+import VideoPlayer from '@/components/VideoPlayer'
 import HierarchicalManager from '@/components/HierarchicalManager'
 import DraftManager from '@/components/DraftManager'
-import { sanitizeHTMLForReact } from '@/utils/sanitize'
 import { saveDraft, loadDraft, deleteDraft } from '@/services/draftService'
 import {
   createDocument,
@@ -1107,12 +1108,22 @@ export const DocumentManagement: React.FC<DocumentManagementProps> = ({ dataLang
                 setPreviewDocument(null)
               }}
             />
+          ) : (previewDocument.documentType || previewDocument.type) === 'video' ? (
+            <VideoPlayer
+              document={previewDocument}
+              onBack={() => {
+                setShowPreview(false)
+                setPreviewDocument(null)
+              }}
+            />
           ) : (
-            <div className="prose max-w-none">
-              <h2>{previewDocument.title}</h2>
-              {previewDocument.summary && <p className="lead">{previewDocument.summary}</p>}
-              <div dangerouslySetInnerHTML={sanitizeHTMLForReact(previewDocument.content || '')} />
-            </div>
+            <GeneralDocumentViewer
+              document={previewDocument}
+              onBack={() => {
+                setShowPreview(false)
+                setPreviewDocument(null)
+              }}
+            />
           )}
         </Modal>
       )}

@@ -438,53 +438,28 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
               ? t('category.selectVideoCategory')
               : t('category.selectDocumentCategory')}
           </h2>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {categories.map((category) => (
-              <Card
+              <button
                 key={category._id}
-                className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50 hover:border-gray-300 dark:hover:border-gray-500/50 transition-all duration-300 cursor-pointer group"
+                type="button"
+                className="group flex min-h-[88px] w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-400 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/50 dark:hover:border-cyan-600"
                 onClick={() => loadCategoryDocuments(category)}
               >
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div
-                        className="w-4 h-4 rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      <CardTitle className="text-slate-800 dark:text-white text-lg group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
-                        {category.name}
-                      </CardTitle>
-                    </div>
-                    <ChevronRight className="h-5 w-5 text-slate-400 dark:text-gray-500 group-hover:text-slate-600 dark:group-hover:text-gray-300 transition-colors" />
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {category.description && (
-                    <p className="text-slate-500 dark:text-gray-400 text-sm mb-3 line-clamp-2">
-                      {category.description}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-400 dark:text-gray-500">
-                      {documentType === 'video' && tutorialType
-                        ? t('knowledge.videoTutorial')
-                        : `${documentType === 'video'
-                          ? ((category as unknown as { videoCount?: number }).videoCount || 0)
-                          : ((category as unknown as { generalCount?: number }).generalCount || 0)
-                        } ${t('category.documents')}`}
-                    </span>
-                    <div className="flex items-center space-x-1">
-                      {Array.isArray(category.documentTypes) && category.documentTypes.includes('general') && (
-                        <FileText className="h-3 w-3 text-slate-400 dark:text-gray-500" />
-                      )}
-                      {Array.isArray(category.documentTypes) && category.documentTypes.includes('video') && (
-                        <Video className="h-3 w-3 text-slate-400 dark:text-gray-500" />
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                <span className="h-3 w-3 shrink-0 rounded-full ring-4 ring-slate-100 dark:ring-slate-800" style={{ backgroundColor: category.color || '#0ea5e9' }} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base font-semibold text-slate-800 transition-colors group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">{category.name}</span>
+                  <span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-400">
+                    {category.description || (documentType === 'video' && tutorialType
+                      ? t('knowledge.videoTutorial')
+                      : `${documentType === 'video'
+                        ? ((category as unknown as { videoCount?: number }).videoCount || 0)
+                        : ((category as unknown as { generalCount?: number }).generalCount || 0)
+                      } ${t('category.documents')}`)}
+                  </span>
+                </span>
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-600 dark:text-slate-500" />
+              </button>
             ))}
           </div>
         </div>

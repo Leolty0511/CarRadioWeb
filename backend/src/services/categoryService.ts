@@ -25,10 +25,13 @@ export class CategoryService {
    * 根据文档类型获取分类
    */
   async getCategoriesByDocumentType(documentType: 'general' | 'video' | 'structured' | 'product', language?: string): Promise<ICategory[]> {
+    const documentTypeValues = documentType === 'video'
+      ? ['video', 'video-installation', 'video-device-operation']
+      : [documentType];
     const query: any = {
       isActive: true,
       $or: [
-        { documentTypes: documentType },
+        { documentTypes: { $in: documentTypeValues } },
         { documentTypes: { $exists: false } },
         { documentTypes: { $size: 0 } },
         { documentTypes: null },
@@ -46,9 +49,13 @@ export class CategoryService {
     // first video is published so the front end does not hide configured tags.
     void tutorialType;
 
+    const videoDocumentType = tutorialType === 'device-operation'
+      ? 'video-device-operation'
+      : 'video-installation';
     const categoryQuery: any = {
       isActive: true,
       $or: [
+        { documentTypes: videoDocumentType },
         { documentTypes: 'video' },
         { documentTypes: { $exists: false } },
         { documentTypes: { $size: 0 } },

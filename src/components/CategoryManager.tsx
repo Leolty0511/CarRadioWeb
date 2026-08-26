@@ -4,7 +4,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Edit, Trash2, Tag, FileText, Video, BookOpen, BarChart3 } from 'lucide-react';
+import { Tag, FileText, Video, BookOpen, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -155,7 +155,7 @@ const CategoryManager: React.FC = () => {
       name: category.name,
       description: category.description || '',
       color: category.color || '#3B82F6',
-      documentTypes: category.documentTypes || ['general', 'video', 'structured']
+      documentTypes: category.documentTypes || ['general', 'video-installation', 'structured']
     });
     setShowCreateModal(true);
   };
@@ -256,55 +256,52 @@ const CategoryManager: React.FC = () => {
             {categories.map((category) => (
               <div
                 key={category._id}
-                className="flex items-center justify-between p-4 bg-slate-100 dark:bg-gray-800/50 rounded-lg border border-slate-200 dark:border-gray-700/50"
+                className="group flex flex-col gap-4 rounded-xl border border-slate-200/80 bg-white p-5 shadow-sm transition hover:border-blue-300 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/40 dark:hover:border-blue-700 sm:flex-row sm:items-center sm:justify-between"
               >
-                <div className="flex items-center space-x-4">
+                <div className="flex min-w-0 items-start gap-4">
                   <div
-                    className="w-4 h-4 rounded-full"
+                    className="mt-1 h-3 w-3 shrink-0 rounded-full ring-4 ring-slate-100 dark:ring-slate-800"
                     style={{ backgroundColor: category.color || '#3B82F6' }}
                   />
-                  <div>
-                    <h3 className="font-medium text-slate-800 dark:text-white">{category.name}</h3>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-base font-semibold text-slate-800 dark:text-white">{category.name}</h3>
                     {category.description && (
-                      <p className="text-sm text-slate-600 dark:text-gray-400">{category.description}</p>
+                      <p className="mt-1 line-clamp-2 text-sm text-slate-500 dark:text-gray-400">{category.description}</p>
                     )}
-                    <div className="flex items-center space-x-2 mt-1">
-                      <span className="text-xs text-slate-500 dark:text-gray-500">
+                    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500 dark:text-gray-400">
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">
                         {category.documentCount} {t('category.publishedDocumentsCount')}
                       </span>
-                      <span className="text-xs text-slate-500 dark:text-gray-500">•</span>
-                      <div className="flex space-x-1">
+                      <div className="flex flex-wrap gap-1.5">
                         {Array.isArray(category.documentTypes) && category.documentTypes.includes('general') && (
-                          <span title={t('category.generalTutorials')}>
-                            <FileText className="h-3 w-3 text-slate-500 dark:text-gray-500" />
-                          </span>
+                          <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">{t('category.generalTutorials')}</span>
                         )}
-                        {Array.isArray(category.documentTypes) && category.documentTypes.includes('video') && (
-                          <span title={t('category.videoTutorials')}>
-                            <Video className="h-3 w-3 text-slate-500 dark:text-gray-500" />
-                          </span>
+                        {Array.isArray(category.documentTypes) && (category.documentTypes.includes('video') || category.documentTypes.includes('video-installation') || category.documentTypes.includes('video-device-operation')) && (
+                          <>
+                            {category.documentTypes.includes('video') || category.documentTypes.includes('video-installation') ? (
+                              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">{t('category.installationVideoTutorials')}</span>
+                            ) : null}
+                            {category.documentTypes.includes('video') || category.documentTypes.includes('video-device-operation') ? (
+                              <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">{t('category.deviceOperationVideoTutorials')}</span>
+                            ) : null}
+                          </>
                         )}
                         {Array.isArray(category.documentTypes) && category.documentTypes.includes('structured') && (
-                          <span title={t('category.structuredTutorials')}>
-                            <BookOpen className="h-3 w-3 text-slate-500 dark:text-gray-500" />
-                          </span>
+                          <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">{t('category.structuredTutorials')}</span>
                         )}
                         {Array.isArray(category.documentTypes) && category.documentTypes.includes('product') && (
-                          <span title="产品分类">
-                            <Tag className="h-3 w-3 text-slate-500 dark:text-gray-500" />
-                          </span>
+                          <span className="rounded-full border border-slate-200 px-2 py-1 dark:border-slate-700">产品</span>
                         )}
                       </div>
                     </div>
                   </div>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex shrink-0 gap-2 sm:ml-6">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleEdit(category)}
                   >
-                    <Edit className="h-4 w-4 mr-1" />
                     {t('category.edit')}
                   </Button>
                   <Button
@@ -313,7 +310,6 @@ const CategoryManager: React.FC = () => {
                     onClick={() => setDeletingCategory(category)}
                     className="text-red-400 hover:text-red-300"
                   >
-                    <Trash2 className="h-4 w-4 mr-1" />
                     {t('category.delete')}
                   </Button>
                 </div>
@@ -394,12 +390,25 @@ const CategoryManager: React.FC = () => {
               <label className="flex items-center">
                 <input
                   type="checkbox"
-                  checked={formData.documentTypes.includes('video')}
-                  onChange={(e) => handleDocumentTypeChange('video', e.target.checked)}
+                  checked={formData.documentTypes.includes('video') || formData.documentTypes.includes('video-installation')}
+                  onChange={(e) => {
+                    handleDocumentTypeChange('video-installation', e.target.checked)
+                    handleDocumentTypeChange('video', false)
+                  }}
                   className="mr-2"
                 />
                 <Video className="h-4 w-4 mr-1" />
-                <span className="ml-2">{t('category.videoTutorials')}</span>
+                <span className="ml-2">{t('category.installationVideoTutorials')}</span>
+              </label>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={formData.documentTypes.includes('video-device-operation')}
+                  onChange={(e) => handleDocumentTypeChange('video-device-operation', e.target.checked)}
+                  className="mr-2"
+                />
+                <Video className="h-4 w-4 mr-1" />
+                <span className="ml-2">{t('category.deviceOperationVideoTutorials')}</span>
               </label>
               <label className="flex items-center">
                 <input

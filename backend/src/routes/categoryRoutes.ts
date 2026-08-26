@@ -138,7 +138,7 @@ router.post('/', authenticateUser, requirePermission(PERMISSIONS.categories.crea
       description: description?.trim(),
       color: color || '#3B82F6',
       icon: icon?.trim(),
-      documentTypes: documentTypes || ['general', 'video'],
+      documentTypes: documentTypes || ['general', 'video-installation'],
       language: language || 'en'  // 添加语言字段
     }, req.user?.nickname || req.user?.email || req.user?.loginUsername || 'admin');
 
