@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Ban, Check, Crown, ShieldCheck, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -11,6 +12,7 @@ import {
   getAdminInvitations,
   getPermissions,
   getUsers,
+  resetAdminPassword,
   resendAdminInvitation,
   transferSuperAdmin,
   updateOwnAccount,
@@ -134,6 +136,7 @@ interface UserDialogProps {
 }
 
 function UserDialog({ user, allPermissions, forceAccountSetup = false, onSave, onClose }: UserDialogProps) {
+  const { t } = useTranslation()
   const [email, setEmail] = useState(user?.email ?? '')
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const [currentPassword, setCurrentPassword] = useState('')
@@ -145,6 +148,7 @@ function UserDialog({ user, allPermissions, forceAccountSetup = false, onSave, o
   const grouped = groupPermissions(allPermissions)
   const isSuperAdmin = user?.role === 'super_admin'
   const isNewInvite = !user
+  const canResetPassword = Boolean(user && !isSuperAdmin && user.provider === 'email')
 
   const togglePerm = (p: string) => {
     setSelected(prev => {
@@ -188,6 +192,16 @@ function UserDialog({ user, allPermissions, forceAccountSetup = false, onSave, o
       setLocalError('两次输入的新密码不一致')
       return
     }
+    if (canResetPassword && newPassword) {
+      if (newPassword.length < 10 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/\d/.test(newPassword)) {
+        setLocalError(t('adminUsers.passwordTooWeak'))
+        return
+      }
+      if (newPassword !== confirmPassword) {
+        setLocalError(t('adminUsers.passwordMismatch'))
+        return
+      }
+    }
     const changesCredentials = isSuperAdmin && (
       forceAccountSetup || cleanEmail !== (user?.email ?? '') || newPassword.length > 0
     )
@@ -203,7 +217,7 @@ function UserDialog({ user, allPermissions, forceAccountSetup = false, onSave, o
         nickname: cleanNickname,
         permissions: [...selected],
         currentPassword: isSuperAdmin ? currentPassword : undefined,
-        newPassword: isSuperAdmin ? newPassword : undefined,
+        newPassword: isSuperAdmin || canResetPassword ? newPassword : undefined,
       })
     } finally {
       setSaving(false)
@@ -229,6 +243,32 @@ function UserDialog({ user, allPermissions, forceAccountSetup = false, onSave, o
             <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-3 py-2" role="alert">
               {localError}
             </p>
+          )}
+
+          {canResetPassword && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t border-slate-200 pt-4 dark:border-slate-700">
+              <div>
+                <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">{t('adminUsers.resetPassword')}</label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder={t('adminUsers.resetPasswordPlaceholder')}
+                />
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t('adminUsers.passwordHint')}</p>
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 dark:text-slate-300 mb-1">{t('adminUsers.confirmPassword')}</label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  autoComplete="new-password"
+                  placeholder={t('adminUsers.confirmPasswordPlaceholder')}
+                />
+              </div>
+            </div>
           )}
 
           {forceAccountSetup && (
@@ -352,6 +392,7 @@ interface UserManagementProps {
 }
 
 export function UserManagement({ currentUser, forceAccountSetup = false, onAccountUpdated }: UserManagementProps) {
+  const { t } = useTranslation()
   const { showToast } = useToast()
   const canManageAdministrators = currentUser?.role === 'super_admin'
   const [users, setUsers] = useState<AdminUserRecord[]>([])
@@ -453,9 +494,23 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
           showToast({ type: 'error', title: errMap[res.error ?? ''] ?? res.error ?? '更新失败' })
         }
       } else {
+        if (data.newPassword) {
+          const passwordRes = await resetAdminPassword(dialogUser._id, data.newPassword)
+          if (!passwordRes.success) {
+            const errMap: Record<string, string> = {
+              password_too_weak: t('adminUsers.passwordTooWeak'),
+              password_account_required: t('adminUsers.passwordAccountRequired'),
+              user_not_found: '管理员不存在',
+              cannot_modify_super_admin: '不能修改超级管理员密码',
+              password_reset_failed: t('adminUsers.passwordResetFailed'),
+            }
+            showToast({ type: 'error', title: errMap[passwordRes.error ?? ''] ?? passwordRes.error ?? '重置管理员密码失败' })
+            return
+          }
+        }
         const res = await updateUser(dialogUser._id, { nickname: data.nickname, permissions: data.permissions })
         if (res.success) {
-          showToast({ type: 'success', title: '已更新' })
+          showToast({ type: 'success', title: data.newPassword ? t('adminUsers.passwordUpdated') : '已更新' })
           setDialogUser(null)
           fetchData()
         } else {
@@ -598,7 +653,7 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                           <div>
                             <p className="font-medium text-slate-800 dark:text-white">{u.nickname}</p>
                             <p className="text-xs text-slate-400">
-                              {[u.loginUsername ? `账号 ${u.loginUsername}` : null, u.email ?? null].filter(Boolean).join(' · ') || '-'}
+                              {u.email || '-'}
                             </p>
                           </div>
                         </div>

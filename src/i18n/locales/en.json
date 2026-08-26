@@ -1000,6 +1000,18 @@
       "unknown": "Unknown error"
     }
   },
+  "adminUsers": {
+    "resetPassword": "Reset login password",
+    "resetPasswordPlaceholder": "Leave blank to keep the current password",
+    "confirmPassword": "Confirm new password",
+    "confirmPasswordPlaceholder": "Enter the new password again",
+    "passwordHint": "At least 10 characters with uppercase, lowercase, and number",
+    "passwordTooWeak": "Use at least 10 characters with uppercase, lowercase, and number",
+    "passwordMismatch": "The two passwords do not match",
+    "passwordUpdated": "Administrator details and password updated",
+    "passwordAccountRequired": "This administrator does not use an email-password account",
+    "passwordResetFailed": "Failed to reset administrator password"
+  },
   "oauthCallback": {
     "loading": "Signing in...",
     "backToLogin": "Back to login",

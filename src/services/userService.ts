@@ -98,6 +98,11 @@ export async function updateUser(id: string, data: UpdateUserPayload) {
   return apiClient.put<AdminUserRecord>(`/users/${id}`, data)
 }
 
+/** Reset an ordinary administrator's password (super_admin only). */
+export async function resetAdminPassword(id: string, newPassword: string) {
+  return apiClient.put<AdminUserRecord>(`/users/${id}/password`, { newPassword })
+}
+
 /** Delete admin user */
 export async function deleteUser(id: string) {
   return apiClient.delete(`/users/${id}`)

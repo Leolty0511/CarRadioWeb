@@ -575,6 +575,43 @@ router.post('/transfer-super-admin', async (req: Request, res: Response) => {
   }
 })
 
+/** PUT /api/users/:id/password — super_admin resets an ordinary administrator's password. */
+router.put('/:id/password', async (req: Request, res: Response) => {
+  try {
+    const newPassword = String(req.body.newPassword || '')
+    if (
+      newPassword.length < MIN_PASSWORD_LENGTH ||
+      !/[A-Z]/.test(newPassword) ||
+      !/[a-z]/.test(newPassword) ||
+      !/\d/.test(newPassword)
+    ) {
+      return res.status(400).json({ success: false, error: 'password_too_weak' })
+    }
+
+    const user = await User.findById(req.params.id).select('+passwordHash')
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'user_not_found' })
+    }
+    if (user.role !== 'admin') {
+      return res.status(403).json({ success: false, error: 'cannot_modify_super_admin' })
+    }
+    if (user.provider !== 'email') {
+      return res.status(400).json({ success: false, error: 'password_account_required' })
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, 12)
+    user.mustChangeCredentials = false
+    await user.save()
+
+    const safeUser = user.toObject()
+    delete (safeUser as { passwordHash?: string }).passwordHash
+    return res.json({ success: true, data: safeUser })
+  } catch (error) {
+    logger.error({ error, userId: req.params.id }, 'Reset administrator password failed')
+    return res.status(500).json({ success: false, error: 'password_reset_failed' })
+  }
+})
+
 /** POST /api/users — create a new admin (invited by super_admin) */
 router.post('/', async (req: Request, res: Response) => {
   try {

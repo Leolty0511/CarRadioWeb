@@ -794,6 +794,18 @@
       "cases": "案例管理",
       "casesDescription": "管理案例展示内容"
     },
+    "users": {
+      "resetPassword": "重置登录密码",
+      "resetPasswordPlaceholder": "留空表示不修改",
+      "confirmPassword": "确认新密码",
+      "confirmPasswordPlaceholder": "再次输入新密码",
+      "passwordHint": "至少 10 位，并包含大写字母、小写字母和数字",
+      "passwordTooWeak": "新密码至少 10 位，并包含大写字母、小写字母和数字",
+      "passwordMismatch": "两次输入的新密码不一致",
+      "passwordUpdated": "管理员信息和密码已更新",
+      "passwordAccountRequired": "该管理员不是邮箱密码账号，无法直接重置密码",
+      "passwordResetFailed": "重置管理员密码失败"
+    },
     "feedbackManagement": {
       "title": "留言管理",
       "allFeedback": "全部留言",
@@ -1952,6 +1964,18 @@
     "system": {
       "debugInfo": "开发调试信息"
     }
+  },
+  "adminUsers": {
+    "resetPassword": "重置登录密码",
+    "resetPasswordPlaceholder": "留空表示不修改",
+    "confirmPassword": "确认新密码",
+    "confirmPasswordPlaceholder": "再次输入新密码",
+    "passwordHint": "至少 10 位，并包含大写字母、小写字母和数字",
+    "passwordTooWeak": "新密码至少 10 位，并包含大写字母、小写字母和数字",
+    "passwordMismatch": "两次输入的新密码不一致",
+    "passwordUpdated": "管理员信息和密码已更新",
+    "passwordAccountRequired": "该管理员不是邮箱密码账号，无法直接重置密码",
+    "passwordResetFailed": "重置管理员密码失败"
   },
   "oauthCallback": {
     "loading": "正在登录...",
