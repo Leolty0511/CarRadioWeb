@@ -194,6 +194,8 @@
       "badge": "Hot Products",
       "subtitle": "Premium solutions for modern vehicles",
       "viewDetails": "View Details",
+    "headUnitTypeFilterLabel": "Head unit type",
+    "generalResource": "General",
       "viewAll": "View All Products",
       "noProducts": "No products available"
     },

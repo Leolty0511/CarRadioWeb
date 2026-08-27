@@ -196,6 +196,8 @@
       "badge": "热门产品",
       "subtitle": "现代车辆的高端解决方案",
       "viewDetails": "查看详情",
+    "headUnitTypeFilterLabel": "适用主机型号",
+    "generalResource": "通用资源",
       "viewAll": "查看所有产品",
       "noProducts": "暂无产品"
     },

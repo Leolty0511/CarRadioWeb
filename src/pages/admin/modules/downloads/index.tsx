@@ -3,14 +3,16 @@
  * 资源直接关联主机型号，不再使用旧的软件分类标签。
  */
 
-import { useEffect, useState } from 'react'
-import { AlertTriangle, Download, ExternalLink, Pencil, Plus, Save, Trash2, X } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/Card'
+import { useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import FilterChipBar from '@/components/knowledge/FilterChipBar'
 import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
 import { softwareService, type Software } from '@/services/softwareService'
+
+const ALL_FILTER = '__all__'
+const GENERAL_FILTER = '__general__'
 
 interface SoftwareFormProps {
   initial?: Software
@@ -20,6 +22,10 @@ interface SoftwareFormProps {
 
 function getHeadUnitTypeId(value: Software['headUnitTypeId']) {
   return typeof value === 'string' ? value : value?._id || ''
+}
+
+function getHeadUnitTypeName(value: Software['headUnitTypeId']) {
+  return typeof value === 'object' && value ? value.name : ''
 }
 
 function SoftwareForm({ initial, onSave, onCancel }: SoftwareFormProps) {
@@ -36,7 +42,9 @@ function SoftwareForm({ initial, onSave, onCancel }: SoftwareFormProps) {
   }, [])
 
   const handleSubmit = async () => {
-    if (!name.trim() || !downloadUrl.trim()) {return}
+    if (!name.trim() || !downloadUrl.trim()) {
+      return
+    }
     setSaving(true)
     try {
       await onSave({
@@ -87,10 +95,10 @@ function SoftwareForm({ initial, onSave, onCancel }: SoftwareFormProps) {
       </div>
       <div className="flex gap-2">
         <Button size="sm" onClick={() => void handleSubmit()} disabled={saving || !name.trim() || !downloadUrl.trim()}>
-          <Save className="mr-1 h-4 w-4" />{saving ? '保存中...' : '保存'}
+          {saving ? '保存中' : '保存'}
         </Button>
-        <Button size="sm" variant="ghost" onClick={onCancel}>
-          <X className="h-4 w-4" />
+        <Button size="sm" variant="outline" onClick={onCancel}>
+          取消
         </Button>
       </div>
     </div>
@@ -100,6 +108,8 @@ function SoftwareForm({ initial, onSave, onCancel }: SoftwareFormProps) {
 export const DownloadsManagement: React.FC = () => {
   const { showToast } = useToast()
   const [softwareList, setSoftwareList] = useState<Software[]>([])
+  const [headUnitTypes, setHeadUnitTypes] = useState<HeadUnitType[]>([])
+  const [filter, setFilter] = useState(ALL_FILTER)
   const [loading, setLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [editingSoftware, setEditingSoftware] = useState<Software | undefined>()
@@ -109,15 +119,20 @@ export const DownloadsManagement: React.FC = () => {
   const loadData = async () => {
     setLoading(true)
     try {
-      const result = await softwareService.getList()
+      const [result, types] = await Promise.all([
+        softwareService.getList(),
+        canbusSettingsService.getAllHeadUnitTypes()
+      ])
       if (result.success && result.data) {
         const data = result.data as { items?: Software[] }
         setSoftwareList(data.items || [])
       } else {
         setSoftwareList([])
       }
+      setHeadUnitTypes(types)
     } catch {
       setSoftwareList([])
+      setHeadUnitTypes([])
       showToast({ type: 'error', title: '加载软件下载资源失败' })
     } finally {
       setLoading(false)
@@ -125,6 +140,34 @@ export const DownloadsManagement: React.FC = () => {
   }
 
   useEffect(() => { void loadData() }, [])
+
+  const filterChips = useMemo(() => {
+    const counts: Record<string, number> = {
+      [ALL_FILTER]: softwareList.length,
+      [GENERAL_FILTER]: softwareList.filter(item => !getHeadUnitTypeId(item.headUnitTypeId)).length
+    }
+    for (const type of headUnitTypes) {
+      counts[type._id] = softwareList.filter(item => getHeadUnitTypeId(item.headUnitTypeId) === type._id).length
+    }
+    return [
+      { id: ALL_FILTER, label: `全部 (${counts[ALL_FILTER]})` },
+      { id: GENERAL_FILTER, label: `通用资源 (${counts[GENERAL_FILTER]})` },
+      ...headUnitTypes.map(type => ({
+        id: type._id,
+        label: `${type.name} (${counts[type._id] || 0})`
+      }))
+    ]
+  }, [softwareList, headUnitTypes])
+
+  const filteredList = softwareList.filter(item => {
+    if (filter === ALL_FILTER) {
+      return true
+    }
+    if (filter === GENERAL_FILTER) {
+      return !getHeadUnitTypeId(item.headUnitTypeId)
+    }
+    return getHeadUnitTypeId(item.headUnitTypeId) === filter
+  })
 
   const handleSaveSoftware = async (data: Partial<Software>) => {
     setSaving(true)
@@ -157,23 +200,28 @@ export const DownloadsManagement: React.FC = () => {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center py-20"><div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-blue-500" /></div>
+    return <p className="py-20 text-center text-sm text-slate-500 dark:text-gray-400">加载中...</p>
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-        <div className="flex items-center gap-3">
-          <Download className="h-8 w-8 text-sky-500" />
-          <div>
-            <h2 className="text-2xl font-bold text-slate-800 dark:text-white">下载资源管理</h2>
-            <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">资源直接绑定主机型号，不再使用旧分类标签</p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-800 dark:text-white">下载资源管理</h2>
+          <p className="mt-1 text-sm text-slate-500 dark:text-gray-400">资源直接绑定主机型号，点击标签筛选列表</p>
         </div>
         <Button onClick={() => { setEditingSoftware(undefined); setShowForm(true) }}>
-          <Plus className="mr-1 h-4 w-4" />添加下载资源
+          添加下载资源
         </Button>
       </div>
+
+      <FilterChipBar
+        label="适用主机型号"
+        ariaLabel="适用主机型号"
+        items={filterChips}
+        selectedId={filter}
+        onSelect={setFilter}
+      />
 
       {showForm && (
         <SoftwareForm
@@ -183,8 +231,8 @@ export const DownloadsManagement: React.FC = () => {
         />
       )}
 
-      {softwareList.length === 0 ? (
-        <Card><CardContent className="py-16 text-center text-sm text-slate-500 dark:text-gray-400">暂无下载资源</CardContent></Card>
+      {filteredList.length === 0 ? (
+        <p className="py-12 text-center text-sm text-slate-500 dark:text-gray-400">暂无下载资源</p>
       ) : (
         <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-gray-700">
           <table className="w-full min-w-[820px] text-sm">
@@ -197,23 +245,23 @@ export const DownloadsManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-gray-700">
-              {softwareList.map(item => (
+              {filteredList.map(item => (
                 <tr key={item._id} className="hover:bg-slate-50 dark:hover:bg-gray-800/40">
                   <td className="px-4 py-3 font-medium text-slate-800 dark:text-gray-100">{item.name}</td>
                   <td className="px-4 py-3 text-slate-600 dark:text-gray-300">
-                    {typeof item.headUnitTypeId === 'object' && item.headUnitTypeId
-                      ? item.headUnitTypeId.name
-                      : '通用资源'}
+                    {getHeadUnitTypeName(item.headUnitTypeId) || '通用资源'}
                   </td>
                   <td className="max-w-md px-4 py-3 text-slate-600 dark:text-gray-300">
                     <p className="line-clamp-2">{item.description || '—'}</p>
-                    {item.importantNote && <p className="mt-1 flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400"><AlertTriangle className="h-3.5 w-3.5" />{item.importantNote}</p>}
+                    {item.importantNote ? (
+                      <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">{item.importantNote}</p>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <a href={item.downloadUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-slate-400 hover:text-sky-500" title="打开链接"><ExternalLink className="h-4 w-4" /></a>
-                      <button type="button" onClick={() => { setEditingSoftware(item); setShowForm(true) }} className="p-2 text-slate-400 hover:text-blue-600" title="编辑"><Pencil className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => setDeleteTarget(item)} className="p-2 text-slate-400 hover:text-red-600" title="删除"><Trash2 className="h-4 w-4" /></button>
+                    <div className="flex justify-end gap-2">
+                      <a href={item.downloadUrl} target="_blank" rel="noopener noreferrer" className="text-sm text-cyan-700 hover:underline dark:text-cyan-300">打开</a>
+                      <button type="button" onClick={() => { setEditingSoftware(item); setShowForm(true) }} className="text-sm text-slate-600 hover:text-slate-900 dark:text-gray-300">编辑</button>
+                      <button type="button" onClick={() => setDeleteTarget(item)} className="text-sm text-red-500 hover:text-red-400">删除</button>
                     </div>
                   </td>
                 </tr>
@@ -223,7 +271,7 @@ export const DownloadsManagement: React.FC = () => {
         </div>
       )}
 
-      {saving && <p className="text-sm text-slate-500 dark:text-gray-400">正在保存...</p>}
+      {saving ? <p className="text-sm text-slate-500 dark:text-gray-400">正在保存...</p> : null}
       <ConfirmDialog
         isOpen={Boolean(deleteTarget)}
         onClose={() => setDeleteTarget(null)}

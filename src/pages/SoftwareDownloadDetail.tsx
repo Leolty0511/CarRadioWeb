@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { AlertTriangle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import SEOHead from '@/components/seo/SEOHead'
 
@@ -53,7 +52,9 @@ const SoftwareDownloadDetail: React.FC = () => {
           setError(true)
         }
       } finally {
-        if (!cancelled) {setLoading(false)}
+        if (!cancelled) {
+          setLoading(false)
+        }
       }
     }
 
@@ -63,8 +64,8 @@ const SoftwareDownloadDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="page-container flex min-h-[50vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+      <div className="page-container px-4 py-16 text-center text-sm text-slate-500 dark:text-gray-400">
+        {t('common.loading')}
       </div>
     )
   }
@@ -91,43 +92,39 @@ const SoftwareDownloadDetail: React.FC = () => {
         keywords={['software download', software.name, ...(headUnitName ? [headUnitName] : [])]}
         type="article"
       />
-      <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
         <button
           type="button"
           onClick={() => navigate('/software-downloads')}
-          className="mb-6 text-sm font-medium text-slate-600 transition hover:text-cyan-600 dark:text-gray-300 dark:hover:text-cyan-400"
+          className="mb-4 text-sm font-medium text-slate-600 transition hover:text-cyan-600 dark:text-gray-300 dark:hover:text-cyan-400"
         >
           {t('softwareDownloads.title')}
         </button>
 
-        <article className="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
-          <header className="border-b border-slate-200 p-6 dark:border-gray-700 sm:p-8">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">{software.name}</h1>
-            <p className="mt-2 text-sm text-slate-500 dark:text-gray-400">
-              {headUnitName || t('softwareDownloads.title')}
-            </p>
+        <article className="rounded-xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900/40">
+          <header className="px-5 py-4">
+            <h1 className="text-xl font-semibold text-slate-800 dark:text-white">{software.name}</h1>
+            {headUnitName ? (
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{headUnitName}</p>
+            ) : null}
           </header>
-          <div className="space-y-6 p-6 sm:p-8">
-            <p className="whitespace-pre-wrap text-base leading-7 text-slate-600 dark:text-gray-300">
-              {software.description}
-            </p>
-            {software.importantNote && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
-                <div className="flex items-start gap-3">
-                  <AlertTriangle className="mt-0.5 h-5 w-5 flex-none text-amber-600 dark:text-amber-400" />
-                  <p className="text-sm leading-6 text-amber-700 dark:text-amber-200">{software.importantNote}</p>
-                </div>
-              </div>
-            )}
+          <div className="space-y-3 border-t border-slate-200 px-5 py-4 dark:border-slate-700">
+            {software.description ? (
+              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600 dark:text-gray-300">
+                {software.description}
+              </p>
+            ) : null}
+            {software.importantNote ? (
+              <p className="text-sm leading-6 text-amber-700 dark:text-amber-300">
+                {software.importantNote}
+              </p>
+            ) : null}
+            <div className="pt-2">
+              <Button onClick={() => window.open(software.downloadUrl, '_blank')}>
+                {t('softwareDownloads.download')}
+              </Button>
+            </div>
           </div>
-          <footer className="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 p-6 dark:border-gray-700 dark:bg-gray-900/40 sm:flex-row">
-            <Button className="flex-1" onClick={() => window.open(software.downloadUrl, '_blank')}>
-              {t('softwareDownloads.download')}
-            </Button>
-            <Button variant="outline" className="flex-1" onClick={() => window.open(software.downloadUrl, '_blank')}>
-              {t('userManual.openInNewTab')}
-            </Button>
-          </footer>
         </article>
       </div>
     </div>
