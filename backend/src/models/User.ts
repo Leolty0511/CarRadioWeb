@@ -21,6 +21,7 @@ export interface IUser extends Document {
   isActive: boolean
   mustChangeCredentials: boolean
   lastLoginAt: Date | null
+  lastSeenAt: Date | null
   createdAt: Date
   updatedAt: Date
 
@@ -89,6 +90,10 @@ const UserSchema = new Schema<IUser>(
       default: false,
     },
     lastLoginAt: {
+      type: Date,
+      default: null,
+    },
+    lastSeenAt: {
       type: Date,
       default: null,
     },

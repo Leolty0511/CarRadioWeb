@@ -18,6 +18,9 @@ export interface AdminUserRecord {
   isActive: boolean
   mustChangeCredentials: boolean
   lastLoginAt: string | null
+  lastSeenAt?: string | null
+  lastActivityAt?: string | null
+  isOnline?: boolean
   createdAt: string
   updatedAt: string
 }

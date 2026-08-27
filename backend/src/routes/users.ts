@@ -415,7 +415,14 @@ router.get('/', async (_req: Request, res: Response) => {
     const users = await User.find()
       .select('-__v')
       .sort({ createdAt: -1 })
-    res.json({ success: true, data: users })
+      .lean()
+    const onlineSince = Date.now() - 5 * 60 * 1000
+    const data = users.map((user) => {
+      const lastActivityAt = user.lastSeenAt || user.lastLoginAt || null
+      const isOnline = Boolean(user.isActive && lastActivityAt && new Date(lastActivityAt).getTime() >= onlineSince)
+      return { ...user, lastActivityAt, isOnline }
+    })
+    res.json({ success: true, data })
   } catch (error) {
     logger.error({ error }, 'Fetch users failed')
     res.status(500).json({ success: false, error: 'fetch_failed' })

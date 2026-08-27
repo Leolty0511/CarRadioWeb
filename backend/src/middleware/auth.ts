@@ -41,6 +41,10 @@ export const authenticateUser = async (req: Request, res: Response, next: NextFu
     }
 
     req.user = user
+    const lastSeen = user.lastSeenAt ? new Date(user.lastSeenAt).getTime() : 0
+    if (!lastSeen || Date.now() - lastSeen >= 60_000) {
+      void User.updateOne({ _id: user._id }, { $set: { lastSeenAt: new Date() } }).catch(() => undefined)
+    }
     next()
   } catch (error) {
     logger.error({ error }, 'authenticateUser failed')

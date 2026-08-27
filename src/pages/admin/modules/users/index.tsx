@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Ban, Check, Crown, ShieldCheck, X } from 'lucide-react'
+import { Crown, ShieldCheck, X } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -671,13 +671,11 @@ export function UserManagement({ currentUser, forceAccountSetup = false, onAccou
                         {LOGIN_PROVIDER_LABELS[u.provider] ?? u.provider}
                       </td>
                       <td className="py-3 px-2">
-                        {u.isActive ? (
-                          <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 text-xs">
-                            <Check className="h-3 w-3" /> 活跃
-                          </span>
+                        {!u.isActive ? (
+                          <span className="text-xs text-red-500">已停用</span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 text-red-500 text-xs">
-                            <Ban className="h-3 w-3" /> 停用
+                          <span className={u.isOnline ? 'text-xs text-emerald-600 dark:text-emerald-400' : 'text-xs text-slate-500 dark:text-slate-400'}>
+                            {u.isOnline ? '在线' : '离线'}
                           </span>
                         )}
                       </td>

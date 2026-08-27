@@ -20,13 +20,29 @@ router.get('/', async (req, res) => {
   const search = String(req.query.search || '').trim()
   const status = String(req.query.status || '')
   const filter: Record<string, unknown> = {}
-  if (['active', 'suspended'].includes(status)) filter.status = status
+  const onlineSince = new Date(Date.now() - 5 * 60 * 1000)
+  if (status === 'suspended') {
+    filter.status = 'suspended'
+  } else if (status === 'online') {
+    filter.status = 'active'
+    filter.lastSeenAt = { $gte: onlineSince }
+  } else if (status === 'offline') {
+    filter.status = 'active'
+    filter.$and = [{
+      $or: [
+        { lastSeenAt: { $exists: false } },
+        { lastSeenAt: null },
+        { lastSeenAt: { $lt: onlineSince } },
+      ]
+    }]
+  } else if (status === 'active') {
+    filter.status = 'active'
+  }
   if (search) filter.$or = [
     { email: { $regex: search, $options: 'i' } },
     { nickname: { $regex: search, $options: 'i' } },
     { registrationIp: { $regex: search, $options: 'i' } },
   ]
-  const onlineSince = new Date(Date.now() - 5 * 60 * 1000)
   const [items, total, allMembers, active, online] = await Promise.all([
     Member.find(filter).select('-passwordHash').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Member.countDocuments(filter),
