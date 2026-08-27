@@ -1,8 +1,26 @@
 import SiteSettings, { ISiteSettings } from '../models/SiteSettings'
 import GlobalSiteSettings from '../models/GlobalSiteSettings'
 import { createLogger } from '../utils/logger'
+import { toExternalHref } from '../utils/externalUrl'
 
 const logger = createLogger('site-settings')
+
+const SOCIAL_KEYS = ['youtube', 'telegram', 'whatsapp', 'facebook', 'instagram', 'tiktok', 'vk'] as const
+
+function normalizeSocialLinks(socialLinks: unknown) {
+  if (!socialLinks || typeof socialLinks !== 'object') {
+    return socialLinks
+  }
+  const source = socialLinks as Record<string, unknown>
+  const next: Record<string, string> = { ...source } as Record<string, string>
+  for (const key of SOCIAL_KEYS) {
+    if (typeof source[key] === 'string') {
+      next[key] = toExternalHref(source[key])
+    }
+  }
+  return next
+}
+
 
 type GlobalKeys =
   | 'multiDataModeEnabled'
@@ -153,6 +171,9 @@ export const updateSiteSettings = async (language: string, settingsData: Partial
   try {
     const globalPatch = pickGlobals(settingsData) as Partial<Record<GlobalKeys, unknown>>
     const localPatch = omitGlobals(settingsData)
+    if (localPatch.socialLinks) {
+      localPatch.socialLinks = normalizeSocialLinks(localPatch.socialLinks) as ISiteSettings['socialLinks']
+    }
 
     if (globalPatch.newsletterSmtp && typeof globalPatch.newsletterSmtp === 'object') {
       const incoming = { ...(globalPatch.newsletterSmtp as Record<string, unknown>) }

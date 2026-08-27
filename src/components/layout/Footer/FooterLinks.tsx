@@ -10,6 +10,7 @@ import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 import { useLanguage } from '@/hooks/useLanguage'
 import type { SocialLinks } from '@/services/siteSettingsService'
 import { getApiBaseUrl } from '@/services/apiClient'
+import { toExternalHref } from '@/utils/externalUrl'
 
 const ICON_SIZE = 'w-7 h-7'
 
@@ -132,7 +133,7 @@ export const FooterLinks: React.FC = () => {
             return (
               <a
                 key={key}
-                href={siteSettings.socialLinks![key]}
+                href={toExternalHref(siteSettings.socialLinks![key])}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={meta.label}
