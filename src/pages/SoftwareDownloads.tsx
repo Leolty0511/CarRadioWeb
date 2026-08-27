@@ -57,9 +57,8 @@ const SoftwareDownloads: React.FC = () => {
     void loadSoftware()
   }, [selectedHeadUnitTypeId])
 
-  const handleDownload = (event: React.MouseEvent, item: Software) => {
-    event.stopPropagation()
-    window.open(item.downloadUrl, '_blank')
+  const openDetails = (item: Software) => {
+    navigate(`/software-downloads/${encodeURIComponent(item.slug || item._id)}`)
   }
 
   const typeChips = [
@@ -112,14 +111,17 @@ const SoftwareDownloads: React.FC = () => {
             id: item._id,
             title: item.name,
             description: item.description || item.importantNote,
-            onClick: () => navigate(`/software-downloads/${encodeURIComponent(item.slug || item._id)}`),
+            onClick: () => openDetails(item),
             actions: (
               <button
                 type="button"
-                onClick={(event) => handleDownload(event, item)}
+                onClick={(event) => {
+                  event.stopPropagation()
+                  openDetails(item)
+                }}
                 className="rounded-full border border-cyan-600 px-3 py-1.5 text-sm text-cyan-700 transition hover:bg-cyan-50 dark:border-cyan-400 dark:text-cyan-300 dark:hover:bg-cyan-950/40"
               >
-                {t('softwareDownloads.download')}
+                {t('softwareDownloads.viewDetails')}
               </button>
             )
           }))}
