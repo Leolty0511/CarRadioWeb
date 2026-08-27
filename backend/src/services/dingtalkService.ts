@@ -100,7 +100,7 @@ class DingtalkService {
     orderNumber?: string;
     location?: string;
     timestamp?: string;
-    documentType?: 'structured' | 'video' | 'image-text' | 'unknown';
+    documentType?: 'structured' | 'video' | 'image-text' | 'unknown' | 'wiring' | 'installation-video' | 'device-operation' | 'canbus';
   }): Promise<boolean> {
     const typeMap = {
       feedback: '用户反馈',
@@ -111,11 +111,15 @@ class DingtalkService {
     let typeLabel = typeMap[data.type] || '表单提交';
     
     if (data.type === 'document-feedback' && data.documentType) {
-      const documentTypeMap = {
-        'structured': '车型资料留言',
-        'video': '视频教程留言',
+      const documentTypeMap: Record<string, string> = {
+        structured: '原车主机接线指南留言',
+        wiring: '原车主机接线指南留言',
+        video: '安装视频教程留言',
+        'installation-video': '安装视频教程留言',
+        'device-operation': '主机操作教程留言',
         'image-text': '图文教程留言',
-        'unknown': '文档留言'
+        canbus: 'CANBus设置留言',
+        unknown: '文档留言'
       };
       typeLabel = documentTypeMap[data.documentType] || '文档留言';
     }

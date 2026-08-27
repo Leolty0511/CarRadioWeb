@@ -4,6 +4,7 @@
  */
 
 import { apiClient } from '@/services/apiClient'
+import { type KnowledgeFeedbackSection } from '@/utils/knowledgeFeedbackSection'
 
 export interface UserFeedback {
   id: string
@@ -46,7 +47,7 @@ export const getDocumentFeedback = async (documentId: string | number): Promise<
 export interface FeedbackWithDocument extends UserFeedback {
   documentInfo: {
     title: string
-    type: 'structured' | 'video' | 'image-text' | 'unknown'
+    type: KnowledgeFeedbackSection | 'unknown'
   }
   documentId: string
 }
@@ -96,14 +97,19 @@ export const saveDocumentFeedback = async (): Promise<void> => {
 /**
  * 添加用户留言
  */
-export const addUserFeedback = async (documentId: string | number, content: string): Promise<UserFeedback> => {
+export const addUserFeedback = async (
+  documentId: string | number,
+  content: string,
+  section?: KnowledgeFeedbackSection
+): Promise<UserFeedback> => {
   if (!documentId) {
     throw new Error('文档ID不能为空')
   }
 
   const result = await apiClient.post('/document-feedback', {
     documentId: String(documentId),
-    content: content ? content.trim() : ''
+    content: content ? content.trim() : '',
+    section
   })
 
   if (!result.success) {

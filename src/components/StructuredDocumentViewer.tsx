@@ -93,7 +93,7 @@ const StructuredDocumentViewer: React.FC<StructuredDocumentViewerProps> = ({ doc
       {faqs.length > 0 ? <div className="space-y-3">{faqs.map((faq: any, index: number) => <details key={faq.id || index} className="group rounded-md border border-slate-200 bg-white open:shadow-sm dark:border-slate-700 dark:bg-slate-900"><summary className="cursor-pointer list-none px-5 py-4 font-medium text-slate-900 dark:text-white">{faq.title}</summary><div className="border-t border-slate-200 px-5 py-5 dark:border-slate-700"><div className="prose prose-slate max-w-none dark:prose-invert" dangerouslySetInnerHTML={sanitizeHTMLForReact(faq.description || '')} />{faq.images?.[0] && <button type="button" onClick={() => openGallery(faq.images[0])} className="mt-4 block max-w-xl overflow-hidden rounded-md border border-slate-200 dark:border-slate-700"><img src={getKnowledgeImageThumbnailUrl(faq.images[0])} alt={faq.title} className="h-auto w-full" loading="lazy" decoding="async" /></button>}</div></details>)}</div> : <p className="text-sm text-slate-500 dark:text-slate-400">{t('knowledge.noFaqs')}</p>}
     </section>
 
-    <DocumentFeedback documentId={document._id || document.id} documentType="structured" className="mt-6" />
+    <DocumentFeedback documentId={document._id || document.id} section="wiring" className="mt-6" />
     <ImageGallery isOpen={galleryOpen} onClose={() => setGalleryOpen(false)} images={galleryImages} initialIndex={initialImageIndex} />
   </div>
 }

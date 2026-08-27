@@ -18,6 +18,7 @@ export interface IDocumentFeedback extends Document {
   timestamp: number
   replies: IUserReply[]
   language: 'en' | 'ru'  // 资料体系（留言所属的资料体系）
+  section?: 'wiring' | 'installation-video' | 'device-operation' | 'image-text' | 'canbus'
   accountId?: string
   accountType?: 'member' | 'admin'
 }
@@ -81,6 +82,11 @@ const documentFeedbackSchema = new Schema<IDocumentFeedback>({
     enum: ['en', 'ru'],
     required: true,
     default: 'en'
+  },
+  section: {
+    type: String,
+    enum: ['wiring', 'installation-video', 'device-operation', 'image-text', 'canbus'],
+    required: false
   },
   accountId: { type: String, default: '' },
   accountType: { type: String, enum: ['member', 'admin'], default: undefined }

@@ -11,6 +11,7 @@ export interface DocumentFeedbackData {
   timestamp: number
   replies: IUserReply[]
   language: 'en' | 'ru'
+  section?: 'wiring' | 'installation-video' | 'device-operation' | 'image-text' | 'canbus'
   createdAt?: Date
   updatedAt?: Date
 }
@@ -20,6 +21,7 @@ export interface CreateFeedbackData {
   author: string
   content: string
   language: 'en' | 'ru'
+  section?: 'wiring' | 'installation-video' | 'device-operation' | 'image-text' | 'canbus'
   accountId?: string
   accountType?: 'member' | 'admin'
 }
@@ -82,6 +84,7 @@ export const createFeedback = async (data: CreateFeedbackData): Promise<Document
       timestamp: Date.now(),
       replies: [],
       language: data.language,
+      section: data.section,
       accountId: data.accountId || '',
       accountType: data.accountType
     })

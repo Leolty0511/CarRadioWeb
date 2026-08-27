@@ -2,14 +2,13 @@
  * 留言反馈管理模块
  */
 
-import React, { useState, useEffect } from 'react'
-import { MessageCircle, Reply, Trash2, FileText, Video, BookOpen } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
-import { StatCard } from '../../components/StatCard'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import { useAdminAuth } from '../../hooks'
+import FilterChipBar from '@/components/knowledge/FilterChipBar'
 import {
   getAllDocumentFeedback,
   addAdminReply,
@@ -18,56 +17,57 @@ import {
   getUnrepliedFeedbackCount,
   type FeedbackWithDocument
 } from '@/services/feedbackService'
+import {
+  KNOWLEDGE_FEEDBACK_SECTIONS,
+  type KnowledgeFeedbackSection
+} from '@/utils/knowledgeFeedbackSection'
 
 interface FeedbackManagementProps {
   onUnrepliedCountChange?: (count: number) => void
 }
 
-type FilterType = 'all' | 'video' | 'image-text' | 'structured'
+type FilterType = 'all' | 'unreplied' | KnowledgeFeedbackSection
 
-// 筛选器文本映射
-const FILTER_TEXT: Record<FilterType, string> = {
-  all: '全部',
-  video: '视频教程',
-  'image-text': '图文教程',
-  structured: '结构化文档'
+const SECTION_I18N: Record<KnowledgeFeedbackSection, string> = {
+  wiring: 'knowledge.sections.wiringGuide',
+  'installation-video': 'knowledge.sections.videoTutorials',
+  'device-operation': 'knowledge.sections.deviceOperationVideos',
+  'image-text': 'knowledge.sections.generalDocuments',
+  canbus: 'knowledge.sections.canbusSettings'
 }
 
 export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepliedCountChange }) => {
+  const { t } = useTranslation()
   const { showToast } = useToast()
   const { user: adminUser } = useAdminAuth()
 
-  // 状态
   const [allFeedback, setAllFeedback] = useState<FeedbackWithDocument[]>([])
   const [loading, setLoading] = useState(true)
   const [unrepliedCount, setUnrepliedCount] = useState(0)
-
-  // 筛选
   const [filter, setFilter] = useState<FilterType>('all')
-
-  // 回复状态
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyContent, setReplyContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
-  // 删除确认
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; feedbackId: string }>({ open: false, feedbackId: '' })
   const [deleteReplyConfirm, setDeleteReplyConfirm] = useState<{ open: boolean; feedbackId: string; replyId: string }>({
     open: false, feedbackId: '', replyId: ''
   })
 
-  // 加载留言数据
+  const refreshFeedback = async () => {
+    const [data, count] = await Promise.all([
+      getAllDocumentFeedback(),
+      getUnrepliedFeedbackCount()
+    ])
+    setAllFeedback(data)
+    setUnrepliedCount(count)
+    onUnrepliedCountChange?.(count)
+  }
+
   useEffect(() => {
     const loadFeedback = async () => {
       setLoading(true)
       try {
-        const [data, count] = await Promise.all([
-          getAllDocumentFeedback(),
-          getUnrepliedFeedbackCount()
-        ])
-        setAllFeedback(data)
-        setUnrepliedCount(count)
-        onUnrepliedCountChange?.(count)
+        await refreshFeedback()
       } catch (error) {
         console.error('加载留言失败:', error)
         showToast({
@@ -82,48 +82,68 @@ export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepl
     loadFeedback()
   }, [showToast, onUnrepliedCountChange])
 
-  // 筛选后的留言
+  const sectionLabel = (section: string) => {
+    if (section in SECTION_I18N) {
+      return t(SECTION_I18N[section as KnowledgeFeedbackSection])
+    }
+    return t('knowledge.document')
+  }
+
+  const hasAdminReply = (feedback: FeedbackWithDocument) => (
+    Boolean(feedback.replies?.some(reply => reply.isAdmin))
+  )
+
+  const stats = useMemo(() => {
+    const counts: Record<KnowledgeFeedbackSection, number> = {
+      wiring: 0,
+      'installation-video': 0,
+      'device-operation': 0,
+      'image-text': 0,
+      canbus: 0
+    }
+    for (const item of allFeedback) {
+      const type = item.documentInfo?.type
+      if (type && type in counts) {
+        counts[type as KnowledgeFeedbackSection] += 1
+      }
+    }
+    return {
+      total: allFeedback.length,
+      unreplied: unrepliedCount,
+      ...counts
+    }
+  }, [allFeedback, unrepliedCount])
+
+  const filterChips = useMemo(() => ([
+    { id: 'all', label: `${t('common.all')} (${stats.total})` },
+    { id: 'unreplied', label: `${t('admin.unreplied', { defaultValue: '未回复' })} (${stats.unreplied})` },
+    ...KNOWLEDGE_FEEDBACK_SECTIONS.map((section) => ({
+      id: section,
+      label: `${sectionLabel(section)} (${stats[section]})`
+    }))
+  ]), [stats, t])
+
   const filteredFeedback = allFeedback.filter(fb => {
-    if (filter === 'all') {return true}
+    if (filter === 'all') {
+      return true
+    }
+    if (filter === 'unreplied') {
+      return !hasAdminReply(fb)
+    }
     return fb.documentInfo?.type === filter
   })
 
-  // 统计数据
-  const stats = {
-    total: allFeedback.length,
-    unreplied: unrepliedCount,
-    video: allFeedback.filter(f => f.documentInfo?.type === 'video').length,
-    structured: allFeedback.filter(f => f.documentInfo?.type === 'structured').length
-  }
-
-  // 获取文档类型图标
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'video': return <Video className="h-4 w-4" />
-      case 'structured': return <BookOpen className="h-4 w-4" />
-      default: return <FileText className="h-4 w-4" />
-    }
-  }
-
-  // 发送回复
   const handleReply = async (feedbackId: string) => {
-    if (!replyContent.trim()) {return}
+    if (!replyContent.trim()) {
+      return
+    }
 
     setSubmitting(true)
     try {
       await addAdminReply('', feedbackId, adminUser?.nickname || 'Admin', replyContent)
-
-      const [data, count] = await Promise.all([
-        getAllDocumentFeedback(),
-        getUnrepliedFeedbackCount()
-      ])
-      setAllFeedback(data)
-      setUnrepliedCount(count)
-      onUnrepliedCountChange?.(count)
-
+      await refreshFeedback()
       setReplyingTo(null)
       setReplyContent('')
-
       showToast({
         type: 'success',
         title: '成功',
@@ -140,24 +160,16 @@ export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepl
     }
   }
 
-  // 删除留言
   const handleDeleteFeedback = async () => {
-    if (!deleteConfirm.feedbackId) {return}
+    if (!deleteConfirm.feedbackId) {
+      return
+    }
 
     setSubmitting(true)
     try {
       await removeFeedback('', deleteConfirm.feedbackId)
-
-      const [data, count] = await Promise.all([
-        getAllDocumentFeedback(),
-        getUnrepliedFeedbackCount()
-      ])
-      setAllFeedback(data)
-      setUnrepliedCount(count)
-      onUnrepliedCountChange?.(count)
-
+      await refreshFeedback()
       setDeleteConfirm({ open: false, feedbackId: '' })
-
       showToast({
         type: 'success',
         title: '成功',
@@ -174,19 +186,16 @@ export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepl
     }
   }
 
-  // 删除回复
   const handleDeleteReply = async () => {
-    if (!deleteReplyConfirm.feedbackId || !deleteReplyConfirm.replyId) {return}
+    if (!deleteReplyConfirm.feedbackId || !deleteReplyConfirm.replyId) {
+      return
+    }
 
     setSubmitting(true)
     try {
       await removeReply('', deleteReplyConfirm.feedbackId, deleteReplyConfirm.replyId)
-
-      const data = await getAllDocumentFeedback()
-      setAllFeedback(data)
-
+      await refreshFeedback()
       setDeleteReplyConfirm({ open: false, feedbackId: '', replyId: '' })
-
       showToast({
         type: 'success',
         title: '成功',
@@ -205,158 +214,134 @@ export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepl
 
   return (
     <div className="space-y-6">
-      {/* 统计卡片 */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard title="总留言数" value={stats.total} icon={MessageCircle} color="blue" />
-        <StatCard title="未回复" value={stats.unreplied} icon={Reply} color="orange" />
-        <StatCard title="视频教程" value={stats.video} icon={Video} color="purple" />
-        <StatCard title="结构化文档" value={stats.structured} icon={BookOpen} color="green" />
-      </div>
+      <FilterChipBar
+        label={t('knowledge.userFeedback')}
+        ariaLabel={t('knowledge.userFeedback')}
+        items={filterChips}
+        selectedId={filter}
+        onSelect={(id) => setFilter(id as FilterType)}
+      />
 
-      {/* 筛选器 */}
-      <div className="flex gap-2">
-        {(['all', 'video', 'image-text', 'structured'] as FilterType[]).map(type => (
-          <Button
-            key={type}
-            variant={filter === type ? 'primary' : 'outline'}
-            size="sm"
-            onClick={() => setFilter(type)}
-            className={filter === type ? 'bg-blue-600' : ''}
-          >
-            {FILTER_TEXT[type]}
-          </Button>
-        ))}
-      </div>
-
-      {/* 留言列表 */}
-      <Card className="bg-white dark:bg-gray-800/50 border-slate-200 dark:border-gray-700">
-        <CardHeader>
-          <CardTitle className="text-slate-800 dark:text-white">留言管理</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
-            </div>
-          ) : filteredFeedback.length === 0 ? (
-            <p className="text-center text-slate-500 dark:text-gray-400 py-8">暂无留言</p>
-          ) : (
-            <div className="space-y-4">
-              {filteredFeedback.map(feedback => (
-                <div key={feedback.id} className="p-4 bg-slate-50 dark:bg-gray-700/50 rounded-lg">
-                  {/* 留言头部 */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-blue-500/20 rounded text-blue-500 dark:text-blue-400">
-                        {getTypeIcon(feedback.documentInfo?.type || 'unknown')}
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-800 dark:text-white">{feedback.author}</p>
-                        <p className="text-xs text-slate-400 dark:text-gray-400">{new Date(feedback.timestamp).toLocaleString()}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {!feedback.replies?.length && (
-                        <span className="px-2 py-0.5 bg-orange-500/20 text-orange-600 dark:text-orange-400 text-xs rounded-full">
-                          待回复
-                        </span>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeleteConfirm({ open: true, feedbackId: feedback.id })}
-                        className="text-red-500 hover:text-red-400"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+      {loading ? (
+        <p className="py-12 text-center text-sm text-slate-500 dark:text-gray-400">{t('common.loading')}</p>
+      ) : filteredFeedback.length === 0 ? (
+        <p className="py-12 text-center text-sm text-slate-500 dark:text-gray-400">{t('knowledge.noUserFeedback')}</p>
+      ) : (
+        <div className="divide-y divide-slate-200 overflow-hidden rounded-xl border border-slate-200 bg-white dark:divide-slate-700 dark:border-slate-700 dark:bg-slate-900/40">
+          {filteredFeedback.map(feedback => (
+            <div key={feedback.id} className="px-4 py-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-semibold text-slate-800 dark:text-white">{feedback.author}</p>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">
+                      {new Date(feedback.timestamp).toLocaleString()}
+                    </span>
+                    <span className="rounded-full border border-slate-200 px-2 py-0.5 text-xs text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                      {sectionLabel(feedback.documentInfo?.type || '')}
+                    </span>
+                    {!hasAdminReply(feedback) ? (
+                      <span className="rounded-full border border-orange-200 px-2 py-0.5 text-xs text-orange-600 dark:border-orange-700 dark:text-orange-400">
+                        {t('admin.unreplied', { defaultValue: '未回复' })}
+                      </span>
+                    ) : null}
                   </div>
-
-                  {/* 文档信息 */}
-                  <p className="text-xs text-slate-400 dark:text-gray-500 mb-2">
-                    文档: {feedback.documentInfo?.title}
+                  <p className="mt-1 truncate text-xs text-slate-400 dark:text-slate-500">
+                    {feedback.documentInfo?.title}
                   </p>
-
-                  {/* 留言内容 */}
-                  <p className="text-slate-600 dark:text-gray-300 mb-3">{feedback.content}</p>
-
-                  {/* 回复列表 */}
-                  {feedback.replies && feedback.replies.length > 0 && (
-                    <div className="ml-4 border-l-2 border-slate-200 dark:border-gray-600 pl-4 space-y-2 mb-3">
-                      {feedback.replies.map(reply => (
-                        <div key={reply.id} className="p-2 bg-slate-100 dark:bg-gray-600/30 rounded">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{reply.author}</span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-slate-400 dark:text-gray-500">
-                                {new Date(reply.timestamp).toLocaleString()}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setDeleteReplyConfirm({
-                                  open: true,
-                                  feedbackId: feedback.id,
-                                  replyId: reply.id
-                                })}
-                                className="text-red-500 hover:text-red-400 p-1"
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-gray-300">{reply.content}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* 回复框 */}
-                  {replyingTo === feedback.id ? (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={replyContent}
-                        onChange={(e) => setReplyContent(e.target.value)}
-                        placeholder="输入回复内容..."
-                        className="flex-1 px-3 py-2 bg-white dark:bg-gray-600 border border-slate-300 dark:border-gray-500 rounded-lg text-slate-800 dark:text-white text-sm"
-                        onKeyDown={(e) => e.key === 'Enter' && handleReply(feedback.id)}
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => handleReply(feedback.id)}
-                        disabled={submitting || !replyContent.trim()}
-                        className="bg-blue-600 hover:bg-blue-700"
-                      >
-                        {submitting ? '...' : '发送'}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setReplyingTo(null); setReplyContent('') }}
-                      >
-                        取消
-                      </Button>
-                    </div>
-                  ) : (
+                  <p className="mt-2 text-sm text-slate-600 dark:text-gray-300">{feedback.content}</p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  {replyingTo === feedback.id ? null : (
                     <Button
                       size="sm"
-                      variant="ghost"
+                      variant="outline"
                       onClick={() => setReplyingTo(feedback.id)}
-                      className="text-blue-600 dark:text-blue-400 hover:text-blue-500"
                     >
-                      <Reply className="h-4 w-4 mr-1" />
-                      回复
+                      {t('knowledge.replyAction')}
                     </Button>
                   )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setDeleteConfirm({ open: true, feedbackId: feedback.id })}
+                    className="text-red-500 hover:text-red-400"
+                  >
+                    {t('common.delete')}
+                  </Button>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </div>
 
-      {/* 删除留言确认 */}
+              {feedback.replies && feedback.replies.length > 0 ? (
+                <div className="mt-3 space-y-2 border-l border-slate-200 pl-4 dark:border-slate-700">
+                  {feedback.replies.map(reply => (
+                    <div key={reply.id} className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-slate-700 dark:text-slate-200">{reply.author}</span>
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
+                            {new Date(reply.timestamp).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-slate-600 dark:text-gray-300">{reply.content}</p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setDeleteReplyConfirm({
+                          open: true,
+                          feedbackId: feedback.id,
+                          replyId: reply.id
+                        })}
+                        className="text-red-500 hover:text-red-400"
+                      >
+                        {t('common.delete')}
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {replyingTo === feedback.id ? (
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="text"
+                    value={replyContent}
+                    onChange={(e) => setReplyContent(e.target.value)}
+                    placeholder={t('knowledge.replyPlaceholder')}
+                    className="flex-1 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 dark:border-gray-500 dark:bg-gray-600 dark:text-white"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleReply(feedback.id)
+                      }
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleReply(feedback.id)}
+                      disabled={submitting || !replyContent.trim()}
+                    >
+                      {submitting ? t('common.loading') : t('knowledge.submitReply')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setReplyingTo(null)
+                        setReplyContent('')
+                      }}
+                    >
+                      {t('common.cancel')}
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      )}
+
       <ConfirmDialog
         open={deleteConfirm.open}
         onClose={() => setDeleteConfirm({ open: false, feedbackId: '' })}
@@ -367,7 +352,6 @@ export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepl
         loading={submitting}
       />
 
-      {/* 删除回复确认 */}
       <ConfirmDialog
         open={deleteReplyConfirm.open}
         onClose={() => setDeleteReplyConfirm({ open: false, feedbackId: '', replyId: '' })}
@@ -382,4 +366,3 @@ export const FeedbackManagement: React.FC<FeedbackManagementProps> = ({ onUnrepl
 }
 
 export default FeedbackManagement
-

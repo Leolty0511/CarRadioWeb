@@ -19,10 +19,82 @@ import { authenticateContentAccess } from '../middleware/contentAccess'
 import { PERMISSIONS } from '../config/permissions'
 import { createRateLimit } from '../middleware/errorHandler'
 import { createLogger } from '../utils/logger'
+import {
+  CANBUS_FEEDBACK_DOCUMENT_ID,
+  isKnowledgeFeedbackSection,
+  sectionFromVideoTutorialType,
+  type KnowledgeFeedbackSection
+} from '../utils/knowledgeFeedbackSection'
 
 const logger = createLogger('document-feedback-route')
 const router = express.Router()
 const documentService = new DocumentService()
+
+type FeedbackDocumentInfo = {
+  title: string
+  type: KnowledgeFeedbackSection | 'unknown'
+}
+
+const resolveFeedbackDocumentInfo = async (
+  documentId: string,
+  storedSection?: string
+): Promise<FeedbackDocumentInfo> => {
+  if (documentId === CANBUS_FEEDBACK_DOCUMENT_ID) {
+    return {
+      title: 'CANBus Settings',
+      type: 'canbus'
+    }
+  }
+
+  try {
+    const structured = await documentService.getDocument(documentId, 'structured')
+    if (structured) {
+      let title = structured.title || `文档ID: ${documentId}`
+      if (structured.basicInfo) {
+        const { brand, model, yearRange } = structured.basicInfo
+        const vehicleInfo = `${brand || ''} ${model || ''} ${yearRange || ''}`.trim()
+        if (vehicleInfo) {
+          title = `${vehicleInfo} - ${title}`
+        }
+      }
+      return {
+        title,
+        type: isKnowledgeFeedbackSection(storedSection) ? storedSection : 'wiring'
+      }
+    }
+
+    const video = await documentService.getDocument(documentId, 'video')
+    if (video) {
+      const inferred = sectionFromVideoTutorialType(video.tutorialType)
+      return {
+        title: video.title || `文档ID: ${documentId}`,
+        type: isKnowledgeFeedbackSection(storedSection) ? storedSection : inferred
+      }
+    }
+
+    const general = await documentService.getDocument(documentId, 'general')
+    if (general) {
+      return {
+        title: general.title || `文档ID: ${documentId}`,
+        type: isKnowledgeFeedbackSection(storedSection) ? storedSection : 'image-text'
+      }
+    }
+  } catch {
+    // Failed to get document info, use fallback
+  }
+
+  if (isKnowledgeFeedbackSection(storedSection)) {
+    return {
+      title: `文档ID: ${documentId}`,
+      type: storedSection
+    }
+  }
+
+  return {
+    title: `文档ID: ${documentId}`,
+    type: 'unknown'
+  }
+}
 
 // Rate limit: 10 submissions per 15 minutes per IP
 const docFeedbackRateLimit = createRateLimit(15 * 60 * 1000, 10, '留言提交过于频繁，请15分钟后再试')
@@ -38,48 +110,7 @@ router.get('/all/admin', authenticateUser, requirePermission(PERMISSIONS.feedbac
     // 获取每个反馈对应的文档信息
     const feedbackWithDocs = await Promise.all(
       feedback.map(async (item) => {
-        let documentInfo = {
-          title: `文档ID: ${item.documentId}`,
-          type: 'unknown'
-        }
-        
-        // 尝试从不同类型的文档中获取信息
-        try {
-          // 先尝试作为结构化文档
-          let doc = await documentService.getDocument(item.documentId, 'structured')
-          if (doc) {
-            documentInfo.title = doc.title || `文档ID: ${item.documentId}`
-            documentInfo.type = 'structured'
-            // 如果有车型信息，添加到标题中
-            if (doc.basicInfo) {
-              const { brand, model, yearRange } = doc.basicInfo
-              const vehicleInfo = `${brand || ''} ${model || ''} ${yearRange || ''}`.trim()
-              if (vehicleInfo) {
-                documentInfo.title = `${vehicleInfo} - ${documentInfo.title}`
-              }
-            }
-            return { ...item, documentInfo }
-          }
-          
-          // 尝试作为视频教程
-          doc = await documentService.getDocument(item.documentId, 'video')
-          if (doc) {
-            documentInfo.title = doc.title || `文档ID: ${item.documentId}`
-            documentInfo.type = 'video'
-            return { ...item, documentInfo }
-          }
-          
-          // 尝试作为图文教程
-          doc = await documentService.getDocument(item.documentId, 'general')
-          if (doc) {
-            documentInfo.title = doc.title || `文档ID: ${item.documentId}`
-            documentInfo.type = 'image-text'
-            return { ...item, documentInfo }
-          }
-        } catch (error) {
-          // Failed to get document info, use fallback
-        }
-        
+        const documentInfo = await resolveFeedbackDocumentInfo(item.documentId, item.section)
         return { ...item, documentInfo }
       })
     )
@@ -167,7 +198,7 @@ router.get('/:documentId', authenticateContentAccess, async (req, res) => {
  */
 router.post('/', authenticateContentAccess, docFeedbackRateLimit, async (req, res) => {
   try {
-    const { documentId, content, language } = req.body
+    const { documentId, content, language, section } = req.body
     const author = req.contentPrincipal!.nickname
     
     if (!documentId || !author || !content) {
@@ -180,71 +211,23 @@ router.post('/', authenticateContentAccess, docFeedbackRateLimit, async (req, re
     
     // 默认使用 'en' 如果没有指定 language
     const feedbackLanguage = (language && ['en', 'ru'].includes(language)) ? language : 'en'
+    const documentInfo = await resolveFeedbackDocumentInfo(
+      documentId,
+      isKnowledgeFeedbackSection(section) ? section : undefined
+    )
+    const resolvedSection = documentInfo.type === 'unknown' ? undefined : documentInfo.type
 
     const feedback = await createFeedback({
       documentId,
       author,
       content,
       language: feedbackLanguage,
+      section: resolvedSection,
       accountId: req.contentPrincipal!.id,
       accountType: req.contentPrincipal!.type
     })
 
-    // 获取文档信息以改善钉钉通知内容
-    let documentTitle = `文档ID: ${documentId}` // 使用documentId作为后备标识
-    let vehicleInfo = ''
-    let documentType = 'unknown'
-    try {
-      // 尝试从不同类型的文档中获取信息
-      let document = null
-      
-      // 先尝试作为结构化文档
-      try {
-        document = await documentService.getDocument(documentId, 'structured')
-        if (document) {
-          documentType = 'structured'
-          documentTitle = document.title || `文档ID: ${documentId}`
-          // 尝试从文档中提取车型信息
-          if (document.basicInfo) {
-            const { brand, model, yearRange } = document.basicInfo
-            vehicleInfo = `${brand || ''} ${model || ''} ${yearRange || ''}`.trim()
-          }
-        }
-      } catch (e) {
-        // 继续尝试其他类型
-      }
-      
-      // 如果不是结构化文档，尝试视频教程
-      if (!document) {
-        try {
-          document = await documentService.getDocument(documentId, 'video')
-          if (document) {
-            documentType = 'video'
-            documentTitle = document.title || `文档ID: ${documentId}`
-          }
-        } catch (e) {
-          // 继续尝试其他类型
-        }
-      }
-      
-      // 如果不是视频教程，尝试图文教程
-      if (!document) {
-        try {
-          document = await documentService.getDocument(documentId, 'general')
-          if (document) {
-            documentType = 'image-text'
-            documentTitle = document.title || `文档ID: ${documentId}`
-          }
-        } catch (e) {
-          // Unrecognized document type, use documentId as fallback
-        }
-      }
-    } catch (error) {
-      // Failed to get document info, use documentId as fallback
-      // 如果获取失败，documentTitle已经设置为documentId，无需额外处理
-    }
-
-    const docTitle = vehicleInfo ? `${vehicleInfo} - ${documentTitle}` : documentTitle;
+    const docTitle = documentInfo.title;
 
     // Get user location and timezone from IP
     const clientIP = getClientIP(req);
@@ -269,7 +252,7 @@ router.post('/', authenticateContentAccess, docFeedbackRateLimit, async (req, re
 
       dingtalkService.notifyFormSubmission({
         type: 'document-feedback',
-        documentType: documentType as 'structured' | 'video' | 'image-text' | 'unknown',
+        documentType: documentInfo.type,
         name: author,
         title: docTitle,
         content,

@@ -3,6 +3,7 @@ import { Play } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/Button'
 import DocumentFeedback from '@/components/DocumentFeedback'
+import { sectionFromVideoTutorialType } from '@/utils/knowledgeFeedbackSection'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import CarRadioVideoFrame from '@/components/CarRadioVideoFrame'
 
@@ -181,7 +182,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ document, onBack }) => {
       {/* 用户留言 */}
       <DocumentFeedback
         documentId={document._id || document.id}
-        documentType="video"
+        section={sectionFromVideoTutorialType(document.tutorialType)}
         className="mt-6"
       />
     </div>

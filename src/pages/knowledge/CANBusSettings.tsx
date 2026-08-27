@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Settings } from 'lucide-react'
 import CANBusSettingsPanel from '@/components/CANBusSettingsPanel'
+import DocumentFeedback from '@/components/DocumentFeedback'
+import { CANBUS_FEEDBACK_DOCUMENT_ID } from '@/utils/knowledgeFeedbackSection'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
@@ -69,6 +71,11 @@ const CANBusSettings: React.FC = () => {
         </div>
 
         <CANBusSettingsPanel />
+        <DocumentFeedback
+          documentId={CANBUS_FEEDBACK_DOCUMENT_ID}
+          section="canbus"
+          className="mt-8"
+        />
       </div>
     </div>
   )

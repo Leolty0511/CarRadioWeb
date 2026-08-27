@@ -311,7 +311,7 @@ const GeneralDocumentViewer: React.FC<GeneralDocumentViewerProps> = ({ document,
       {/* 用户留言 */}
       <DocumentFeedback
         documentId={document._id || document.id}
-        documentType="image-text"
+        section="image-text"
         className="mt-6"
       />
 

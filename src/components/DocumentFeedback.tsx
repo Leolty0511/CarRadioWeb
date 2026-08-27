@@ -6,15 +6,17 @@ import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { getDocumentFeedback, addUserFeedback, addUserReply, UserFeedback as FeedbackType } from '@/services/feedbackService'
 import { useAuth } from '@/contexts/AuthContext'
+import { type KnowledgeFeedbackSection } from '@/utils/knowledgeFeedbackSection'
 
 interface DocumentFeedbackProps {
   documentId: string
-  documentType: 'video' | 'image-text' | 'structured'
+  section: KnowledgeFeedbackSection
   className?: string
 }
 
 const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
   documentId,
+  section,
   className = ""
 }) => {
   const { t } = useTranslation()
@@ -46,7 +48,7 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
         throw new Error('文档ID不存在')
       }
 
-      const newFeedbackItem = await addUserFeedback(documentId, newFeedback)
+      const newFeedbackItem = await addUserFeedback(documentId, newFeedback, section)
       setFeedbackList(prev => [...prev, newFeedbackItem])
       setNewFeedback('')
       setShowFeedbackForm(false)
