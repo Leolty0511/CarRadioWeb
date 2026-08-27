@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Car, Shield } from 'lucide-react'
+import { ArrowLeft, Car } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import VehicleSelector from '@/components/VehicleSelector'
@@ -9,6 +9,7 @@ import PasswordProtection from '@/components/PasswordProtection'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
+import KnowledgeDocumentList from '@/components/knowledge/KnowledgeDocumentList'
 import { getDocuments } from '@/services/documentApi'
 import { findVehicleByBrandModelYear } from '@/services/vehicleService'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
@@ -204,52 +205,18 @@ const VehicleData: React.FC = () => {
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             </div>
-            {vehicleDocuments.length > 0 ? (
-              <div className="grid gap-6">
-                {vehicleDocuments.map((doc) => (
-                  <Card key={doc._id || doc.id} className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-gray-700 shadow-lg transition-shadow hover:shadow-xl">
-                    <CardContent className="p-6">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-3 mb-3">
-                            <h4 className="text-xl font-bold text-slate-800 dark:text-white">{doc.title}</h4>
-                            <span className="px-3 py-1 text-sm font-medium rounded-full bg-teal-100 dark:bg-teal-600/20 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30">
-                              {t('knowledge.structuredArticle')}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-4 text-sm text-slate-500 dark:text-gray-400">
-                            <span>{t('knowledge.author')}: {doc.author || t('knowledge.technicalTeam')}</span>
-                            <span>•</span>
-                            <span>{t('knowledge.viewCount')}: {doc.views || 0}</span>
-                          </div>
-                        </div>
-                        <Button
-                          size="lg"
-                          onClick={() => handleViewDocument(doc)}
-                          className="bg-blue-600 text-white shadow-sm hover:bg-blue-700"
-                        >
-                          {t('knowledge.view')}
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50 backdrop-blur-sm shadow-xl">
-                <CardContent className="p-12 text-center">
-                  <div className="w-20 h-20 bg-gray-100 dark:bg-gradient-to-br dark:from-gray-600 dark:to-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-6">
-                    <Shield className="h-10 w-10 text-slate-400 dark:text-gray-400" />
-                  </div>
-                  <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">
-                    {t('knowledge.noResearchData')}
-                  </h3>
-                  <p className="text-slate-600 dark:text-gray-300 text-lg leading-relaxed max-w-2xl mx-auto">
-                    {t('knowledge.noResearchDataDesc')}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
+            <KnowledgeDocumentList
+              accent="structured"
+              emptyText={t('knowledge.noResearchData')}
+              items={vehicleDocuments.map((doc) => ({
+                id: String(doc._id || doc.id),
+                title: doc.title,
+                eyebrow: t('knowledge.structuredArticle'),
+                description: doc.summary,
+                meta: `${t('knowledge.author')}: ${doc.author || t('knowledge.technicalTeam')}`,
+                onClick: () => handleViewDocument(doc)
+              }))}
+            />
           </div>
         )}
       </div>

@@ -7,6 +7,7 @@ import ReferenceImageModal from '@/components/ReferenceImageModal'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
+import FilterChipBar from '@/components/knowledge/FilterChipBar'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
 import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
 import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
@@ -218,30 +219,14 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
                   </button>
                 </div>
 
-                <div className="mt-5 border-t border-slate-200 pt-4 dark:border-gray-700">
-                  <p className="mb-2 text-sm font-medium text-slate-700 dark:text-gray-300">
-                    {t('knowledge.headUnitTypeFilterLabel')}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {headUnitTypes.map(type => {
-                      const isSelected = type._id === headUnitTypeId
-                      return (
-                        <button
-                          key={type._id}
-                          type="button"
-                          onClick={() => handleHeadUnitTypeSelect(type._id)}
-                          className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                            isSelected
-                              ? 'border-cyan-600 bg-cyan-600 text-white'
-                              : 'border-slate-300 bg-white text-slate-700 hover:border-cyan-400 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-200 dark:hover:border-cyan-600'
-                          }`}
-                        >
-                          {type.name}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
+                <FilterChipBar
+                  className="mt-5 border-t border-slate-200 pt-4 dark:border-gray-700"
+                  label={t('knowledge.headUnitTypeFilterLabel')}
+                  ariaLabel={t('knowledge.headUnitTypeFilterLabel')}
+                  items={headUnitTypes.map(type => ({ id: type._id, label: type.name }))}
+                  selectedId={headUnitTypeId || ''}
+                  onSelect={handleHeadUnitTypeSelect}
+                />
               </>
             )}
           </section>
@@ -252,6 +237,7 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
             documentType="video"
             tutorialType={tutorialType}
             headUnitTypeId={headUnitTypeId}
+            scopeLabel={selectedHeadUnitType?.name}
             onViewDocument={handleViewDocument}
             className="space-y-6"
           />

@@ -1374,6 +1374,8 @@
     "backToCategories": "Back to Categories",
     "noVideosInCategory": "No video tutorials in this category",
     "noDocumentsInCategory": "No image-text tutorials in this category",
+    "filterLabel": "Tutorial categories",
+    "noRelatedTutorials": "No related tutorials",
     "videoCategoriesComingSoon": "Video tutorial categories are under construction",
     "documentCategoriesComingSoon": "Image-text tutorial categories are under construction",
     "selectVideoCategory": "Select video tutorial category",

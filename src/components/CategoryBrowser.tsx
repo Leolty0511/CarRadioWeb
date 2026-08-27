@@ -2,13 +2,19 @@
  * 分类浏览组件 - 用户界面按分类浏览文档
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Tag, FileText, Video, ChevronRight, ArrowLeft, Search, X } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Search, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { getCategoriesByDocumentType, type Category } from '@/services/categoryService';
 import { getDocuments, searchDocuments } from '@/services/documentApi';
+import FilterChipBar from '@/components/knowledge/FilterChipBar';
+import KnowledgeDocumentList from '@/components/knowledge/KnowledgeDocumentList';
+import {
+  ALL_CATEGORY_ID,
+  buildCategoryChips,
+  filterDocumentsByCategory
+} from '@/utils/knowledgeCategoryChips';
 
 /**
  * 将用户界面语言映射到文档语言（仅英文资料）
@@ -21,6 +27,7 @@ interface CategoryBrowserProps {
   documentType: 'video' | 'general';
   tutorialType?: 'installation' | 'device-operation';
   headUnitTypeId?: string;
+  scopeLabel?: string;
   onViewDocument: (doc: any) => void;
   className?: string;
 }
@@ -29,6 +36,7 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   documentType,
   tutorialType,
   headUnitTypeId,
+  scopeLabel,
   onViewDocument,
   className = ''
 }) => {
@@ -36,117 +44,103 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
   const documentLanguage = mapUILanguageToDocLanguage(i18n.language);
 
   const [categories, setCategories] = useState<Category[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [allDocuments, setAllDocuments] = useState<any[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState(ALL_CATEGORY_ID);
   const [loading, setLoading] = useState(true);
   const [documentsLoading, setDocumentsLoading] = useState(false);
 
-  // 搜索状态
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
 
-  // 加载分类列表 - 按语言隔离
   useEffect(() => {
+    setSelectedCategoryId(ALL_CATEGORY_ID);
+  }, [documentType, tutorialType, headUnitTypeId, documentLanguage]);
+
+  useEffect(() => {
+    let cancelled = false;
     const loadCategories = async () => {
       try {
-        setLoading(true);
-        // 传入语言参数，获取对应语言的分类
         const matchingCategories = await getCategoriesByDocumentType(
           documentType,
           documentLanguage,
           documentType === 'video' ? tutorialType : undefined
         );
-        setCategories(matchingCategories);
+        if (!cancelled) {
+          setCategories(matchingCategories);
+        }
       } catch (error) {
         console.error('加载分类失败:', error);
-      } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setCategories([]);
+        }
       }
     };
 
     loadCategories();
+    return () => {
+      cancelled = true;
+    };
   }, [documentType, documentLanguage, tutorialType]);
 
-  // 从 CANBus 页面带主机型号进入时，直接展示该型号的主机操作教程。
-  // 不要求教程必须绑定分类，避免新建教程后因未选择分类而无法在前台看到。
   useEffect(() => {
-    if (documentType !== 'video' || !headUnitTypeId) {
-      return
-    }
-
-    let cancelled = false
-    const loadHeadUnitDocuments = async () => {
-      setDocumentsLoading(true)
+    let cancelled = false;
+    const loadDocuments = async () => {
       try {
+        setLoading(true);
+        setDocumentsLoading(true);
         const result = await getDocuments({
-          documentType: 'video',
-          tutorialType,
-          headUnitTypeId,
+          documentType,
+          tutorialType: documentType === 'video' ? tutorialType : undefined,
+          headUnitTypeId: documentType === 'video' ? headUnitTypeId : undefined,
           status: 'published',
           language: documentLanguage,
           limit: 1000
-        })
-        if (cancelled) {
-          return
-        }
-        setDocuments(result.documents)
-        setSelectedCategory({
-          _id: `head-unit-${headUnitTypeId}`,
-          name: t('knowledge.sections.deviceOperationVideos'),
-          description: '',
-          color: '#06b6d4',
-          documentTypes: ['video'],
-        } as Category)
-      } catch {
+        });
         if (!cancelled) {
-          setDocuments([])
+          setAllDocuments(result.documents);
+        }
+      } catch (error) {
+        console.error('加载文档失败:', error);
+        if (!cancelled) {
+          setAllDocuments([]);
         }
       } finally {
         if (!cancelled) {
-          setDocumentsLoading(false)
+          setLoading(false);
+          setDocumentsLoading(false);
         }
       }
+    };
+
+    loadDocuments();
+    return () => {
+      cancelled = true;
+    };
+  }, [documentType, documentLanguage, tutorialType, headUnitTypeId]);
+
+  const categoryChips = useMemo(
+    () => buildCategoryChips(
+      categories,
+      allDocuments,
+      t('common.all'),
+      { scopedToExistingContent: Boolean(headUnitTypeId) }
+    ),
+    [categories, allDocuments, t, headUnitTypeId]
+  );
+
+  const visibleDocuments = useMemo(
+    () => filterDocumentsByCategory(allDocuments, selectedCategoryId, categoryChips),
+    [allDocuments, selectedCategoryId, categoryChips]
+  );
+
+  useEffect(() => {
+    if (!categoryChips.some((chip) => chip.id === selectedCategoryId)) {
+      setSelectedCategoryId(ALL_CATEGORY_ID);
     }
+  }, [categoryChips, selectedCategoryId]);
 
-    loadHeadUnitDocuments()
-    return () => { cancelled = true }
-  }, [documentType, documentLanguage, tutorialType, headUnitTypeId, t])
-
-  // 加载分类下的文档
-  const loadCategoryDocuments = async (category: Category) => {
-    try {
-      setDocumentsLoading(true);
-      setSelectedCategory(category);
-
-      // 获取该分类下的已发布文档，按用户语言过滤
-      const result = await getDocuments({
-        documentType,
-        tutorialType: documentType === 'video' ? tutorialType : undefined,
-        headUnitTypeId: documentType === 'video' ? headUnitTypeId : undefined,
-        category: category.name,
-        status: 'published',
-        language: documentLanguage,  // 根据用户界面语言过滤文档
-        limit: 1000
-      });
-
-      setDocuments(result.documents);
-    } catch (error) {
-      console.error('加载分类文档失败:', error);
-      setDocuments([]);
-    } finally {
-      setDocumentsLoading(false);
-    }
-  };
-
-  // 返回分类列表
-  const handleBackToCategories = () => {
-    setSelectedCategory(null);
-    setDocuments([]);
-  };
-
-  // 搜索文档
   const handleSearch = useCallback(async () => {
     const query = searchQuery.trim();
     if (!query) {
@@ -163,7 +157,6 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
         headUnitTypeId: documentType === 'video' ? headUnitTypeId : undefined,
         limit: 50
       });
-      // 过滤语言
       const filteredResults = results.filter(doc => {
         const docLang = (doc as unknown as { language?: string }).language;
         return docLang === documentLanguage || !docLang;
@@ -178,29 +171,27 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
     }
   }, [searchQuery, documentType, documentLanguage, tutorialType, headUnitTypeId]);
 
-  // 清除搜索
   const clearSearch = () => {
     setSearchQuery('');
     setSearchResults([]);
     setShowSearchResults(false);
   };
 
-  // 回车搜索
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
   };
 
-  if (loading) {
-    return (
-      <div className={`text-center text-gray-400 py-12 ${className}`}>
-        {t('common.loading')}
-      </div>
-    );
-  }
+  const toListItems = (docs: any[]) => docs.map((doc) => ({
+    id: doc._id,
+    title: doc.title,
+    description: doc.summary,
+    eyebrow: doc.category || (documentType === 'video' ? t('knowledge.videoTutorial') : t('knowledge.generalDocument')),
+    meta: doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : undefined,
+    onClick: () => onViewDocument(doc)
+  }));
 
-  // 搜索框组件
   const renderSearchBox = () => (
     <div className="mb-6">
       <div className="relative max-w-md">
@@ -237,232 +228,74 @@ const CategoryBrowser: React.FC<CategoryBrowserProps> = ({
     </div>
   );
 
-  // 搜索结果视图
+  if (loading && allDocuments.length === 0 && categories.length === 0) {
+    return (
+      <div className={`text-center text-gray-400 py-12 ${className}`}>
+        {t('common.loading')}
+      </div>
+    );
+  }
+
   if (showSearchResults) {
     return (
       <div className={className}>
         {renderSearchBox()}
-
-        {/* 返回按钮 */}
-        <div className="flex items-center mb-6">
-          <Button
-            variant="outline"
-            onClick={clearSearch}
-            className="mr-4 h-10 w-10 p-0"
-            aria-label={t('category.backToCategories')}
-            title={t('category.backToCategories')}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
+        <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-xl font-bold text-slate-800 dark:text-white">
             {t('category.searchResultsFor', { query: searchQuery })} ({searchResults.length})
           </h2>
-        </div>
-
-        {/* 搜索结果列表 */}
-        {searchResults.length === 0 ? (
-          <Card className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50">
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Search className="h-8 w-8 text-slate-400 dark:text-gray-400" />
-              </div>
-              <p className="text-slate-500 dark:text-gray-400">
-                {t('category.noSearchResults')}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {searchResults.map((doc) => (
-              <Card
-                key={doc._id}
-                className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50 hover:border-gray-300 dark:hover:border-gray-500/50 transition-all duration-300 cursor-pointer group"
-                onClick={() => onViewDocument(doc)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {documentType === 'video' ? (
-                        <Video className="h-5 w-5 text-green-500 dark:text-green-400" />
-                      ) : (
-                        <FileText className="h-5 w-5 text-purple-500 dark:text-purple-400" />
-                      )}
-                      <span className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wide">
-                        {doc.category}
-                      </span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-400 dark:text-gray-500 group-hover:text-slate-600 dark:group-hover:text-gray-300 transition-colors" />
-                  </div>
-                  <CardTitle className="text-slate-800 dark:text-white text-lg leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
-                    {doc.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {doc.summary && (
-                    <p className="text-slate-500 dark:text-gray-400 text-sm line-clamp-2 mb-3">
-                      {doc.summary}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between text-xs text-slate-400 dark:text-gray-500">
-                    <span>{doc.authorId?.username || doc.author || t('knowledge.technicalTeam')}</span>
-                    <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  // 显示分类下的文档列表
-  if (selectedCategory) {
-    return (
-      <div className={className}>
-        {renderSearchBox()}
-
-        {/* 返回按钮和分类标题 */}
-        <div className="flex items-center mb-6">
-          <Button
-            variant="outline"
-            onClick={handleBackToCategories}
-            className="mr-4 h-10 w-10 p-0"
-            aria-label={t('category.backToCategories')}
-            title={t('category.backToCategories')}
-          >
-            <ArrowLeft className="h-4 w-4" />
+          <Button variant="outline" onClick={clearSearch} size="sm">
+            {t('category.backToCategories')}
           </Button>
-          <div className="flex items-center">
-            <div
-              className="w-4 h-4 rounded-full mr-3"
-              style={{ backgroundColor: selectedCategory.color }}
-            />
-            <h2 className="text-xl font-bold text-slate-800 dark:text-white">{selectedCategory.name}</h2>
-            {selectedCategory.description && (
-              <span className="ml-3 text-slate-500 dark:text-gray-400">- {selectedCategory.description}</span>
-            )}
-          </div>
         </div>
-
-        {/* 文档列表 */}
-        {documentsLoading ? (
-          <div className="text-center text-slate-500 dark:text-gray-400 py-12">
-            {t('common.loading')}
-          </div>
-        ) : documents.length === 0 ? (
-          <Card className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50">
-            <CardContent className="p-8 text-center">
-              <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
-                {documentType === 'video' ? (
-                  <Video className="h-8 w-8 text-slate-400 dark:text-gray-400" />
-                ) : (
-                  <FileText className="h-8 w-8 text-slate-400 dark:text-gray-400" />
-                )}
-              </div>
-              <p className="text-slate-500 dark:text-gray-400">
-                {documentType === 'video'
-                  ? t('category.noVideosInCategory')
-                  : t('category.noDocumentsInCategory')}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {documents.map((doc) => (
-              <Card
-                key={doc._id}
-                className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50 hover:border-gray-300 dark:hover:border-gray-500/50 transition-all duration-300 cursor-pointer group"
-                onClick={() => onViewDocument(doc)}
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-2">
-                      {documentType === 'video' ? (
-                        <Video className="h-5 w-5 text-green-500 dark:text-green-400" />
-                      ) : (
-                        <FileText className="h-5 w-5 text-purple-500 dark:text-purple-400" />
-                      )}
-                      <span className="text-xs text-slate-500 dark:text-gray-400 uppercase tracking-wide">
-                        {documentType === 'video' ? t('knowledge.videoTutorial') : t('knowledge.generalDocument')}
-                      </span>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-slate-400 dark:text-gray-500 group-hover:text-slate-600 dark:group-hover:text-gray-300 transition-colors" />
-                  </div>
-                  <CardTitle className="text-slate-800 dark:text-white text-lg leading-tight group-hover:text-blue-600 dark:group-hover:text-blue-300 transition-colors">
-                    {doc.title}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  {doc.summary && (
-                    <p className="text-slate-500 dark:text-gray-400 text-sm line-clamp-2 mb-3">
-                      {doc.summary}
-                    </p>
-                  )}
-                  <div className="flex items-center justify-between text-xs text-slate-400 dark:text-gray-500">
-                    <span>{doc.authorId?.username || doc.author || t('knowledge.technicalTeam')}</span>
-                    <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
+        <KnowledgeDocumentList
+          items={toListItems(searchResults)}
+          accent={documentType}
+          emptyText={t('category.noSearchResults')}
+        />
       </div>
     );
   }
 
-  // 显示分类列表
+  const emptyText = selectedCategoryId === ALL_CATEGORY_ID
+    ? t('category.noRelatedTutorials')
+    : (documentType === 'video' ? t('category.noVideosInCategory') : t('category.noDocumentsInCategory'));
+
   return (
     <div className={className}>
       {renderSearchBox()}
 
-      {categories.length === 0 ? (
-        <Card className="bg-white dark:bg-gradient-to-br dark:from-gray-800/50 dark:to-gray-700/50 border border-gray-200 dark:border-gray-600/50">
-          <CardContent className="p-12 text-center">
-            <div className="w-20 h-20 bg-gray-100 dark:bg-gray-700 rounded-2xl flex items-center justify-center mx-auto mb-6">
-              <Tag className="h-10 w-10 text-slate-400 dark:text-gray-400" />
-            </div>
-            <h3 className="text-2xl font-bold text-slate-800 dark:text-white mb-4">{t('category.noCategories')}</h3>
-            <p className="text-slate-600 dark:text-gray-300 text-lg">
-              {documentType === 'video'
-                ? t('category.videoCategoriesComingSoon')
-                : t('category.documentCategoriesComingSoon')}
-            </p>
-          </CardContent>
-        </Card>
+      {scopeLabel ? (
+        <h2 className="mb-3 text-lg font-semibold text-slate-800 dark:text-white">
+          {scopeLabel}
+        </h2>
+      ) : null}
+
+      {categoryChips.length > 1 ? (
+        <FilterChipBar
+          className="mb-6"
+          label={t('category.filterLabel')}
+          ariaLabel={t('category.filterLabel')}
+          items={categoryChips}
+          selectedId={categoryChips.some((chip) => chip.id === selectedCategoryId) ? selectedCategoryId : ALL_CATEGORY_ID}
+          onSelect={setSelectedCategoryId}
+        />
+      ) : null}
+
+      {categories.length === 0 && allDocuments.length === 0 && !documentsLoading ? (
+        <p className="py-12 text-center text-sm text-slate-500 dark:text-gray-400">
+          {documentType === 'video'
+            ? t('category.videoCategoriesComingSoon')
+            : t('category.documentCategoriesComingSoon')}
+        </p>
       ) : (
-        <div className="space-y-4">
-          <h2 className="text-xl font-bold text-slate-800 dark:text-white mb-6">
-            {documentType === 'video'
-              ? t('category.selectVideoCategory')
-              : t('category.selectDocumentCategory')}
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {categories.map((category) => (
-              <button
-                key={category._id}
-                type="button"
-                className="group flex min-h-[88px] w-full items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-cyan-400 hover:shadow-md dark:border-slate-700 dark:bg-slate-900/50 dark:hover:border-cyan-600"
-                onClick={() => loadCategoryDocuments(category)}
-              >
-                <span className="h-3 w-3 shrink-0 rounded-full ring-4 ring-slate-100 dark:ring-slate-800" style={{ backgroundColor: category.color || '#0ea5e9' }} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-base font-semibold text-slate-800 transition-colors group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">{category.name}</span>
-                  <span className="mt-1 block truncate text-xs text-slate-500 dark:text-slate-400">
-                    {category.description || (documentType === 'video' && tutorialType
-                      ? t('knowledge.videoTutorial')
-                      : `${documentType === 'video'
-                        ? ((category as unknown as { videoCount?: number }).videoCount || 0)
-                        : ((category as unknown as { generalCount?: number }).generalCount || 0)
-                      } ${t('category.documents')}`)}
-                  </span>
-                </span>
-                <ChevronRight className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-hover:translate-x-0.5 group-hover:text-cyan-600 dark:text-slate-500" />
-              </button>
-            ))}
-          </div>
-        </div>
+        <KnowledgeDocumentList
+          items={toListItems(visibleDocuments)}
+          accent={documentType}
+          loading={documentsLoading}
+          loadingText={t('common.loading')}
+          emptyText={emptyText}
+        />
       )}
     </div>
   );
