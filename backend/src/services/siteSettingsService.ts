@@ -32,6 +32,8 @@ type GlobalKeys =
   | 'legalTermsPath'
   | 'legalDisclaimerPath'
   | 'newsletterEnabled'
+  | 'contactFormEmailEnabled'
+  | 'contactFormEmailTo'
   | 'newsletterSmtp'
 
 const GLOBAL_KEYS: GlobalKeys[] = [
@@ -44,6 +46,8 @@ const GLOBAL_KEYS: GlobalKeys[] = [
   'legalTermsPath',
   'legalDisclaimerPath',
   'newsletterEnabled',
+  'contactFormEmailEnabled',
+  'contactFormEmailTo',
   'newsletterSmtp',
 ]
 
@@ -76,6 +80,8 @@ const DEFAULT_GLOBALS: Record<GlobalKeys, unknown> = {
   legalTermsPath: '/terms',
   legalDisclaimerPath: '/disclaimer',
   newsletterEnabled: false,
+  contactFormEmailEnabled: false,
+  contactFormEmailTo: '',
   newsletterSmtp: { ...DEFAULT_NEWSLETTER_SMTP },
 }
 
@@ -119,6 +125,8 @@ function mergeGlobalsForResponse(g: Record<string, unknown>) {
     legalTermsPath: g.legalTermsPath ?? DEFAULT_GLOBALS.legalTermsPath,
     legalDisclaimerPath: g.legalDisclaimerPath ?? DEFAULT_GLOBALS.legalDisclaimerPath,
     newsletterEnabled: g.newsletterEnabled ?? DEFAULT_GLOBALS.newsletterEnabled,
+    contactFormEmailEnabled: g.contactFormEmailEnabled ?? DEFAULT_GLOBALS.contactFormEmailEnabled,
+    contactFormEmailTo: String(g.contactFormEmailTo || ''),
     newsletterSmtp,
     newsletterSmtpPassSet: passSet,
   }
@@ -169,6 +177,10 @@ export const getSiteSettings = async (language: string = 'en'): Promise<ISiteSet
  */
 export const updateSiteSettings = async (language: string, settingsData: Partial<ISiteSettings>): Promise<ISiteSettings> => {
   try {
+    const existingGlobals = await GlobalSiteSettings.findOne().lean() as {
+      contactFormEmailEnabled?: boolean
+      newsletterSmtp?: Record<string, unknown>
+    } | null
     const globalPatch = pickGlobals(settingsData) as Partial<Record<GlobalKeys, unknown>>
     const localPatch = omitGlobals(settingsData)
     if (localPatch.socialLinks) {
@@ -178,8 +190,7 @@ export const updateSiteSettings = async (language: string, settingsData: Partial
     if (globalPatch.newsletterSmtp && typeof globalPatch.newsletterSmtp === 'object') {
       const incoming = { ...(globalPatch.newsletterSmtp as Record<string, unknown>) }
       delete incoming.newsletterSmtpPassSet
-      const existingDoc = await GlobalSiteSettings.findOne().lean()
-      const prevPass = String((existingDoc as { newsletterSmtp?: { pass?: string } } | null)?.newsletterSmtp?.pass || '')
+      const prevPass = String(existingGlobals?.newsletterSmtp?.pass || '')
       const passIn = incoming.pass
       if (passIn === undefined || String(passIn).trim() === '') {
         incoming.pass = prevPass
@@ -192,6 +203,21 @@ export const updateSiteSettings = async (language: string, settingsData: Partial
         user: String(incoming.user || '').trim().slice(0, 256),
         pass: String(incoming.pass || '').slice(0, 512),
         from: String(incoming.from || '').trim().slice(0, 256),
+      }
+    }
+
+    const nextContactFormEmailEnabled = globalPatch.contactFormEmailEnabled !== undefined
+      ? globalPatch.contactFormEmailEnabled === true
+      : existingGlobals?.contactFormEmailEnabled === true
+    if (nextContactFormEmailEnabled && (globalPatch.contactFormEmailEnabled !== undefined || globalPatch.newsletterSmtp !== undefined)) {
+      const smtp = (globalPatch.newsletterSmtp || existingGlobals?.newsletterSmtp) as Record<string, unknown> | undefined
+      const smtpReady = !!smtp
+        && smtp.enabled === true
+        && String(smtp.host || '').trim() !== ''
+        && String(smtp.user || '').trim() !== ''
+        && String(smtp.pass || '').trim() !== ''
+      if (!smtpReady) {
+        throw new Error('contact_form_email_requires_smtp')
       }
     }
 

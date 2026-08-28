@@ -28,6 +28,8 @@ export interface IGlobalSiteSettings extends Document {
   legalDisclaimerPath: string
   /** 邮件订阅（前台表单 + API） */
   newsletterEnabled: boolean
+  contactFormEmailEnabled: boolean
+  contactFormEmailTo: string
   /**
    * 群发 / 订阅确认等外发邮件专用 SMTP（与「消息推送」中的系统通知 SMTP 分离）
    */
@@ -76,6 +78,8 @@ const GlobalSiteSettingsSchema = new Schema<IGlobalSiteSettings>({
   legalTermsPath: { type: String, default: '/terms', trim: true, maxlength: 256 },
   legalDisclaimerPath: { type: String, default: '/disclaimer', trim: true, maxlength: 256 },
   newsletterEnabled: { type: Boolean, default: false },
+  contactFormEmailEnabled: { type: Boolean, default: false },
+  contactFormEmailTo: { type: String, default: '', trim: true, maxlength: 256 },
   newsletterSmtp: {
     type: {
       enabled: { type: Boolean, default: false },

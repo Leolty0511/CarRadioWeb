@@ -60,6 +60,45 @@ router.get('/categories', authenticateUser, async (req, res) => {
 });
 
 /**
+ * Admin: export English FAQs as JSON
+ */
+router.get('/admin/export', authenticateUser, requirePermission(PERMISSIONS.content.read), async (_req, res) => {
+  try {
+    const items = await faqService.exportFAQs('en');
+    res.setHeader('Content-Disposition', 'attachment; filename="faq-en.json"');
+    res.json({ success: true, data: { language: 'en', items } });
+  } catch (error) {
+    logger.error({ error }, 'Failed to export FAQs');
+    res.status(500).json({ success: false, error: 'Failed to export FAQs' });
+  }
+});
+
+/**
+ * Admin: import English FAQs from JSON
+ * Body: { items: [...], mode?: 'merge' | 'replace' }
+ */
+router.post('/admin/import', authenticateUser, requirePermission(PERMISSIONS.content.create), async (req, res) => {
+  try {
+    const payload = req.body || {};
+    const items = Array.isArray(payload.items) ? payload.items : (Array.isArray(payload) ? payload : []);
+    if (!Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ success: false, error: 'items array is required' });
+      return;
+    }
+    if (items.length > 500) {
+      res.status(400).json({ success: false, error: 'too_many_items' });
+      return;
+    }
+    const mode = payload.mode === 'replace' ? 'replace' : 'merge';
+    const result = await faqService.importFAQs(items, mode);
+    res.json({ success: true, data: result });
+  } catch (error) {
+    logger.error({ error }, 'Failed to import FAQs');
+    res.status(500).json({ success: false, error: 'Failed to import FAQs' });
+  }
+});
+
+/**
  * Admin: create FAQ
  */
 router.post('/', authenticateUser, requirePermission(PERMISSIONS.content.create), async (req, res) => {

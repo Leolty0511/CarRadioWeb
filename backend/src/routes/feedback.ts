@@ -15,6 +15,7 @@ import {
 import dingtalkService from '../services/dingtalkService'
 import { getClientIP, getGeoWithTimezone, getDualTime, formatDualTime } from '../services/geoLocationService'
 import { createLogger } from '../utils/logger'
+import GlobalSiteSettings from '../models/GlobalSiteSettings'
 
 const logger = createLogger('feedback-route')
 import { notificationService } from '../services/notificationService'
@@ -26,6 +27,17 @@ const router = express.Router()
 
 // Rate limit: 5 submissions per 15 minutes per IP
 const feedbackRateLimit = createRateLimit(15 * 60 * 1000, 5, '反馈提交过于频繁，请15分钟后再试')
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
 
 /**
  * 获取所有反馈（按资料体系）- 需要认证
@@ -82,6 +94,19 @@ router.post('/', feedbackRateLimit, async (req, res) => {
       })
       return
     }
+    const normalizedEmail = typeof email === 'string' ? email.trim() : ''
+    if (
+      normalizedEmail.length > 254 ||
+      normalizedEmail.includes('\r') ||
+      normalizedEmail.includes('\n') ||
+      !EMAIL_PATTERN.test(normalizedEmail)
+    ) {
+      res.status(400).json({
+        success: false,
+        error: 'invalid_email'
+      })
+      return
+    }
     if (normalizedOrderNumber.length < 2 || normalizedOrderNumber.length > 100) {
       res.status(400).json({
         success: false,
@@ -98,7 +123,7 @@ router.post('/', feedbackRateLimit, async (req, res) => {
 
     const feedback = await createFeedback({
       name,
-      email,
+      email: normalizedEmail,
       orderNumber: normalizedOrderNumber,
       subject,
       message,
@@ -139,6 +164,98 @@ router.post('/', feedbackRateLimit, async (req, res) => {
     }).catch(() => {
       // 静默处理钉钉发送错误
     })
+
+    // 联系表单邮件通知：使用后台配置的 Newsletter SMTP，发送失败不影响表单提交。
+    void (async () => {
+      try {
+        const settings = await GlobalSiteSettings.findOne().lean() as {
+          contactFormEmailEnabled?: boolean
+          contactFormEmailTo?: string
+          newsletterSmtp?: {
+            enabled?: boolean
+            user?: string
+          }
+        } | null
+        const smtp = settings?.newsletterSmtp
+        if (!settings?.contactFormEmailEnabled || !smtp?.enabled) {
+          return
+        }
+
+        // 直接发送到 SMTP 登录账号邮箱，确保管理员使用该账号即可接收并回复。
+        const recipient = String(smtp.user || settings.contactFormEmailTo || '').trim()
+        if (!EMAIL_PATTERN.test(recipient)) {
+          logger.warn({ recipient: recipient ? '[configured]' : '[missing]' }, '联系表单邮件未发送：收件地址无效')
+          return
+        }
+
+        const isRussian = feedbackLanguage === 'ru'
+        const mailSubject = isRussian
+          ? '[Контактная форма] Новое сообщение клиента'
+          : '[Contact form] New customer message'
+        const labels = isRussian
+          ? {
+              intro: 'Получено новое сообщение из контактной формы.',
+              name: 'Имя',
+              email: 'Электронная почта',
+              reference: 'Справочная информация',
+              topic: 'Тема',
+              content: 'Сообщение',
+              location: 'Местоположение',
+              time: 'Отправлено',
+            }
+          : {
+              intro: 'A new contact form message has been submitted.',
+              name: 'Name',
+              email: 'Email',
+              reference: 'Reference',
+              topic: 'Subject',
+              content: 'Message',
+              location: 'Location',
+              time: 'Submitted at',
+            }
+        const text = [
+          labels.intro,
+          '',
+          `${labels.name}: ${name}`,
+          `${labels.email}: ${normalizedEmail}`,
+          `${labels.reference}: ${normalizedOrderNumber}`,
+          `${labels.topic}: ${subject}`,
+          `${labels.content}:`,
+          message,
+          '',
+          `${labels.location}: ${geo.location}`,
+          `${labels.time}: ${timeDisplay}`,
+        ].join('\n')
+        const html = `
+          <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
+            <p>${escapeHtml(labels.intro)}</p>
+            <table style="border-collapse:collapse;width:100%;max-width:720px">
+              <tbody>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.name)}</td><td style="padding:6px 0">${escapeHtml(name)}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.email)}</td><td style="padding:6px 0">${escapeHtml(normalizedEmail)}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.reference)}</td><td style="padding:6px 0">${escapeHtml(normalizedOrderNumber)}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.topic)}</td><td style="padding:6px 0">${escapeHtml(subject)}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600;vertical-align:top">${escapeHtml(labels.content)}</td><td style="padding:6px 0;white-space:pre-wrap">${escapeHtml(message)}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.location)}</td><td style="padding:6px 0">${escapeHtml(geo.location)}</td></tr>
+                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.time)}</td><td style="padding:6px 0">${escapeHtml(timeDisplay)}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        `
+        const result = await notificationService.sendTransactionalEmail(
+          recipient,
+          mailSubject,
+          text,
+          html,
+          { replyTo: normalizedEmail }
+        )
+        if (!result.ok) {
+          logger.warn({ error: result.error }, '联系表单邮件发送失败')
+        }
+      } catch (error) {
+        logger.error({ error }, '联系表单邮件通知处理失败')
+      }
+    })()
 
     res.status(201).json({
       success: true,

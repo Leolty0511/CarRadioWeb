@@ -74,6 +74,8 @@ export interface SiteSettings {
   legalTermsPath?: string;
   legalDisclaimerPath?: string;
   newsletterEnabled?: boolean;
+  contactFormEmailEnabled?: boolean;
+  contactFormEmailTo?: string;
   /** 群发专用 SMTP（API 不返回密码原文） */
   newsletterSmtp?: {
     enabled: boolean;

@@ -77,6 +77,52 @@ class FAQService {
   async getCategories(language: string): Promise<string[]> {
     return FAQ.distinct('category', { language });
   }
+
+  async exportFAQs(language: string = 'en') {
+    const faqs = await this.getAllFAQs(language);
+    return faqs.map((faq) => ({
+      question: faq.question,
+      answer: faq.answer,
+      category: faq.category,
+      sortOrder: faq.sortOrder,
+      published: faq.published,
+      language: 'en',
+    }));
+  }
+
+  async importFAQs(
+    items: Array<{ question?: string; answer?: string; category?: string; sortOrder?: number; published?: boolean }>,
+    mode: 'merge' | 'replace' = 'merge'
+  ): Promise<{ imported: number; skipped: number }> {
+    const language = 'en';
+    const cleaned = items
+      .map((item, index) => ({
+        question: String(item.question || '').trim(),
+        answer: String(item.answer || '').trim(),
+        category: String(item.category || 'general').trim() || 'general',
+        sortOrder: Number.isFinite(Number(item.sortOrder)) ? Number(item.sortOrder) : index + 1,
+        published: item.published !== false,
+        language,
+      }))
+      .filter((item) => item.question && item.answer);
+
+    if (mode === 'replace') {
+      await FAQ.deleteMany({ language });
+    }
+
+    let imported = 0;
+    for (const item of cleaned) {
+      await FAQ.findOneAndUpdate(
+        { language, question: item.question },
+        item,
+        { upsert: true, new: true, runValidators: true }
+      );
+      imported += 1;
+    }
+
+    logger.info({ imported, skipped: items.length - cleaned.length, mode }, 'FAQ import completed');
+    return { imported, skipped: items.length - cleaned.length };
+  }
 }
 
 export default new FAQService();

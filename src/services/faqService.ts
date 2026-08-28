@@ -57,3 +57,22 @@ export async function deleteFAQ(id: string): Promise<boolean> {
   const res = await apiClient.delete(`/faq/${id}`);
   return res.success;
 }
+
+export async function exportAdminFAQs(): Promise<{ language: string; items: FAQCreateData[] }> {
+  const res = await apiClient.get('/faq/admin/export');
+  if (!res.success || !res.data) {
+    throw new Error(res.error || 'export_failed');
+  }
+  return res.data;
+}
+
+export async function importAdminFAQs(
+  items: FAQCreateData[],
+  mode: 'merge' | 'replace' = 'merge'
+): Promise<{ imported: number; skipped: number }> {
+  const res = await apiClient.post('/faq/admin/import', { items, mode });
+  if (!res.success) {
+    throw new Error(res.error || 'import_failed');
+  }
+  return res.data;
+}

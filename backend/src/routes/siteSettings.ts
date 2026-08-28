@@ -54,6 +54,8 @@ router.put('/', authenticateUser, requirePermission(PERMISSIONS.settings.update)
       legalTermsPath,
       legalDisclaimerPath,
       newsletterEnabled,
+      contactFormEmailEnabled,
+      contactFormEmailTo,
       newsletterSmtp,
       externalLinks, 
       socialLinks, 
@@ -82,6 +84,8 @@ router.put('/', authenticateUser, requirePermission(PERMISSIONS.settings.update)
     if (legalTermsPath !== undefined) settingsData.legalTermsPath = legalTermsPath
     if (legalDisclaimerPath !== undefined) settingsData.legalDisclaimerPath = legalDisclaimerPath
     if (newsletterEnabled !== undefined) settingsData.newsletterEnabled = newsletterEnabled
+    if (contactFormEmailEnabled !== undefined) settingsData.contactFormEmailEnabled = contactFormEmailEnabled
+    if (contactFormEmailTo !== undefined) settingsData.contactFormEmailTo = contactFormEmailTo
     if (newsletterSmtp !== undefined) settingsData.newsletterSmtp = newsletterSmtp
     if (externalLinks !== undefined) settingsData.externalLinks = externalLinks
     if (socialLinks !== undefined) settingsData.socialLinks = socialLinks

@@ -1,0 +1,285 @@
+{
+  "language": "en",
+  "items": [
+    {
+      "category": "product",
+      "question": "How do I confirm this radio fits my vehicle?",
+      "answer": "To confirm compatibility more accurately, please send a photo of the backside of your factory radio connector/plug and a photo of your center console. You can also include your vehicle model name and manufacturing year.",
+      "sortOrder": 1,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "Will factory features still work after installation?",
+      "answer": "Most factory features are retained. The radio is designed to work with your vehicle systems so you can continue using steering wheel controls, air conditioning display, and other essential functions. Some features may require extra components or configuration depending on the vehicle model.",
+      "sortOrder": 2,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "Can I keep the factory backup camera?",
+      "answer": "The factory backup camera is compatible with our radio on most vehicles. Image quality may not be optimal because many factory cameras use a CVBS signal (360p), while our screen supports AHD (1080p). For clearer video and reliable reverse trigger, we recommend using the camera included with the radio.",
+      "sortOrder": 3,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "Can I keep the factory microphone?",
+      "answer": "The original microphone is integrated with the factory audio system and uses wiring, signal protocols, and software that are not compatible with this aftermarket unit. Please use the external microphone included with the radio.",
+      "sortOrder": 4,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "Will the factory USB ports still work?",
+      "answer": "Factory USB ports may not work correctly after the head unit is upgraded. Use the USB cables included with the radio as a replacement.",
+      "sortOrder": 5,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "What screen type and resolution does the radio use?",
+      "answer": "7-inch and 8-inch models use an IPS display. Larger models use OLED. Typical resolutions are 1280 x 800 for 9-inch and 10.1-inch, 1024 x 768 for 9.7-inch, and 1920 x 1200 for 13.1-inch.",
+      "sortOrder": 6,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "What is the difference between RAM and storage?",
+      "answer": "RAM is temporary working memory used to run apps. More RAM generally means smoother multitasking. Storage is where files, apps, and the operating system are saved. Higher storage lets you keep more maps, videos, and applications.",
+      "sortOrder": 7,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "What is the speaker power output?",
+      "answer": "RMS (continuous) power is 4 x 28 W per channel. Maximum output is 4 x 45 W.",
+      "sortOrder": 8,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "product",
+      "question": "How long is the warranty?",
+      "answer": "When purchased through Amazon, the standard warranty period is one year.",
+      "sortOrder": 9,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "account",
+      "question": "How do I find my Amazon or eBay order number?",
+      "answer": "Amazon: sign in, open Orders, select the order, then find the order number on the details page.\n\neBay: sign in, go to My eBay > Purchase History, then open the item to see the order number.",
+      "sortOrder": 10,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I reset the radio if it is not working normally?",
+      "answer": "First try a hard reset: use a pin-like tool to press the RST hole about 6 times.\n\nIf the issue remains, go to Settings > User > Backup and Reset (password 3368) > Erase All Data (Factory Reset).",
+      "sortOrder": 11,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "The radio will not power on. What should I check?",
+      "answer": "1. Press RST about 6 times with a pin-like tool.\n2. Check the radio fuse and vehicle fuses. Reinstall the factory radio if needed to confirm vehicle fuses are good.\n3. Confirm all wiring connections are secure.\n4. Use a multimeter to measure voltage on the yellow constant-power wire and the red ACC wire.\n\nIf you do not have a multimeter, temporarily connect the red wire to the yellow wire (do not cut the yellow wire) to test whether the unit can power on.",
+      "sortOrder": 12,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "The radio stays on after I turn off the car and drains the battery.",
+      "answer": "Disconnect the CANBUS box and check whether the issue continues.\n\nTypical current draw is about 600–800 mA during normal operation and about 10–30 mA in standby.\n\nTo force a full shutdown, connect the red ACC wire and yellow constant 12V wire together on the power harness. The unit will then shut down with the ignition, but it will not retain time or radio presets.",
+      "sortOrder": 13,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Does the radio support SiriusXM satellite radio?",
+      "answer": "There is no port for a SiriusXM tuner. You may check the radio App Store for a SiriusXM app, but third-party app compatibility is not guaranteed.",
+      "sortOrder": 14,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Does the radio support AM stations?",
+      "answer": "AM radio is supported on models with 4GB+64GB (8-core) or higher. Lower-spec models do not have the hardware for AM.",
+      "sortOrder": 15,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Why am I receiving very few radio stations?",
+      "answer": "Open the Radio app, go to Settings, turn on RDS, and set Radio Area to U.S.A 1.",
+      "sortOrder": 16,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Why is there no FM radio sound after connecting CarPlay or Android Auto?",
+      "answer": "This is normal. After CarPlay or Android Auto connects, the head unit switches the audio channel to Bluetooth and mutes built-in apps such as FM radio.\n\nTo use FM radio together with navigation, connect the radio to Wi-Fi or a phone hotspot and use the built-in Maps app.",
+      "sortOrder": 17,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Why does Wi-Fi turn off when Bluetooth or CarPlay is connected?",
+      "answer": "Wi-Fi and Bluetooth/CarPlay cannot run at the same time. The system prioritizes Bluetooth/CarPlay for audio and data. Enabling both at once can cause dropped connections or audio glitches.",
+      "sortOrder": 18,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Wi-Fi is unstable. How can I fix it?",
+      "answer": "1. Make sure the yellow RCA camera plug is fully connected. The small nearby wires receive Wi-Fi and Bluetooth signals.\n2. Go to Settings > User > Backup and Reset (password 3368) > Reset Wi-Fi and Mobile Bluetooth.\n3. Try another Wi-Fi source or hotspot, and test Bluetooth with another phone.\n4. If a phone hotspot stays on SAVE instead of CONNECTED, set the hotspot band to 2.4 GHz.",
+      "sortOrder": 19,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I change the Bluetooth ringtone?",
+      "answer": "In File Manager, create a folder named brting and put audio files in it. Then go to Bluetooth > Settings > Ringtone > Set and choose a ringtone.",
+      "sortOrder": 20,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I connect wireless Apple CarPlay or Android Auto (Car Link 2.0)?",
+      "answer": "1. Open Bluetooth on the radio and pair your phone (PIN 0000). For Android Auto, install Android Auto on the phone first.\n2. Open Car Link 2.0 on the radio.\n3. On the phone, set the device type to Car Stereo. On iPhone, tap Turn on Wi-Fi & Use CarPlay when prompted.\n\nFor a wired connection, plug the phone into USB and open Car Link 2.0.\n\nIf the connection drops, try Car Link 2.0 > Settings > 5G, update Car Link from the radio App Store, or forget old Bluetooth pairings and pair again.",
+      "sortOrder": 21,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Wireless CarPlay is stuck on verification. What should I do?",
+      "answer": "Keep Bluetooth on and turn phone Wi-Fi off. Wait until the phone asks to turn Wi-Fi on for CarPlay, then turn Wi-Fi back on.\n\nIf it still fails, fully close CarPlay, confirm Bluetooth is connected, then reopen the app. Do not use USB at the same time as wireless CarPlay until CarPlay connects.",
+      "sortOrder": 22,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I set CarPlay to start automatically?",
+      "answer": "Go to Settings > User > Self starting upon startup and turn on the Car Link 2.0 app.",
+      "sortOrder": 23,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Steering wheel controls do not work. What should I try?",
+      "answer": "If your vehicle has no CANBUS box, open the SWC/Control app and program the buttons there.\n\nIf the vehicle uses a CANBUS box, controls are learned automatically and usually should not be programmed manually. Check whether the door indicator appears on the radio when a door is opened.\n\nIf volume or track skip is reversed, go to Settings > Factory (password 3368) > Original Car Agreement and toggle Reversal Volume or Reversal Previous And Next.",
+      "sortOrder": 24,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I change wallpaper, theme, or button sounds?",
+      "answer": "Wallpaper: Settings > Device > Display > Wallpaper. You can also load an image from USB.\n\nKey beep: Settings > Device > Sound > turn off Keypad Tone.\n\nTheme: Settings > General > Home Launcher Selection, or install a theme from the radio App Store.",
+      "sortOrder": 25,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "There is little or no sound. What should I check?",
+      "answer": "On vehicles with a factory amplifier, disconnect the battery for about 15 minutes to reset amplifier protection, then reconnect.\n\nIf rear speakers are silent, open Equalizer and set Field to ALL.\n\nFactory-amplified systems (for example Bose) process audio in the original amplifier before it reaches the Android unit.",
+      "sortOrder": 26,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I adjust reverse-camera image, parking lines, and reverse audio?",
+      "answer": "Mirror left/right: Settings > General > Mirror view on reverse image.\n\nFlip up/down: the camera is often mounted upside down; check the mount first.\n\nBlack-and-white image with our camera: Settings > Factory (3368) > turn on HD reversing video format (AHD).\n\nHide parking lines: Settings > Factory (3368) > Original Car Agreement > turn off Reverse Parking Line.\n\nNo reverse audio: Settings > General > turn off Mute audio when Reversing, or Factory > Original Car Agreement > turn on Radar Display.",
+      "sortOrder": 27,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "installation",
+      "question": "Where should I mount the backup camera, GPS antenna, and microphone?",
+      "answer": "Backup camera: above the license plate or near the center of the rear bumper.\n\nGPS antenna: on the A-pillar or just outside the dash, with a clear view of the sky. Do not hide it inside the dash.\n\nMicrophone: plug into the 3.5 mm port on the RCA cable and mount it on the driver-side sun visor, facing the driver.",
+      "sortOrder": 28,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I use GPS navigation on the radio?",
+      "answer": "Connect the GPS antenna first. Then connect the radio to Wi-Fi and open Maps for online navigation, or download offline maps for use without internet. You can also navigate through CarPlay or Android Auto.",
+      "sortOrder": 29,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Can I use a 4G SIM card in the radio?",
+      "answer": "The radio currently supports 4G Micro SIM cards and is compatible with T-Mobile and AT&T. The SIM cable shares a port with RCA cables; if you need both at once, a combined cable is required.\n\nInstall the 4G antenna on the A-pillar or outside the dash.",
+      "sortOrder": 30,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Does the radio support a front camera?",
+      "answer": "A standard front camera input is not supported. You can add a USB dashcam instead.",
+      "sortOrder": 31,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "Should I update the system firmware if the radio works normally?",
+      "answer": "If the radio is working normally, we do not recommend upgrading system or firmware files. Updates are intended to fix specific issues and can introduce new problems.",
+      "sortOrder": 32,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "installation",
+      "question": "Videos will not play while driving. How do I enable video in motion?",
+      "answer": "Go to Settings > Factory (password 3368) and turn off Brake wire for video in motion.",
+      "sortOrder": 33,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "The USB drive is not recognized. What should I try?",
+      "answer": "Go to Settings > Factory (password 3368) > USB protocol selection and choose 2.0. Also check Developer Options (password 3368) if needed. Use a FAT32 USB drive when possible.",
+      "sortOrder": 34,
+      "published": true,
+      "language": "en"
+    },
+    {
+      "category": "technical",
+      "question": "How do I change the boot logo?",
+      "answer": "Go to Settings > Factory (password 3368) > Boot Screen Logo.\n\nFor a custom logo, prepare a PNG image (typically 1280x720 for landscape or 1024x768 for portrait), rename it as required by the unit, copy it to the root of a USB drive, and insert the USB.",
+      "sortOrder": 35,
+      "published": true,
+      "language": "en"
+    }
+  ]
+}

@@ -298,6 +298,8 @@ export const ComplianceHubManagement: React.FC = () => {
 
   const [newsletterSmtp, setNewsletterSmtp] = useState<NewsletterSmtpForm | null>(null)
   const [savedNewsletterSmtp, setSavedNewsletterSmtp] = useState<NewsletterSmtpForm | null>(null)
+  const [contactFormEmailEnabled, setContactFormEmailEnabled] = useState(false)
+  const [savedContactFormEmailEnabled, setSavedContactFormEmailEnabled] = useState(false)
   const [smtpSaving, setSmtpSaving] = useState(false)
 
   const activeHelp = TAB_HELP[tab]
@@ -320,6 +322,13 @@ export const ComplianceHubManagement: React.FC = () => {
     )
   }, [newsletterSmtp, savedNewsletterSmtp])
 
+  const contactFormEmailDirty = contactFormEmailEnabled !== savedContactFormEmailEnabled
+  const smtpReady = !!newsletterSmtp
+    && newsletterSmtp.enabled
+    && newsletterSmtp.host.trim() !== ''
+    && newsletterSmtp.user.trim() !== ''
+    && (newsletterSmtp.passSet || newsletterSmtp.pass.trim() !== '')
+
   const loadGlobals = useCallback(async () => {
     const s = await getSiteSettings('en')
     const d = buildComplianceDraft(s)
@@ -328,6 +337,8 @@ export const ComplianceHubManagement: React.FC = () => {
     const ns = buildNewsletterSmtpForm(s)
     setNewsletterSmtp(ns)
     setSavedNewsletterSmtp(ns)
+    setContactFormEmailEnabled(!!s.contactFormEmailEnabled)
+    setSavedContactFormEmailEnabled(!!s.contactFormEmailEnabled)
   }, [])
 
   const loadLegalHtml = useCallback(async () => {
@@ -438,6 +449,7 @@ export const ComplianceHubManagement: React.FC = () => {
     try {
       const next = await updateSiteSettings(
         {
+          contactFormEmailEnabled,
           newsletterSmtp: {
             enabled: newsletterSmtp.enabled,
             host: newsletterSmtp.host,
@@ -453,6 +465,8 @@ export const ComplianceHubManagement: React.FC = () => {
       const ns = buildNewsletterSmtpForm(next)
       setNewsletterSmtp(ns)
       setSavedNewsletterSmtp(ns)
+      setContactFormEmailEnabled(!!next.contactFormEmailEnabled)
+      setSavedContactFormEmailEnabled(!!next.contactFormEmailEnabled)
       showToast({ type: 'success', title: '发信设置已保存' })
     } catch (e) {
       showToast({ type: 'error', title: e instanceof Error ? e.message : '保存失败' })
@@ -950,12 +964,15 @@ export const ComplianceHubManagement: React.FC = () => {
                     <CardTitle className="text-slate-800 dark:text-white">发信服务器（SMTP）</CardTitle>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    {newsletterSmtpDirty && (
+                    {(newsletterSmtpDirty || contactFormEmailDirty) && (
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => savedNewsletterSmtp && setNewsletterSmtp({ ...savedNewsletterSmtp })}
+                        onClick={() => {
+                          if (savedNewsletterSmtp) {setNewsletterSmtp({ ...savedNewsletterSmtp })}
+                          setContactFormEmailEnabled(savedContactFormEmailEnabled)
+                        }}
                         disabled={smtpSaving}
                       >
                         恢复
@@ -965,13 +982,13 @@ export const ComplianceHubManagement: React.FC = () => {
                       type="button"
                       size="sm"
                       onClick={() => void saveNewsletterSmtpBlock()}
-                      disabled={smtpSaving || !newsletterSmtpDirty}
+                      disabled={smtpSaving || (!newsletterSmtpDirty && !contactFormEmailDirty)}
                     >
                       {smtpSaving ? '保存中…' : '保存发信设置'}
                     </Button>
                   </div>
                 </div>
-                {newsletterSmtpDirty && (
+                {(newsletterSmtpDirty || contactFormEmailDirty) && (
                   <p className="text-xs text-amber-700 dark:text-amber-300 mt-2">有未保存的更改</p>
                 )}
               </CardHeader>
@@ -984,6 +1001,25 @@ export const ComplianceHubManagement: React.FC = () => {
                   <Toggle
                     checked={newsletterSmtp.enabled}
                     onChange={(v) => setNewsletterSmtp((p) => (p ? { ...p, enabled: v } : p))}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-4 p-3 border border-slate-200 dark:border-gray-700 rounded-lg">
+                  <div>
+                    <div className="text-sm font-medium text-slate-800 dark:text-white">联系表单邮件通知</div>
+                    <div className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
+                      用户提交联系表单后，发送到 SMTP 账号邮箱；点击回复会直接回复用户邮箱
+                    </div>
+                    {!smtpReady && (
+                      <div className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                        请先填写并保存 SMTP 主机、账号和密码 / 授权码
+                      </div>
+                    )}
+                  </div>
+                  <Toggle
+                    checked={contactFormEmailEnabled}
+                    onChange={(v) => {
+                      if (!v || smtpReady) {setContactFormEmailEnabled(v)}
+                    }}
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

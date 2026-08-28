@@ -52,6 +52,8 @@ import {
   createFAQ,
   updateFAQ,
   deleteFAQ,
+  exportAdminFAQs,
+  importAdminFAQs,
   type FAQItem,
   type FAQCreateData,
 } from '@/services/faqService'
@@ -1597,6 +1599,8 @@ function FAQPanel({ dataLanguage, showToast }: PanelProps) {
   const [formCategory, setFormCategory] = useState('general')
   const [formSortOrder, setFormSortOrder] = useState(0)
   const [formPublished, setFormPublished] = useState(true)
+  const importInputRef = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
 
   useEffect(() => {
     moduleSettingsService.getModuleSettings().then((data) => {
@@ -1607,7 +1611,7 @@ function FAQPanel({ dataLanguage, showToast }: PanelProps) {
   const loadFAQs = useCallback(async () => {
     setLoadingFaqs(true)
     try {
-      const data = await getAdminFAQs(dataLanguage)
+      const data = await getAdminFAQs('en')
       setFaqs(data)
     } catch {
       showToast({ type: 'error', title: '加载失败', description: '无法加载 FAQ 数据' })
@@ -1675,7 +1679,7 @@ function FAQPanel({ dataLanguage, showToast }: PanelProps) {
         category: formCategory,
         sortOrder: formSortOrder,
         published: formPublished,
-        language: dataLanguage,
+        language: 'en',
       }
       if (editingFaq) {
         const updated = await updateFAQ(editingFaq._id, payload)
@@ -1717,6 +1721,48 @@ function FAQPanel({ dataLanguage, showToast }: PanelProps) {
     }
   }
 
+  const handleExportFaqs = async () => {
+    try {
+      const data = await exportAdminFAQs()
+      const blob = new Blob([JSON.stringify({ language: 'en', items: data.items }, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'faq-en.json'
+      link.click()
+      URL.revokeObjectURL(url)
+      showToast({ type: 'success', title: '已导出英文 FAQ' })
+    } catch {
+      showToast({ type: 'error', title: '导出失败' })
+    }
+  }
+
+  const handleImportFaqs = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) {
+      return
+    }
+    setImporting(true)
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text)
+      const items = Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed) ? parsed : [])
+      if (items.length === 0) {
+        showToast({ type: 'error', title: '文件中没有 FAQ 条目' })
+        return
+      }
+      const replace = window.confirm('用文件内容替换全部英文 FAQ？点取消则按问题合并更新。')
+      const result = await importAdminFAQs(items, replace ? 'replace' : 'merge')
+      showToast({ type: 'success', title: `已导入 ${result.imported} 条英文 FAQ` })
+      await loadFAQs()
+    } catch {
+      showToast({ type: 'error', title: '导入失败', description: '请使用 faq-en.json 格式' })
+    } finally {
+      setImporting(false)
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
@@ -1747,9 +1793,24 @@ function FAQPanel({ dataLanguage, showToast }: PanelProps) {
             <h4 className="text-sm font-medium text-slate-700 dark:text-gray-200">
               FAQ 内容管理 <span className="text-slate-400 font-normal">({faqs.length} 条)</span>
             </h4>
-            <Button size="sm" variant="outline" onClick={openCreate} className="h-8">
-              <Plus className="w-4 h-4 mr-1" /> 新增
-            </Button>
+            <div className="flex items-center gap-2">
+              <input
+                ref={importInputRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden"
+                onChange={(event) => { void handleImportFaqs(event) }}
+              />
+              <Button size="sm" variant="outline" onClick={() => { void handleExportFaqs() }} className="h-8">
+                导出
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => importInputRef.current?.click()} disabled={importing} className="h-8">
+                {importing ? '导入中' : '导入'}
+              </Button>
+              <Button size="sm" variant="outline" onClick={openCreate} className="h-8">
+                新增
+              </Button>
+            </div>
           </div>
 
           {/* Inline form */}

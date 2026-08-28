@@ -448,7 +448,8 @@ class NotificationService {
     to: string,
     subject: string,
     text: string,
-    html?: string
+    html?: string,
+    options?: { replyTo?: string }
   ): Promise<{ ok: boolean; error?: string }> {
     try {
       const g = await GlobalSiteSettings.findOne().lean();
@@ -472,6 +473,7 @@ class NotificationService {
       await transporter.sendMail({
         from,
         to,
+        ...(options?.replyTo ? { replyTo: options.replyTo } : {}),
         subject,
         text,
         html: html ?? `<pre>${text.replace(/</g, '&lt;')}</pre>`,
