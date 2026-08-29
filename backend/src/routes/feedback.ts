@@ -200,8 +200,6 @@ router.post('/', feedbackRateLimit, async (req, res) => {
               reference: 'Справочная информация',
               topic: 'Тема',
               content: 'Сообщение',
-              location: 'Местоположение',
-              time: 'Отправлено',
             }
           : {
               intro: 'A new contact form message has been submitted.',
@@ -210,8 +208,6 @@ router.post('/', feedbackRateLimit, async (req, res) => {
               reference: 'Reference',
               topic: 'Subject',
               content: 'Message',
-              location: 'Location',
-              time: 'Submitted at',
             }
         const text = [
           labels.intro,
@@ -222,9 +218,6 @@ router.post('/', feedbackRateLimit, async (req, res) => {
           `${labels.topic}: ${subject}`,
           `${labels.content}:`,
           message,
-          '',
-          `${labels.location}: ${geo.location}`,
-          `${labels.time}: ${timeDisplay}`,
         ].join('\n')
         const html = `
           <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937">
@@ -236,8 +229,6 @@ router.post('/', feedbackRateLimit, async (req, res) => {
                 <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.reference)}</td><td style="padding:6px 0">${escapeHtml(normalizedOrderNumber)}</td></tr>
                 <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.topic)}</td><td style="padding:6px 0">${escapeHtml(subject)}</td></tr>
                 <tr><td style="padding:6px 12px 6px 0;font-weight:600;vertical-align:top">${escapeHtml(labels.content)}</td><td style="padding:6px 0;white-space:pre-wrap">${escapeHtml(message)}</td></tr>
-                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.location)}</td><td style="padding:6px 0">${escapeHtml(geo.location)}</td></tr>
-                <tr><td style="padding:6px 12px 6px 0;font-weight:600">${escapeHtml(labels.time)}</td><td style="padding:6px 0">${escapeHtml(timeDisplay)}</td></tr>
               </tbody>
             </table>
           </div>
