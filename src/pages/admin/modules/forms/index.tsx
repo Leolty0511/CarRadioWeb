@@ -12,7 +12,7 @@ import {
   ColumnDef,
   PaginationState
 } from '@tanstack/react-table'
-import { MessageSquare, Eye, Trash2 } from 'lucide-react'
+import { MessageSquare, Eye, Trash2, Mail } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
@@ -49,7 +49,7 @@ const PAGE_SIZE_OPTIONS = [10, 20, 50, 100]
 
 const STATUS_TEXT: Record<string, string> = {
   pending: '待处理',
-  read: '已读',
+  read: '已查看',
   replied: '已回复'
 }
 
@@ -323,8 +323,8 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
           <CardTitle className="text-slate-800 dark:text-white">联系表单</CardTitle>
           {selectedIds.length > 0 && (
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('read', '已读')}>
-                标记已读 ({selectedIds.length})
+              <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('read', '已查看')}>
+                标记已查看 ({selectedIds.length})
               </Button>
               <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('replied', '已回复')}>
                 标记已回复 ({selectedIds.length})
@@ -409,7 +409,18 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
               </div>
               <div>
                 <p className="text-sm text-slate-500 dark:text-slate-400">邮箱</p>
-                <p className="text-slate-900 dark:text-white">{viewingForm.email}</p>
+                {viewingForm.email ? (
+                  <a
+                    href={`mailto:${viewingForm.email}?subject=${encodeURIComponent(`Re: ${viewingForm.subject}`)}`}
+                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                    title="通过邮箱回复"
+                  >
+                    <Mail className="h-4 w-4" />
+                    {viewingForm.email}
+                  </a>
+                ) : (
+                  <p className="text-slate-500 dark:text-slate-400">未提供邮箱，可在官网标记已回复</p>
+                )}
               </div>
               {viewingForm.phone && (
                 <div>
