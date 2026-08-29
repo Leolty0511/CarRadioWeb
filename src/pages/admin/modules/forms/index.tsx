@@ -31,6 +31,7 @@ import {
 } from '@/services/contactService'
 import type { ContactForm as ServiceContactForm } from '@/services/contactService'
 import { cn } from '@/utils/cn'
+import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 
 interface FormsManagementProps {
   onUnreadCountChange?: (count: number) => void
@@ -61,6 +62,12 @@ const STATUS_COLORS: Record<string, string> = {
 
 export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountChange }) => {
   const { showToast } = useToast()
+  const { siteSettings } = useSiteSettings()
+  const emailReplyEnabled = Boolean(
+    siteSettings.contactFormEmailEnabled &&
+    siteSettings.newsletterSmtp?.enabled &&
+    siteSettings.newsletterSmtp.user?.trim()
+  )
 
   const [forms, setForms] = useState<ContactForm[]>([])
   const [loading, setLoading] = useState(true)
@@ -326,9 +333,11 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
               <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('read', '已查看')}>
                 标记已查看 ({selectedIds.length})
               </Button>
-              <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('replied', '已回复')}>
-                标记已回复 ({selectedIds.length})
-              </Button>
+              {!emailReplyEnabled && (
+                <Button variant="outline" size="sm" onClick={() => handleBatchMarkStatus('replied', '已回复')}>
+                  标记已回复 ({selectedIds.length})
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -439,16 +448,22 @@ export const FormsManagement: React.FC<FormsManagementProps> = ({ onUnreadCountC
                 <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{viewingForm.message}</p>
               </div>
             </div>
-            <div className="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
-              <Button
-                size="sm"
-                variant={viewingForm.status === 'replied' ? 'secondary' : 'outline'}
-                onClick={() => handleUpdateStatus(viewingForm.id, 'replied')}
-                className={viewingForm.status === 'replied' ? 'bg-green-600' : ''}
-              >
-                标记已回复
-              </Button>
-            </div>
+            {emailReplyEnabled ? (
+              <p className="pt-4 border-t border-slate-200 dark:border-slate-700 text-sm text-slate-500 dark:text-slate-400">
+                邮件已发送至 SMTP 账号，请直接在邮箱中回复；回复后无需再回官网标记。
+              </p>
+            ) : (
+              <div className="flex gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <Button
+                  size="sm"
+                  variant={viewingForm.status === 'replied' ? 'secondary' : 'outline'}
+                  onClick={() => handleUpdateStatus(viewingForm.id, 'replied')}
+                  className={viewingForm.status === 'replied' ? 'bg-green-600' : ''}
+                >
+                  标记已回复
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </FormModal>
