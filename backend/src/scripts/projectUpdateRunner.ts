@@ -2,6 +2,7 @@ import { spawnSync } from 'child_process'
 import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
+import crypto from 'crypto'
 
 interface RunnerPayload {
   jobId: string
@@ -41,6 +42,7 @@ let logs: string[] = []
 let merged = false
 let artifactBackupDir: string | null = null
 let artifactApplied = false
+let forumBridgeChanged = false
 const artifactPaths = [
   'dist',
   path.join('backend', 'dist'),
@@ -215,6 +217,26 @@ async function clearDirectory(directory: string): Promise<void> {
   await Promise.all(entries.map(entry => fs.rm(path.join(directory, entry), { recursive: true, force: true })))
 }
 
+async function directoryFingerprint(directory: string): Promise<string> {
+  const hash = crypto.createHash('sha256')
+  const walk = async (current: string, relative = ''): Promise<void> => {
+    let entries: Array<import('fs').Dirent>
+    try { entries = await fs.readdir(current, { withFileTypes: true }) } catch { return }
+    entries.sort((a, b) => a.name.localeCompare(b.name))
+    for (const entry of entries) {
+      const rel = path.join(relative, entry.name)
+      const full = path.join(current, entry.name)
+      if (entry.isDirectory()) await walk(full, rel)
+      else {
+        hash.update(rel)
+        hash.update(await fs.readFile(full))
+      }
+    }
+  }
+  await walk(directory)
+  return hash.digest('hex')
+}
+
 async function replaceStableDirectory(relativePath: string, sourceRoot: string, backupCurrent: boolean): Promise<void> {
   if (!artifactBackupDir) throw new Error('artifact backup directory is not initialized')
   const current = path.join(payload.repoRoot, relativePath)
@@ -267,6 +289,10 @@ async function applyArtifact(): Promise<void> {
 
   for (const relative of artifactPaths) {
     if (stableDirectoryPaths.has(relative)) {
+      if (relative === 'forum-extensions') {
+        forumBridgeChanged = (await directoryFingerprint(path.join(payload.repoRoot, relative))) !==
+          (await directoryFingerprint(path.join(stagingDir, relative)))
+      }
       await replaceStableDirectory(relative, stagingDir, true)
       continue
     }
@@ -335,7 +361,11 @@ async function main(): Promise<void> {
     if (payload.artifactUrl) {
       await writeStatus({ stage: 'downloading', message: 'Downloading the prebuilt package from GitHub' })
       await applyArtifact()
-      await installForumBridge()
+      if (forumBridgeChanged) {
+        await installForumBridge()
+      } else {
+        await writeStatus({ stage: 'forum_bridge_unchanged', message: 'Forum login bridge unchanged; skipping bridge reinstall' })
+      }
       await restartFrontend()
       await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
       await writeStatus({ stage: 'health_check', message: 'Checking the new version health' })
