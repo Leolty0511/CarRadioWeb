@@ -144,8 +144,9 @@ function NewsEditor({ item, onSave, onCancel, saving }: NewsEditorProps) {
       formData.append('image', file)
       formData.append('folder', 'uploads')
       const response = await apiClient.upload<{ url: string }>('/upload/image', formData)
-      if (response.success && response.data?.url) {
-        updateField('thumbnail', response.data.url)
+      const uploadedUrl = (response as any).url || (response.data as any)?.url
+      if (response.success && uploadedUrl) {
+        updateField('thumbnail', uploadedUrl)
         showToast({ type: 'success', title: '封面上传成功' })
       } else {
         throw new Error(response.error || '上传失败')

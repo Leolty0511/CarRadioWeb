@@ -67,7 +67,8 @@ class CategoryService extends BaseCrudService<Category, CreateCategoryRequest, U
       return [];
     }
 
-    return response.data || [];
+    const payload: any = response.data;
+    return Array.isArray(payload) ? payload : (payload?.data || []);
   }
 
   /**
@@ -87,7 +88,8 @@ class CategoryService extends BaseCrudService<Category, CreateCategoryRequest, U
       return [];
     }
 
-    return response.data || [];
+    const payload: any = response.data;
+    return Array.isArray(payload) ? payload : (payload?.data || []);
   }
 
   /**
@@ -103,7 +105,8 @@ class CategoryService extends BaseCrudService<Category, CreateCategoryRequest, U
       throw new Error(response.error || '创建分类失败');
     }
 
-    return response.data!;
+    const payload: any = response.data;
+    return (payload?.data || payload)!;
   }
 
   /**

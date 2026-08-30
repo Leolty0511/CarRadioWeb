@@ -8,6 +8,7 @@ export interface IProduct extends Document {
   description: string;
   category: string;
   image: string;
+  images: Array<{ url: string; alt?: string; order?: number }>;
   features: string[];
   specifications: Record<string, string>;
   price?: string;
@@ -37,14 +38,14 @@ const ProductSchema: Schema = new Schema(
       type: String,
       required: true,
     },
-    category: {
-      type: String,
-      required: true,
-      enum: ['carplay', 'screens', 'accessories'],
-    },
+    category: { type: String, required: true, trim: true },
     image: {
       type: String,
       default: '',
+    },
+    images: {
+      type: [{ url: { type: String, required: true }, alt: { type: String, default: '' }, order: { type: Number, default: 0 } }],
+      default: [],
     },
     features: {
       type: [String],
@@ -95,4 +96,3 @@ ProductSchema.index({ category: 1, language: 1 });
 ProductSchema.index({ createdAt: -1 });
 
 export default mongoose.model<IProduct>('Product', ProductSchema);
-

@@ -4,6 +4,8 @@ import { VisitRecord } from '../models/Visitor';
 import mongoose from 'mongoose';
 import { createLogger } from '../utils/logger';
 import { processDueNewsletterCampaigns } from './newsletterCampaignProcessor';
+import { Feedback } from '../models/Feedback';
+import GlobalSiteSettings from '../models/GlobalSiteSettings';
 
 const logger = createLogger('cleanup-job');
 
@@ -17,6 +19,7 @@ export class CleanupJob {
     this.startDatabaseCleanup();
     this.startVisitorDataCleanup();
     this.startNewsletterCampaignScheduler();
+    this.startContactAutoReplyJob();
     logger.info('所有清理任务已启动');
   }
 
@@ -197,6 +200,20 @@ export class CleanupJob {
       }
     });
     logger.info('Newsletter 群发调度已启动: 每分钟检查一次');
+  }
+
+  /** 联系表单邮件通知开启时，超过 24 小时的未回复记录自动归档为已回复。 */
+  private startContactAutoReplyJob() {
+    cron.schedule('*/10 * * * *', async () => {
+      try {
+        const settings = await GlobalSiteSettings.findOne().lean() as any;
+        if (!settings?.contactFormEmailEnabled || !settings?.newsletterSmtp?.enabled || !String(settings.newsletterSmtp.user || '').trim()) return;
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const result = await Feedback.updateMany({ status: { $in: ['pending', 'read'] }, submitTime: { $lte: cutoff } }, { $set: { status: 'replied' } });
+        if (result.modifiedCount) logger.info({ count: result.modifiedCount }, '联系表单已按邮件通知策略自动标记为已回复');
+      } catch (error) { logger.error({ error }, '联系表单自动标记失败'); }
+    });
+    logger.info('联系表单自动回复状态任务已启动: 每10分钟检查一次');
   }
 
   /**

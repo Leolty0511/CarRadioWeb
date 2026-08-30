@@ -48,18 +48,17 @@ const EnterpriseNewsDisplay: React.FC<EnterpriseNewsDisplayProps> = ({
     try {
       setLoading(true);
       const response = await apiClient.get('/v1/content/news', {
-        params: {
-          page: currentPage,
-          limit,
-          status: 'published',
-          sortBy: 'createdAt',
-          sortOrder: 'desc'
-        }
+        page: currentPage,
+        limit,
+        status: 'published',
+        sortBy: 'createdAt',
+        sortOrder: 'desc'
       });
 
-      if (response.data?.success) {
-        setNews(response.data.data || []);
-        setTotalPages(response.data.pagination?.totalPages || 1);
+      if (response.success) {
+        const payload: any = response.data || {};
+        setNews(payload.documents || payload.data || []);
+        setTotalPages(payload.pagination?.totalPages || payload.totalPages || 1);
       }
     } catch (error) {
       console.error('加载新闻失败:', error);

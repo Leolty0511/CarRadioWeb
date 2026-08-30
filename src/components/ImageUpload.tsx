@@ -1,7 +1,7 @@
 // 方法/组件：ImageUpload
 import React, { useRef, useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Image as ImageIcon, X } from 'lucide-react'
+import { Image as ImageIcon, X, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useToast } from '@/components/ui/Toast'
 import { apiClient } from '@/services/apiClient'
@@ -37,6 +37,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
   const { showToast } = useToast()
   const dropZoneRef = useRef<HTMLDivElement>(null)
   const [isUploading, setIsUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   /** 上传到后端 /api/upload/image，返回 URL */
   const uploadToBackend = async (file: File, folder?: string, customName?: string): Promise<string> => {
@@ -158,6 +159,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         `}
         tabIndex={0}
       >
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileSelect(file); e.currentTarget.value = '' }} />
         {value ? (
           <div className="space-y-2">
             <img
@@ -181,6 +183,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
                 <X className="h-4 w-4 mr-1" />
                 {t('common.remove')}
               </Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                <Upload className="h-4 w-4 mr-1" />更换图片
+              </Button>
             </div>
           </div>
         ) : (
@@ -193,6 +198,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
             <p className="text-xs text-gray-400 italic">
               {t('admin.images.dragDropPasteOnly')}
             </p>
+            <Button type="button" size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+              <Upload className="h-4 w-4 mr-1" />选择图片
+            </Button>
           </div>
         )}
       </div>

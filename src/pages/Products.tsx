@@ -82,7 +82,7 @@ export default function Products() {
       const response = await fetch(`/api/products/published?language=${contentLanguage}`)
       if (!response.ok) {return []}
       const data = await response.json()
-      return data.products || []
+      return Array.isArray(data) ? data : (data.products || data.data || [])
     },
     staleTime: 5 * 60 * 1000,
   })

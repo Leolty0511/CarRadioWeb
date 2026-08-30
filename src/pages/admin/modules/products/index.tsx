@@ -4,11 +4,12 @@
  */
 
 import { useState, useEffect } from 'react'
-import { Edit, Trash2, Image, Package } from 'lucide-react'
+import { Edit, Trash2, Image, Package, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import CategorySelector from '@/components/CategorySelector'
 import ImageUpload from '@/components/ImageUpload'
+import { apiClient } from '@/services/apiClient'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
 
 interface Product {
@@ -17,6 +18,7 @@ interface Product {
   description: string
   category: string
   image: string
+  images?: Array<{ url: string; alt?: string; order?: number }>
   features: string[]
   specifications: Record<string, string>
   price?: string
@@ -53,7 +55,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ dataLangua
       const response = await fetch(`/api/products?language=${dataLanguage}`)
       if (response.ok) {
         const data = await response.json()
-        setProducts(data)
+        const list = Array.isArray(data) ? data : data.products || data.data || []
+        setProducts(list.map((item: any) => ({ ...item, id: item.id || item._id, title: item.title || item.name || '', image: item.image || item.images?.[0]?.url || '' })))
       }
     } catch (error) {
       console.error('Failed to load products:', error)
@@ -74,10 +77,8 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ dataLangua
 
   const handleDelete = async (productId: string) => {
     try {
-      const response = await fetch(`/api/products/${productId}`, {
-        method: 'DELETE',
-      })
-      if (response.ok) {
+      const response = await apiClient.delete(`/products/${productId}`)
+      if (response.success) {
         loadProducts()
       }
     } catch (error) {
@@ -90,15 +91,11 @@ export const ProductManagement: React.FC<ProductManagementProps> = ({ dataLangua
       const url = editingProduct
         ? `/api/products/${editingProduct.id}`
         : '/api/products'
-      const method = editingProduct ? 'PUT' : 'POST'
+      const response = editingProduct
+        ? await apiClient.put(url.replace('/api', ''), { ...product, language: dataLanguage })
+        : await apiClient.post(url.replace('/api', ''), { ...product, language: dataLanguage })
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...product, language: dataLanguage }),
-      })
-
-      if (response.ok) {
+      if (response.success) {
         setShowEditor(false)
         loadProducts()
       }
@@ -253,6 +250,7 @@ const ProductEditor: React.FC<ProductEditorProps> = ({ product, onSave, onCancel
       description: '',
       category: '',
       image: '',
+      images: [],
       features: [''],
       specifications: {},
       status: 'active', // 默认为已发布
@@ -262,7 +260,8 @@ const ProductEditor: React.FC<ProductEditorProps> = ({ product, onSave, onCancel
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     // 创建时自动设置为已发布
-    onSave({ ...formData, status: 'active' })
+    const images = (formData.images || []).filter((item) => item?.url)
+    onSave({ ...formData, image: images[0]?.url || formData.image || '', images, status: 'active' })
   }
 
   return (
@@ -321,10 +320,16 @@ const ProductEditor: React.FC<ProductEditorProps> = ({ product, onSave, onCancel
           <label className="block text-sm font-medium text-slate-600 dark:text-gray-300 mb-2">
             产品图片 *
           </label>
-          <ImageUpload
-            value={formData.image || ''}
-            onChange={(url) => setFormData({ ...formData, image: url })}
-          />
+          <div className="space-y-3">
+            <ImageUpload value={formData.image || formData.images?.[0]?.url || ''} onChange={(url) => setFormData({ ...formData, image: url, images: url ? [{ url, order: 0 }, ...(formData.images || []).slice(1)] : (formData.images || []).slice(1) })} placeholder="上传主图" />
+            {(formData.images || []).slice(1).map((item, index) => (
+              <div key={`${item.url}-${index}`} className="flex items-start gap-2">
+                <div className="flex-1"><ImageUpload value={item.url} onChange={(url) => setFormData({ ...formData, images: (formData.images || []).map((img, i) => i === index + 1 ? { ...img, url } : img) })} placeholder={`详情图 ${index + 1}`} /></div>
+                <Button type="button" variant="outline" size="sm" onClick={() => setFormData({ ...formData, images: (formData.images || []).filter((_, i) => i !== index + 1) })}><X className="w-4 h-4" /></Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={() => setFormData({ ...formData, images: [...(formData.images || []), { url: '', order: (formData.images || []).length }] })}><Plus className="w-4 h-4 mr-1" />添加详情图</Button>
+          </div>
         </div>
 
         <div>
@@ -358,4 +363,3 @@ const ProductEditor: React.FC<ProductEditorProps> = ({ product, onSave, onCancel
 }
 
 export default ProductManagement
-

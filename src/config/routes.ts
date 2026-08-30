@@ -35,7 +35,9 @@ const MemberProfile = lazy(() => import('@/pages/MemberProfile'));
 
 // 企业官网页面
 const Products = lazy(() => import('@/pages/Products'));
+const ProductDetail = lazy(() => import('@/pages/ProductDetail'));
 const News = lazy(() => import('@/pages/News'));
+const NewsDetail = lazy(() => import('@/pages/NewsDetail'));
 const Resources = lazy(() => import('@/pages/Resources'));
 const About = lazy(() => import('@/pages/About'));
 const Quality = lazy(() => import('@/pages/Quality'));
@@ -80,7 +82,9 @@ export const commonRoutes: RouteConfig[] = [
   { path: 'user-manual', component: UserManual, protected: true },
   { path: 'user-manual/:slug', component: UserManualDetail, protected: true },
   { path: 'products', component: Products },
+  { path: 'products/:id', component: ProductDetail },
   { path: 'news', component: News },
+  { path: 'news/:id', component: NewsDetail },
   { path: 'resources', component: Resources },
   { path: 'about', component: About },
   { path: 'quality', component: Quality },
