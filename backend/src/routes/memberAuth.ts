@@ -361,7 +361,10 @@ router.get('/forum/oauth/user', async (req, res) => {
   const identity = member || admin
   const identityEmail = String(identity?.email || (admin?.loginUsername || '')).trim().toLowerCase()
   if (!identity || !EMAIL.test(identityEmail) || await blockedForumMember(identityEmail)) return res.status(401).json({ error: 'invalid_token' })
-  res.json({ id: String(identity._id), email: identityEmail, name: identity.nickname, nickname: identity.nickname, avatar: identity.avatar || '', isAdmin: Boolean(admin), role: admin?.role || 'member' })
+  // Prefix administrator identifiers so the Flarum bridge can reliably
+  // distinguish a main-site admin even if Passport drops unknown profile fields.
+  const identityId = admin ? `admin:${String(admin._id)}` : String(identity._id)
+  res.json({ id: identityId, email: identityEmail, name: identity.nickname, nickname: identity.nickname, avatar: identity.avatar || '', isAdmin: Boolean(admin), role: admin?.role || 'member' })
 })
 
 router.post('/send-code', codeLimiter, async (req, res) => {

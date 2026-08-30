@@ -57,7 +57,7 @@ final class PassportResponseListener
 
             // Main-site administrators receive moderator access in Flarum while
             // preserving any existing Admin/Moderator groups already assigned.
-            if (!empty($profile['isAdmin']) || in_array($profile['role'] ?? null, ['admin', 'super_admin'], true)) {
+            if (str_starts_with($identifier, 'admin:') || !empty($profile['isAdmin']) || in_array($profile['role'] ?? null, ['admin', 'super_admin'], true)) {
                 $moderator = Group::where('name', 'Moderator')->first() ?: Group::find(4);
                 if ($moderator && method_exists($user, 'joinGroup')) {
                     $user->joinGroup($moderator);
