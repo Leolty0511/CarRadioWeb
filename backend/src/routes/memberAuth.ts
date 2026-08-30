@@ -276,16 +276,17 @@ router.get('/forum/oauth/authorize', async (req, res) => {
   }
 
   await optionalContentAccess(req, res, () => undefined)
-  const isAdmin = req.contentPrincipal?.type === 'admin' && req.user
+  const adminUser = req.user
+  const isAdmin = req.contentPrincipal?.type === 'admin' && Boolean(adminUser)
   const member = req.contentPrincipal?.type === 'member' ? req.member : null
   if (!member && !isAdmin) return res.redirect(frontendLoginUrl())
-  const identityEmail = isAdmin ? String(req.user.email || req.user.loginUsername || '').trim().toLowerCase() : member!.email
+  const identityEmail = isAdmin ? String(adminUser!.email || adminUser!.loginUsername || '').trim().toLowerCase() : member!.email
   if (!EMAIL.test(identityEmail) || await blockedForumMember(identityEmail)) return oauthError(res, redirectUri, state, 'access_denied', 'This account is not allowed to sign in to the forum.')
 
   const code = crypto.randomBytes(32).toString('base64url')
   await ForumOAuthAuthorizationCode.create({
     codeHash: hashOAuthToken(code),
-    ...(isAdmin ? { adminId: req.user._id, principalType: 'admin' as const } : { memberId: member!._id, principalType: 'member' as const }),
+    ...(isAdmin ? { adminId: adminUser!._id, principalType: 'admin' as const } : { memberId: member!._id, principalType: 'member' as const }),
     clientId,
     redirectUri,
     expiresAt: new Date(Date.now() + OAUTH_CODE_TTL_MS),
