@@ -217,7 +217,7 @@ function blockedForumEmail(email: string): boolean {
 
 async function blockedForumMember(email: string): Promise<boolean> {
   if (blockedForumEmail(email)) return true
-  return Boolean(await User.exists({ email: email.toLowerCase(), role: { $in: ['admin', 'super_admin'] } }))
+  return false
 }
 
 function frontendLoginUrl(): string {
@@ -276,14 +276,16 @@ router.get('/forum/oauth/authorize', async (req, res) => {
   }
 
   await optionalContentAccess(req, res, () => undefined)
+  const isAdmin = req.contentPrincipal?.type === 'admin' && req.user
   const member = req.contentPrincipal?.type === 'member' ? req.member : null
-  if (!member) return res.redirect(frontendLoginUrl())
-  if (await blockedForumMember(member.email)) return oauthError(res, redirectUri, state, 'access_denied', 'This account is reserved for a forum administrator.')
+  if (!member && !isAdmin) return res.redirect(frontendLoginUrl())
+  const identityEmail = isAdmin ? String(req.user.email || req.user.loginUsername || '').trim().toLowerCase() : member!.email
+  if (!EMAIL.test(identityEmail) || await blockedForumMember(identityEmail)) return oauthError(res, redirectUri, state, 'access_denied', 'This account is not allowed to sign in to the forum.')
 
   const code = crypto.randomBytes(32).toString('base64url')
   await ForumOAuthAuthorizationCode.create({
     codeHash: hashOAuthToken(code),
-    memberId: member._id,
+    ...(isAdmin ? { adminId: req.user._id, principalType: 'admin' as const } : { memberId: member!._id, principalType: 'member' as const }),
     clientId,
     redirectUri,
     expiresAt: new Date(Date.now() + OAUTH_CODE_TTL_MS),
@@ -318,13 +320,21 @@ router.post('/forum/oauth/token', async (req, res) => {
   )
   if (!record) return res.status(400).json({ error: 'invalid_grant' })
 
-  const member = await Member.findOne({ _id: record.memberId, status: 'active' }).select('email nickname avatar')
-  if (!member || await blockedForumMember(member.email)) return res.status(400).json({ error: 'invalid_grant' })
+  const member = record.principalType === 'member'
+    ? await Member.findOne({ _id: record.memberId, status: 'active' }).select('email nickname avatar')
+    : null
+  const admin = record.principalType === 'admin'
+    ? await User.findOne({ _id: record.adminId, isActive: true }).select('email loginUsername nickname avatar role')
+    : null
+  const identity = member || admin
+  const identityEmail = String(identity?.email || (admin?.loginUsername || '')).trim().toLowerCase()
+  if (!identity || !EMAIL.test(identityEmail) || await blockedForumMember(identityEmail)) return res.status(400).json({ error: 'invalid_grant' })
 
   const accessToken = crypto.randomBytes(32).toString('base64url')
   await ForumOAuthAccessToken.create({
     tokenHash: hashOAuthToken(accessToken),
-    memberId: member._id,
+    ...(member ? { memberId: member._id } : { adminId: admin!._id }),
+    principalType: record.principalType,
     clientId,
     expiresAt: new Date(Date.now() + OAUTH_ACCESS_TOKEN_TTL_MS),
   })
@@ -342,9 +352,16 @@ router.get('/forum/oauth/user', async (req, res) => {
 
   const token = await ForumOAuthAccessToken.findOne({ tokenHash: hashOAuthToken(match[1]), clientId: config.clientId, expiresAt: { $gt: new Date() } })
   if (!token) return res.status(401).json({ error: 'invalid_token' })
-  const member = await Member.findOne({ _id: token.memberId, status: 'active' }).select('email nickname avatar')
-  if (!member || await blockedForumMember(member.email)) return res.status(401).json({ error: 'invalid_token' })
-  res.json({ id: String(member._id), email: member.email, name: member.nickname, nickname: member.nickname, avatar: member.avatar || '' })
+  const member = token.principalType === 'member'
+    ? await Member.findOne({ _id: token.memberId, status: 'active' }).select('email nickname avatar')
+    : null
+  const admin = token.principalType === 'admin'
+    ? await User.findOne({ _id: token.adminId, isActive: true }).select('email loginUsername nickname avatar role')
+    : null
+  const identity = member || admin
+  const identityEmail = String(identity?.email || (admin?.loginUsername || '')).trim().toLowerCase()
+  if (!identity || !EMAIL.test(identityEmail) || await blockedForumMember(identityEmail)) return res.status(401).json({ error: 'invalid_token' })
+  res.json({ id: String(identity._id), email: identityEmail, name: identity.nickname, nickname: identity.nickname, avatar: identity.avatar || '', isAdmin: Boolean(admin), role: admin?.role || 'member' })
 })
 
 router.post('/send-code', codeLimiter, async (req, res) => {

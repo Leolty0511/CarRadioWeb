@@ -6,6 +6,7 @@ use Flarum\Http\RememberAccessToken;
 use Flarum\Http\Rememberer;
 use Flarum\User\LoginProvider;
 use Flarum\User\User;
+use Flarum\Group\Group;
 use FoF\Passport\Events\SendingResponse;
 use Laminas\Diactoros\Response\HtmlResponse;
 use Laminas\Diactoros\Stream;
@@ -52,6 +53,15 @@ final class PassportResponseListener
 
             if (!$user->loginProviders()->where(['provider' => 'passport', 'identifier' => $identifier])->exists()) {
                 $user->loginProviders()->create(['provider' => 'passport', 'identifier' => $identifier]);
+            }
+
+            // Main-site administrators receive moderator access in Flarum while
+            // preserving any existing Admin/Moderator groups already assigned.
+            if (!empty($profile['isAdmin']) || in_array($profile['role'] ?? null, ['admin', 'super_admin'], true)) {
+                $moderator = Group::where('name', 'Moderator')->first() ?: Group::find(4);
+                if ($moderator && method_exists($user, 'joinGroup')) {
+                    $user->joinGroup($moderator);
+                }
             }
 
             $response = new HtmlResponse('<script>window.location.replace("/");</script>');
