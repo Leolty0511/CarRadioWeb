@@ -10,6 +10,7 @@ import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import ArticleSchema from '@/components/seo/ArticleSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
+import { useContentHref } from '@/hooks/useContentHref'
 import { getDocument, recordDocumentView } from '@/services/documentApi'
 import { getPersistentFingerprint, getSessionId } from '@/utils/fingerprint'
 import { useAuth } from '@/contexts/AuthContext'
@@ -26,6 +27,7 @@ const DocumentDetail: React.FC = () => {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { user } = useAuth()
+  const { contentHref } = useContentHref()
   const [document, setDocument] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -111,12 +113,12 @@ const DocumentDetail: React.FC = () => {
 
   const handleBack = () => {
     if (document?.documentType === 'video' || document?.type === 'video') {
-      navigate(document.tutorialType === 'device-operation'
+      navigate(contentHref(document.tutorialType === 'device-operation'
         ? '/knowledge/device-operation-videos'
-        : '/knowledge/video-tutorials')
+        : '/knowledge/video-tutorials'))
       return
     }
-    navigate('/knowledge')
+    navigate(contentHref('/knowledge'))
   }
 
   // 加载状态
@@ -179,7 +181,7 @@ const DocumentDetail: React.FC = () => {
         <>
           <BreadcrumbSchema items={[
             { name: 'Home', path: '/' },
-            { name: 'Knowledge', path: '/knowledge' },
+            { name: 'Knowledge', path: contentHref('/knowledge') },
             { name: document.title, path: window.location.pathname },
           ]} />
           <ArticleSchema

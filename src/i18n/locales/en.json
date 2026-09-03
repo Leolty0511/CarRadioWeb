@@ -356,6 +356,8 @@
     "year": "Year",
     "backToSelect": "← Re-select Vehicle",
     "backToKnowledge": "Back to Knowledge Home",
+    "publicGuideHint": "This is the QR viewing page. Manuals and technical documents can be opened here without registering or signing in.",
+    "publicGuideUserManual": "User Manuals",
     "documentNotFound": "Document Not Found",
     "documentNotFoundDesc": "The document you are looking for does not exist or has been removed.",
     "seo": {
@@ -458,6 +460,7 @@
     "noUserFeedback": "No user feedback for this document yet",
     "document": "Document",
     "addFeedback": "Add Feedback",
+    "feedbackLoginToComment": "Sign in to leave a comment",
     "feedbackName": "Your Name",
     "feedbackNamePlaceholder": "Please enter your name",
     "feedbackContent": "Feedback Content",

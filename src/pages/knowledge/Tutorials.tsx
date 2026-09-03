@@ -7,18 +7,19 @@ import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
+import { useContentHref } from '@/hooks/useContentHref'
 
 const Tutorials: React.FC = () => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const navigate = useNavigate()
+  const { contentHref } = useContentHref()
   const sectionEnabled = useKnowledgeSection('tutorialsEnabled')
-  const langPrefix = i18n.language === 'en' ? '' : `/${i18n.language}`
 
   const handleViewDocument = (document: any) => {
     const docId = document._id || document.id
     const docSlug = document.slug
     const identifier = docSlug || docId
-    navigate(`${langPrefix}/knowledge/article/${identifier}`)
+    navigate(contentHref(`/knowledge/article/${identifier}`))
   }
 
   if (sectionEnabled !== true) {return null}
@@ -33,8 +34,8 @@ const Tutorials: React.FC = () => {
       />
       <BreadcrumbSchema items={[
         { name: 'Home', path: '/' },
-        { name: t('knowledge.title'), path: '/knowledge' },
-        { name: t('knowledge.sections.generalDocuments'), path: '/knowledge/tutorials' },
+        { name: t('knowledge.title'), path: contentHref('/knowledge') },
+        { name: t('knowledge.sections.generalDocuments'), path: contentHref('/knowledge/tutorials') },
       ]} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

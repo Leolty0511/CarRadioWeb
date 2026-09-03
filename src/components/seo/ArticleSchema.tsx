@@ -5,6 +5,7 @@
 
 import { useEffect } from 'react'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
+import { isPublicGuidePath } from '@/utils/publicGuide'
 
 const SCHEMA_SCRIPT_ID = 'ld-json-article'
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin
@@ -38,7 +39,7 @@ export const ArticleSchema: React.FC<ArticleSchemaProps> = ({
   const { siteSettings } = useSiteSettings()
   const resolvedAuthor = authorName || siteSettings?.siteName || 'Organization'
   useEffect(() => {
-    if (!title) {return}
+    if (!title || isPublicGuidePath(window.location.pathname)) {return}
 
     const schema = {
       '@context': 'https://schema.org',

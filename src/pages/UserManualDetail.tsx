@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FileText, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import SEOHead from '@/components/seo/SEOHead'
+import { useContentHref } from '@/hooks/useContentHref'
 
 interface Manual {
   id: string
@@ -20,6 +21,7 @@ interface Manual {
 const UserManualDetail: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { contentHref } = useContentHref()
   const { slug } = useParams<{ slug: string }>()
   const [manual, setManual] = useState<Manual | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,7 +77,7 @@ const UserManualDetail: React.FC = () => {
       <div className="page-container px-4 py-16 text-center">
         <h1 className="text-xl font-semibold text-slate-800 dark:text-white">{t('userManual.noManuals')}</h1>
         <p className="mt-2 text-sm text-slate-500 dark:text-gray-400">{t('userManual.noManualsDesc')}</p>
-        <Button className="mt-6" onClick={() => navigate('/user-manual')}>
+        <Button className="mt-6" onClick={() => navigate(contentHref('/user-manual'))}>
           {t('userManual.backToManuals')}
         </Button>
       </div>
@@ -93,7 +95,7 @@ const UserManualDetail: React.FC = () => {
       <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
         <button
           type="button"
-          onClick={() => navigate('/user-manual')}
+          onClick={() => navigate(contentHref('/user-manual'))}
           className="mb-6 text-sm font-medium text-slate-600 transition hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-400"
         >
           {t('userManual.backToManuals')}

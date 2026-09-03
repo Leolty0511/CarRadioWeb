@@ -15,7 +15,7 @@ import { notificationService } from '../services/notificationService'
 import { getClientIP, getGeoWithTimezone, getDualTime, formatDualTime } from '../services/geoLocationService'
 import { DocumentService } from '../services/documentService'
 import { authenticateUser, requirePermission } from '../middleware/auth'
-import { authenticateContentAccess } from '../middleware/contentAccess'
+import { authenticateContentAccess, authenticateContentOrGuideView } from '../middleware/contentAccess'
 import { PERMISSIONS } from '../config/permissions'
 import { createRateLimit } from '../middleware/errorHandler'
 import { createLogger } from '../utils/logger'
@@ -175,7 +175,7 @@ router.get('/stats/unreplied', authenticateUser, requirePermission(PERMISSIONS.f
 /**
  * 获取文档的所有反馈
  */
-router.get('/:documentId', authenticateContentAccess, async (req, res) => {
+router.get('/:documentId', authenticateContentOrGuideView, async (req, res) => {
   try {
     const { documentId } = req.params
     const feedback = await getDocumentFeedback(documentId)

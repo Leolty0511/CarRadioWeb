@@ -8,10 +8,12 @@ import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
+import { useContentHref } from '@/hooks/useContentHref'
 import canbusSettingsService from '@/services/canbusSettingsService'
 
 const CANBusSettings: React.FC = () => {
   const { t, i18n } = useTranslation()
+  const { contentHref } = useContentHref()
   const sectionEnabled = useKnowledgeSection('canbusSettingsEnabled')
   const [intro, setIntro] = useState('')
 
@@ -48,8 +50,8 @@ const CANBusSettings: React.FC = () => {
       />
       <BreadcrumbSchema items={[
         { name: 'Home', path: '/' },
-        { name: t('knowledge.title'), path: '/knowledge' },
-        { name: t('knowledge.sections.canbusSettings'), path: '/knowledge/canbus-settings' },
+        { name: t('knowledge.title'), path: contentHref('/knowledge') },
+        { name: t('knowledge.sections.canbusSettings'), path: contentHref('/knowledge/canbus-settings') },
       ]} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

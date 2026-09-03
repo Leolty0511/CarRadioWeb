@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import SEOHead from '@/components/seo/SEOHead'
 import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
+import { useContentHref } from '@/hooks/useContentHref'
 import moduleSettingsService from '@/services/moduleSettingsService'
 
 type ContentSection = 'vehicle-data' | 'video-tutorials' | 'device-operation-videos' | 'tutorials' | 'canbus-settings'
@@ -42,9 +43,9 @@ const defaultSectionFlags: KnowledgeSectionFlags = {
 }
 
 const KnowledgeLanding: React.FC = () => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
+  const { isPublicGuide, contentHref } = useContentHref()
   const [sectionFlags, setSectionFlags] = useState<KnowledgeSectionFlags>(defaultSectionFlags)
-  const langPrefix = i18n.language === 'en' ? '' : `/${i18n.language}`
 
   useEffect(() => {
     const loadModuleSettings = async () => {
@@ -65,6 +66,7 @@ const KnowledgeLanding: React.FC = () => {
   }, [])
 
   const validNavItems = NAV_ITEMS.filter(item => sectionFlags[item.settingKey])
+  const homePath = contentHref('/knowledge')
 
   return (
     <>
@@ -76,7 +78,7 @@ const KnowledgeLanding: React.FC = () => {
       />
       <BreadcrumbSchema items={[
         { name: 'Home', path: '/' },
-        { name: t('knowledge.title'), path: '/knowledge' },
+        { name: t('knowledge.title'), path: homePath },
       ]} />
 
       {/* 背景标记元素 - 触发 CSS :has() 选择器 */}
@@ -90,6 +92,11 @@ const KnowledgeLanding: React.FC = () => {
           <h1 className="mb-6 text-3xl lg:text-4xl font-bold text-white leading-tight [text-shadow:_0_2px_8px_rgba(0,0,0,0.8)]">
             {t('knowledge.title')}
           </h1>
+          {isPublicGuide && (
+            <p className="mb-6 max-w-sm text-sm text-white/90 [text-shadow:_0_1px_4px_rgba(0,0,0,0.7)]">
+              {t('knowledge.publicGuideHint')}
+            </p>
+          )}
 
           {/* 导航卡片 - hover 渐变边框发光效果，w-full 填满容器宽度 */}
           <nav className="flex flex-col gap-3">
@@ -97,7 +104,7 @@ const KnowledgeLanding: React.FC = () => {
               return (
                 <Link
                   key={item.key}
-                  to={`${langPrefix}${item.path}`}
+                  to={contentHref(item.path)}
                   className="group relative w-full px-8 py-3 text-center rounded-full transition-all duration-300 hover:scale-[1.02]"
                   style={{ animationDelay: `${index * 100}ms` }}
                 >
@@ -116,6 +123,23 @@ const KnowledgeLanding: React.FC = () => {
                 </Link>
               )
             })}
+            {isPublicGuide && (
+              <Link
+                key="user-manual"
+                to={contentHref('/user-manual')}
+                className="group relative w-full px-8 py-3 text-center rounded-full transition-all duration-300 hover:scale-[1.02]"
+                style={{ animationDelay: `${validNavItems.length * 100}ms` }}
+              >
+                <span className="absolute inset-0 rounded-full border border-white/30 group-hover:opacity-0 transition-opacity duration-300" />
+                <span className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 p-[2px]">
+                  <span className="block w-full h-full rounded-full bg-slate-900/80 dark:bg-slate-900/90" />
+                </span>
+                <span className="absolute inset-0 rounded-full opacity-0 group-hover:opacity-70 dark:group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-500 blur-lg -z-10" />
+                <span className="relative z-10 text-white font-semibold [text-shadow:_0_1px_4px_rgba(0,0,0,0.7)]">
+                  {t('knowledge.publicGuideUserManual')}
+                </span>
+              </Link>
+            )}
           </nav>
         </div>
 

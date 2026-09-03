@@ -364,6 +364,8 @@
     "year": "年份",
     "backToSelect": "← 重新选择车型",
     "backToKnowledge": "返回知识库首页",
+    "publicGuideHint": "本页为扫码查阅入口，无需注册登录即可查看说明书和技术资料。",
+    "publicGuideUserManual": "用户说明书",
     "documentNotFound": "文档未找到",
     "documentNotFoundDesc": "您查找的文档不存在或已被删除。",
     "seo": {
@@ -467,6 +469,7 @@
     "noUserFeedback": "当前文档暂无用户留言",
     "document": "文档",
     "addFeedback": "添加留言",
+    "feedbackLoginToComment": "登录后即可留言",
     "feedbackName": "您的姓名",
     "feedbackNamePlaceholder": "请输入您的姓名",
     "feedbackContent": "留言内容",

@@ -8,6 +8,8 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 import { getSEOByPageKey, SEOSettings } from '@/services/seoSettingsService'
+import { useLocation } from 'react-router-dom'
+import { isPublicGuidePath } from '@/utils/publicGuide'
 
 // Page key to i18n key mapping for smart defaults
 const PAGE_SEO_CONFIG: Record<string, { titleKey: string; descKey: string; keywords: string[] }> = {
@@ -97,6 +99,8 @@ export const SEOHead: React.FC<SEOProps> = ({
 }) => {
   const { t, i18n } = useTranslation()
   const { siteSettings } = useSiteSettings()
+  const location = useLocation()
+  const hideFromSearch = isPublicGuidePath(location.pathname)
   const [seoSettings, setSeoSettings] = useState<SEOSettings | null>(null)
 
   // Generate smart defaults from i18n when no backend config exists
@@ -134,8 +138,8 @@ export const SEOHead: React.FC<SEOProps> = ({
     const keywords = seoSettings?.keywords ?? (propKeywords.length > 0 ? propKeywords : smartDefaults?.keywords) ?? []
     const image = seoSettings?.ogImage ?? propImage
     const type = seoSettings?.ogType ?? propType
-    const noIndex = seoSettings?.noIndex ?? propNoIndex
-    const noFollow = seoSettings?.noFollow ?? propNoFollow
+    const noIndex = hideFromSearch || (seoSettings?.noIndex ?? propNoIndex)
+    const noFollow = hideFromSearch || (seoSettings?.noFollow ?? propNoFollow)
     const structuredDataFromBackend = seoSettings?.structuredData
 
     // 构建完整标题
@@ -267,7 +271,10 @@ export const SEOHead: React.FC<SEOProps> = ({
     setMetaTag('theme-color', '#1f2937')
     setMetaTag('msapplication-TileColor', '#1f2937')
 
-    // 结构化数据 - 优先使用后台配置
+    // 结构化数据 - 扫码入口不输出，避免被搜索引擎收录
+    if (hideFromSearch) {
+      document.querySelectorAll('script[type="application/ld+json"]').forEach(el => el.remove())
+    } else {
     let structuredData: Record<string, unknown>
 
     if (structuredDataFromBackend) {
@@ -313,6 +320,7 @@ export const SEOHead: React.FC<SEOProps> = ({
       document.head.appendChild(scriptTag)
     }
     scriptTag.textContent = JSON.stringify(structuredData)
+    }
 
   }, [
     seoSettings,
@@ -331,6 +339,7 @@ export const SEOHead: React.FC<SEOProps> = ({
     propNoIndex,
     propNoFollow,
     canonical,
+    hideFromSearch,
     t,
     i18n.language,
     siteSettings

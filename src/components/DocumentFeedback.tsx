@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link, useLocation } from 'react-router-dom'
 import { MessageCircle, Send, ChevronDown, ChevronUp, Reply } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -21,7 +22,8 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
 }) => {
   const { t } = useTranslation()
   const { showToast } = useToast()
-  const { user } = useAuth()
+  const { user, isAuthenticated, loading } = useAuth()
+  const location = useLocation()
   const [newFeedback, setNewFeedback] = useState('')
   const [showFeedbackForm, setShowFeedbackForm] = useState(false)
   const [feedbackList, setFeedbackList] = useState<FeedbackType[]>([])
@@ -80,7 +82,7 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {!showFeedbackForm && (
+        {!loading && isAuthenticated && !showFeedbackForm && (
           <Button
             onClick={() => setShowFeedbackForm(true)}
             className="mb-4 bg-blue-600 hover:bg-blue-700 text-white"
@@ -88,6 +90,14 @@ const DocumentFeedback: React.FC<DocumentFeedbackProps> = ({
             <MessageCircle className="h-4 w-4 mr-2" />
             {t('knowledge.addFeedback')}
           </Button>
+        )}
+        {!loading && !isAuthenticated && (
+          <Link
+            to={`/login?returnTo=${encodeURIComponent(`${location.pathname}${location.search}`)}`}
+            className="mb-4 inline-flex items-center text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            {t('knowledge.feedbackLoginToComment')}
+          </Link>
         )}
 
         {showFeedbackForm && (

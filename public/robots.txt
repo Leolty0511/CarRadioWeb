@@ -5,6 +5,8 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /api/
+Disallow: /guide
+Disallow: /guide/
 
 # Sitemap
 Sitemap: https://protonavi.com/sitemap.xml

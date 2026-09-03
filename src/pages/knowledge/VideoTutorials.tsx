@@ -9,6 +9,7 @@ import BreadcrumbSchema from '@/components/seo/BreadcrumbSchema'
 import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
 import FilterChipBar from '@/components/knowledge/FilterChipBar'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
+import { useContentHref } from '@/hooks/useContentHref'
 import canbusSettingsService, { type HeadUnitType } from '@/services/canbusSettingsService'
 import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
 
@@ -28,8 +29,9 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
   titleKey = 'videoTutorials',
   routePath = '/knowledge/video-tutorials',
 }) => {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
   const navigate = useNavigate()
+  const { contentHref } = useContentHref()
   const [searchParams, setSearchParams] = useSearchParams()
   const headUnitTypeId = searchParams.get('headUnitTypeId') || undefined
   const [headUnitTypes, setHeadUnitTypes] = React.useState<HeadUnitType[]>([])
@@ -39,7 +41,6 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
   const sectionEnabled = useKnowledgeSection(
     tutorialType === 'device-operation' ? 'deviceOperationVideosEnabled' : 'videoTutorialsEnabled'
   )
-  const langPrefix = i18n.language === 'en' ? '' : `/${i18n.language}`
   const selectedHeadUnitType = headUnitTypes.find(type => type._id === headUnitTypeId)
   const previewImages = previewHeadUnitType
     ? getHeadUnitImages(previewHeadUnitType).map((url, index) => ({
@@ -96,7 +97,7 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
     const docId = document._id || document.id
     const docSlug = document.slug
     const identifier = docSlug || docId
-    navigate(`${langPrefix}/knowledge/video/${identifier}`)
+    navigate(contentHref(`/knowledge/video/${identifier}`))
   }
 
   if (sectionEnabled !== true) {return null}
@@ -111,8 +112,8 @@ const VideoTutorials: React.FC<VideoTutorialsProps> = ({
       />
       <BreadcrumbSchema items={[
         { name: 'Home', path: '/' },
-        { name: t('knowledge.title'), path: '/knowledge' },
-        { name: t(`knowledge.sections.${titleKey}`), path: routePath },
+        { name: t('knowledge.title'), path: contentHref('/knowledge') },
+        { name: t(`knowledge.sections.${titleKey}`), path: contentHref(routePath) },
       ]} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

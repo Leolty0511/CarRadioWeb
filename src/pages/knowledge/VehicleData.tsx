@@ -13,15 +13,16 @@ import KnowledgeDocumentList from '@/components/knowledge/KnowledgeDocumentList'
 import { getDocuments } from '@/services/documentApi'
 import { findVehicleByBrandModelYear } from '@/services/vehicleService'
 import { useKnowledgeSection } from '@/hooks/useKnowledgeSection'
+import { useContentHref } from '@/hooks/useContentHref'
 
 const mapUILanguageToDocLanguage = (_uiLang: string): 'en' => 'en'
 
 const VehicleData: React.FC = () => {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const { contentHref } = useContentHref()
   const sectionEnabled = useKnowledgeSection('vehicleDataEnabled')
   const documentLanguage = mapUILanguageToDocLanguage(i18n.language)
-  const langPrefix = '' // 路由无语言前缀
 
   const [selectedVehicle, setSelectedVehicle] = useState<any>(null)
   const [vehicleData, setVehicleData] = useState<any>({})
@@ -91,7 +92,7 @@ const VehicleData: React.FC = () => {
     const identifier = docSlug || docId
 
     if (!selectedVehicle) {
-      navigate(`${langPrefix}/knowledge/vehicle/${identifier}`)
+      navigate(contentHref(`/knowledge/vehicle/${identifier}`))
       return
     }
 
@@ -99,7 +100,7 @@ const VehicleData: React.FC = () => {
       const docBrand = document.brand || document.basicInfo?.brand
       const docModel = document.model || document.basicInfo?.model
       if (docBrand !== selectedVehicle.brand || docModel !== selectedVehicle.model) {
-        navigate(`${langPrefix}/knowledge/vehicle/${identifier}`)
+        navigate(contentHref(`/knowledge/vehicle/${identifier}`))
         return
       }
       const vehicle = await findVehicleByBrandModelYear(selectedVehicle.brand, selectedVehicle.model, selectedVehicle.year)
@@ -107,10 +108,10 @@ const VehicleData: React.FC = () => {
         setSelectedDocument(document)
         setShowPasswordProtection(true)
       } else {
-        navigate(`${langPrefix}/knowledge/vehicle/${identifier}`)
+        navigate(contentHref(`/knowledge/vehicle/${identifier}`))
       }
     } catch (error) {
-      navigate(`${langPrefix}/knowledge/vehicle/${identifier}`)
+      navigate(contentHref(`/knowledge/vehicle/${identifier}`))
     }
   }
 
@@ -126,7 +127,7 @@ const VehicleData: React.FC = () => {
       if (result.verified) {
         setShowPasswordProtection(false)
         const identifier = selectedDocument.slug || selectedDocument._id || selectedDocument.id
-        navigate(`${langPrefix}/knowledge/vehicle/${identifier}`)
+        navigate(contentHref(`/knowledge/vehicle/${identifier}`))
         return true
       }
       return false
@@ -152,8 +153,8 @@ const VehicleData: React.FC = () => {
       />
       <BreadcrumbSchema items={[
         { name: 'Home', path: '/' },
-        { name: t('knowledge.title'), path: '/knowledge' },
-        { name: t('knowledge.sections.vehicleResearch'), path: '/knowledge/vehicle-data' },
+        { name: t('knowledge.title'), path: contentHref('/knowledge') },
+        { name: t('knowledge.sections.vehicleResearch'), path: contentHref('/knowledge/vehicle-data') },
       ]} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

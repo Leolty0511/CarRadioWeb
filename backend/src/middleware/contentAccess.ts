@@ -6,6 +6,7 @@ import { extractToken } from '../utils/tokenCookie'
 import { getMemberToken } from '../utils/memberTokenCookie'
 import { getClientIP } from '../services/geoLocationService'
 import { parseMemberDevice } from '../utils/memberDevice'
+import { hasValidGuideViewCookie } from '../utils/guideViewCookie'
 
 declare global {
   namespace Express {
@@ -82,6 +83,16 @@ export async function authenticateContentAccess(req: Request, res: Response, nex
     return
   }
   next()
+}
+
+/** Member/admin login, or a signed cookie issued only after opening the QR /guide entry. */
+export async function authenticateContentOrGuideView(req: Request, res: Response, next: NextFunction): Promise<void> {
+  await optionalContentAccess(req, res, () => undefined)
+  if (req.contentPrincipal || hasValidGuideViewCookie(req)) {
+    next()
+    return
+  }
+  res.status(401).json({ success: false, error: 'content_login_required' })
 }
 
 /** Member-only endpoints must never accept an administrator session. */

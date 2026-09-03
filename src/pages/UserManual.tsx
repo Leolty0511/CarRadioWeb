@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { Card, CardContent } from '@/components/ui/Card'
 import SEOHead from '@/components/seo/SEOHead'
 import HeadUnitTypeIdentifier from '@/components/knowledge/HeadUnitTypeIdentifier'
+import KnowledgeHomeLink from '@/components/knowledge/KnowledgeHomeLink'
+import { useContentHref } from '@/hooks/useContentHref'
 import { useHeadUnitTypes } from '@/contexts/HeadUnitTypeContext'
 
 interface Manual {
@@ -24,6 +26,7 @@ interface Manual {
 const UserManual: React.FC = () => {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { isPublicGuide, contentHref } = useContentHref()
   const { selectedHeadUnitType, selectedHeadUnitTypeId } = useHeadUnitTypes()
   const [manuals, setManuals] = useState<Manual[]>([])
   const [loading, setLoading] = useState(true)
@@ -61,6 +64,8 @@ const UserManual: React.FC = () => {
           <p className="mx-auto mt-2 max-w-2xl text-gray-600 dark:text-gray-300">{t('userManual.description')}</p>
         </header>
 
+        {isPublicGuide && <KnowledgeHomeLink className="mb-5" />}
+
         <section className="mb-8 flex flex-col gap-4 rounded-2xl border border-cyan-200 bg-cyan-50/70 p-5 dark:border-cyan-900/60 dark:bg-cyan-950/20 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0 text-left">
             <h2 className="text-base font-semibold text-slate-800 dark:text-white">
@@ -87,7 +92,7 @@ const UserManual: React.FC = () => {
               <Card
                 key={manual.id}
                 hoverable
-                onClick={() => navigate(`/user-manual/${encodeURIComponent(manual.slug || manual.id)}`)}
+                onClick={() => navigate(contentHref(`/user-manual/${encodeURIComponent(manual.slug || manual.id)}`))}
                 className="cursor-pointer"
               >
                 <CardContent className="p-5">

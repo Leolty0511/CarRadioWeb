@@ -4,6 +4,7 @@
  */
 
 import { useEffect } from 'react'
+import { isPublicGuidePath } from '@/utils/publicGuide'
 
 const SCHEMA_SCRIPT_ID = 'ld-json-breadcrumb'
 const SITE_URL = import.meta.env.VITE_SITE_URL || window.location.origin
@@ -19,7 +20,7 @@ interface BreadcrumbSchemaProps {
 
 export const BreadcrumbSchema: React.FC<BreadcrumbSchemaProps> = ({ items }) => {
   useEffect(() => {
-    if (items.length === 0) {return}
+    if (items.length === 0 || isPublicGuidePath(window.location.pathname)) {return}
 
     const schema = {
       '@context': 'https://schema.org',

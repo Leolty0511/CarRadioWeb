@@ -189,6 +189,13 @@ app.use(requestTracing());
 // 7. CSRF 保护（双提交 Cookie 模式）
 app.use(csrfMiddleware);
 
+app.use((req, res, next) => {
+  if (/^\/(?:zh\/)?guide(?:\/|$)/.test(req.path) || req.path.startsWith('/api/guide-view')) {
+    res.set('X-Robots-Tag', 'noindex, nofollow')
+  }
+  next()
+})
+
 // ==================== 数据库连接 ====================
 
 // 连接 MongoDB
@@ -423,9 +430,10 @@ app.get('/product.html', (_req, res) => {
 
 // ==================== 认证中间件导入 ====================
 import { authenticateUser } from './middleware/auth';
-import { authenticateContentAccess } from './middleware/contentAccess';
+import { authenticateContentAccess, authenticateContentOrGuideView } from './middleware/contentAccess';
 import memberAuthRouter from './routes/memberAuth';
 import membersRouter from './routes/members';
+import guideViewRouter from './routes/guideView';
 
 // ==================== 公开路由（无需认证） ====================
 // Authentication routes (email verification + password login)
@@ -434,12 +442,13 @@ app.use('/api/member-auth', memberAuthRouter);
 app.get('/api/csrf-token', (_req, res) => {
   res.json({ success: true });
 });
-// 前端展示数据（只读）
-app.use('/api/documents', authenticateContentAccess, documentsRouter);
+app.use('/api/guide-view', guideViewRouter);
+// 知识库/说明书只读：登录用户，或扫码进入 /guide 后签发的查阅 cookie
+app.use('/api/documents', authenticateContentOrGuideView, documentsRouter);
 app.use('/api/images', imagesRouter);
 app.use('/api/software', authenticateContentAccess, softwareRouter);
-app.use('/api/vehicles', authenticateContentAccess, vehiclesRouter);
-app.use('/api/categories', authenticateContentAccess, categoryRouter);
+app.use('/api/vehicles', authenticateContentOrGuideView, vehiclesRouter);
+app.use('/api/categories', authenticateContentOrGuideView, categoryRouter);
 app.use('/api/announcement', announcementRouter);
 app.use('/api/language', languageRouter);
 app.use('/api/products', productsRouter);
@@ -447,14 +456,14 @@ app.use('/api/hero-banners', heroBannersRouter);
 app.use('/api/seo', seoSettingsRouter);
 app.use('/api/faq', faqRouter);
 app.use('/api/search', searchRouter);
-app.use('/api/user-manual', authenticateContentAccess, userManualRouter);
+app.use('/api/user-manual', authenticateContentOrGuideView, userManualRouter);
 app.use('/api/page-content', pageContentRouter);
 app.use('/api/resource-links', resourceLinksRouter);
 app.use('/api/site-settings', siteSettingsRouter);
 app.use('/api/legal-versions', legalVersionsRouter);
 app.use('/api/newsletter', newsletterRouter);
 // CANBus 设置（路由内部自行控制认证，公开 GET + 管理端点需认证）
-app.use('/api/canbus-settings', authenticateContentAccess, canbusSettingsRouter);
+app.use('/api/canbus-settings', authenticateContentOrGuideView, canbusSettingsRouter);
 // 网站图片配置（GET 公开，PUT/POST 路由内部自行认证）
 app.use('/api', siteImagesRouter);
 // 前端公开提交（反馈表单、文档反馈、联系表单）

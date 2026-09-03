@@ -15,15 +15,19 @@ import { getAnnouncement, getAnnouncementHistory, Announcement, AnnouncementHist
 import { trackPageVisit } from '@/services/visitorService'
 import { CookieConsentBanner } from '@/components/compliance/CookieConsentBanner'
 import OnlineMembersBubble from '@/components/knowledge/OnlineMembersBubble'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { useGuideViewSession } from '@/hooks/useGuideViewSession'
 
 // 需要隐藏 Footer 的路由模式
 const HIDE_FOOTER_PATTERNS = [
   /^\/?(en|ru|zh)?\/knowledge(\/.*)?$/,  // 知识库所有页面
+  /^\/?(en|ru|zh)?\/guide(\/.*)?$/,  // 扫码查阅入口
 ]
 
 // 需要透明背景的路由（全屏沉浸式页面）
 const TRANSPARENT_BG_PATTERNS = [
   /^\/?(en|ru|zh)?\/knowledge$/,  // 知识库入口页
+  /^\/?(en|ru|zh)?\/guide$/,  // 扫码查阅入口
 ]
 
 // 需要 main 区域透明的路由（包含 Hero Banner 的页面）
@@ -37,6 +41,7 @@ const Layout: React.FC = () => {
   const { user } = useAuth()
   const { siteSettings, pagesEnabled } = useSiteSettings()
   const location = useLocation()
+  const { isPublicGuide, ready: guideViewReady } = useGuideViewSession()
   const lastTrackedPath = useRef<string>('')
 
   // 公告状态
@@ -68,7 +73,7 @@ const Layout: React.FC = () => {
     return TRANSPARENT_MAIN_PATTERNS.some(pattern => pattern.test(location.pathname))
   }, [location.pathname])
 
-  const isKnowledgePage = /^\/?(en|ru|zh)?\/?knowledge(?:\/|$)/.test(location.pathname)
+  const isKnowledgePage = /^\/?(en|ru|zh)?\/?(knowledge|guide)(?:\/|$)/.test(location.pathname)
 
   // 路由切换时立即重置滚动位置（禁用平滑滚动）
   useEffect(() => {
@@ -169,12 +174,16 @@ const Layout: React.FC = () => {
 
       {/* 主内容区域 - pt-16 补偿 fixed header 高度 */}
       <main className={`flex-1 relative transition-colors duration-300 pt-16 ${shouldTransparentBg || shouldTransparentMain ? '' : 'bg-white dark:bg-slate-950'}`}>
-        <Outlet />
+        {isPublicGuide && !guideViewReady ? (
+          <div className="min-h-[50vh] flex items-center justify-center"><LoadingSpinner /></div>
+        ) : (
+          <Outlet />
+        )}
 
         {/* 页脚 - 部分页面隐藏 */}
         {!shouldHideFooter && <Footer />}
       </main>
-      {isKnowledgePage && <OnlineMembersBubble />}
+      {isKnowledgePage && !isPublicGuide && <OnlineMembersBubble />}
     </div>
   )
 }
