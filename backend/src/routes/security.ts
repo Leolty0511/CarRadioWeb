@@ -9,22 +9,28 @@ router.use(authenticateUser)
 
 router.get('/dashboard', async (_req, res) => {
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  const [blockedIps, suspiciousIps, attacksToday, activeIps, recentEvents, topRequestIps] = await Promise.all([
+  const [blockedIps, suspiciousIps, attacksToday, activeIps, todayBans, recentEvents, topRequestIps, topAttackIps] = await Promise.all([
     SecurityBan.countDocuments({ active: true, $or: [{ expiresAt: null }, { expiresAt: { $gt: new Date() } }] }),
     SecurityIp.countDocuments({ status: 'suspicious' }),
     SecurityEvent.countDocuments({ createdAt: { $gte: today } }),
     SecurityIp.countDocuments({ lastSeenAt: { $gte: new Date(Date.now() - 15 * 60_000) } }),
+    SecurityBan.countDocuments({ bannedAt: { $gte: today } }),
     SecurityEvent.find().sort({ createdAt: -1 }).limit(20).lean(),
     SecurityIp.find().sort({ requestCount: -1 }).limit(10).select('ip requestCount lastSeenAt status').lean(),
+    SecurityEvent.aggregate([{ $match: { createdAt: { $gte: today } } }, { $group: { _id: '$ip', count: { $sum: 1 }, lastRule: { $last: '$rule' } } }, { $sort: { count: -1 } }, { $limit: 10 }]),
   ])
-  res.json({ success: true, data: { blockedIps, suspiciousIps, attacksToday, activeIps, recentEvents, topRequestIps } })
+  res.json({ success: true, data: { blockedIps, suspiciousIps, attacksToday, activeIps, todayBans, recentEvents, topRequestIps, topAttackIps } })
 })
 
 router.get('/ips', async (req, res) => {
   const page = Math.max(1, Number(req.query.page) || 1); const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 25))
   const filter: Record<string, unknown> = {}
   if (typeof req.query.ip === 'string' && req.query.ip) filter.ip = { $regex: req.query.ip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' }
+  if (typeof req.query.url === 'string' && req.query.url) filter.lastUrl = { $regex: req.query.url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' }
   if (['normal', 'suspicious', 'blocked'].includes(String(req.query.status))) filter.status = req.query.status
+  const from = typeof req.query.from === 'string' ? new Date(req.query.from) : null
+  const to = typeof req.query.to === 'string' ? new Date(req.query.to) : null
+  if ((from && !Number.isNaN(from.getTime())) || (to && !Number.isNaN(to.getTime()))) filter.lastSeenAt = { ...(from && !Number.isNaN(from.getTime()) ? { $gte: from } : {}), ...(to && !Number.isNaN(to.getTime()) ? { $lte: to } : {}) }
   const [items, total] = await Promise.all([SecurityIp.find(filter).sort({ lastSeenAt: -1 }).skip((page - 1) * limit).limit(limit).lean(), SecurityIp.countDocuments(filter)])
   res.json({ success: true, data: { items, pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } } })
 })
