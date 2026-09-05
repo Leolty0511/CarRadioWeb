@@ -18,6 +18,9 @@ import {
   getMemberFavorites,
   getMemberForumSummary,
   getMemberProfile,
+  addMemberVehicle,
+  getAvailableVehicles,
+  type MemberVehicle,
   removeMemberFavorite,
   updateMemberPassword,
   updateMemberProfile,
@@ -67,6 +70,9 @@ export default function MemberProfilePage() {
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [vehicles, setVehicles] = useState<MemberVehicle[]>([])
+  const [availableVehicles, setAvailableVehicles] = useState<Array<{ _id: string; brand: string; modelName: string; year: string; generation?: string }>>([])
+  const [vehicleToAdd, setVehicleToAdd] = useState('')
 
   const translateError = (errorCode?: string, fallbackKey = 'errors.generic') =>
     errorCode
@@ -88,6 +94,9 @@ export default function MemberProfilePage() {
         if (profileResult.success) {
           setProfile(profileResult.data || null)
           setNickname(profileResult.data?.nickname || user.nickname)
+          if (user.type === 'member') {
+            setVehicles(profileResult.data?.vehicles || [])
+          }
         }
         if (favoriteResult.success) {
           setFavorites(favoriteResult.data || [])
@@ -100,6 +109,9 @@ export default function MemberProfilePage() {
         }
       })
       .catch(() => setError(t('memberProfile.profileLoadFailed')))
+    if (user.type === 'member') {
+      getAvailableVehicles().then((result) => setAvailableVehicles(result.data?.items || [])).catch(() => undefined)
+    }
   }, [t, user])
 
   if (authLoading) {
@@ -368,6 +380,27 @@ export default function MemberProfilePage() {
                 </div>
               </div>
             </section>
+            {user.type === 'member' && (
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:col-span-2 sm:p-6">
+                <h2 className="font-semibold text-slate-950 dark:text-white">{t('memberProfile.vehicles', { defaultValue: '我的车辆' })}</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {vehicles.map((vehicle) => (
+                    <div key={vehicle._id} className="rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
+                      <p className="font-medium text-slate-900 dark:text-white">{vehicle.nickname || `${vehicle.brand} ${vehicle.modelName}`}</p>
+                      <p className="mt-1 text-slate-500 dark:text-slate-400">{vehicle.brand} · {vehicle.modelName} · {vehicle.yearRange}{vehicle.generation ? ` · ${vehicle.generation}` : ''}</p>
+                      {vehicle.isDefault && <span className="mt-2 inline-block text-xs text-blue-600">{t('memberProfile.defaultVehicle', { defaultValue: '默认车辆' })}</span>}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <select value={vehicleToAdd} onChange={(event) => setVehicleToAdd(event.target.value)} className={inputClassName}>
+                    <option value="">{t('memberProfile.selectVehicle', { defaultValue: '选择车辆' })}</option>
+                    {availableVehicles.filter((item) => !vehicles.some((v) => v.vehicleId === item._id)).map((item) => <option key={item._id} value={item._id}>{item.brand} {item.modelName} · {item.year}</option>)}
+                  </select>
+                  <button type="button" disabled={!vehicleToAdd || busy} onClick={async () => { setBusy(true); const result = await addMemberVehicle(vehicleToAdd); if (result.success && result.data) { setVehicles((items) => [...items, result.data]); setVehicleToAdd('') } setBusy(false) }} className="rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{t('memberProfile.addVehicle', { defaultValue: '添加车辆' })}</button>
+                </div>
+              </section>
+            )}
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               <div className="flex items-start justify-between gap-3">
                 <div>

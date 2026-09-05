@@ -7,9 +7,12 @@ import sharp from 'sharp'
 import Member from '../models/Member'
 import User from '../models/User'
 import MemberFavorite from '../models/MemberFavorite'
+import MemberVehicle from '../models/MemberVehicle'
+import { Vehicle } from '../models/Vehicle'
 import ForumOAuthAuthorizationCode from '../models/ForumOAuthAuthorizationCode'
 import ForumOAuthAccessToken from '../models/ForumOAuthAccessToken'
 import ForumBridgeNonce from '../models/ForumBridgeNonce'
+import ForumIdentityLink from '../models/ForumIdentityLink'
 import BaseDocument from '../models/Document'
 import { signTokenPair, verifyAccessToken, verifyRefreshToken } from '../utils/jwt'
 import { clearTokenCookie, clearRefreshTokenCookie, setTokenCookie, setRefreshTokenCookie } from '../utils/tokenCookie'
@@ -79,6 +82,14 @@ function sameSecret(left: string, right: string): boolean {
 
 function hashOAuthToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
+}
+
+async function recordForumIdentityLink(principalType: 'member' | 'admin', principalId: mongoose.Types.ObjectId, subject: string, profile: { id?: string; username?: string } = {}): Promise<void> {
+  await ForumIdentityLink.findOneAndUpdate(
+    { principalType, principalId },
+    { $set: { subject, ...(profile.id ? { flarumUserId: profile.id } : {}), ...(profile.username ? { flarumUsername: profile.username } : {}), status: 'linked', roleSyncStatus: 'synced', roleConflict: '', lastSyncAt: new Date() }, $setOnInsert: { linkedAt: new Date(), linkMethod: 'oauth' } },
+    { upsert: true, setDefaultsOnInsert: true },
+  )
 }
 
 interface ForumBridgeClaims {
@@ -364,8 +375,13 @@ router.get('/forum/oauth/user', async (req, res) => {
   if (!identity || !EMAIL.test(identityEmail) || await blockedForumMember(identityEmail)) return res.status(401).json({ error: 'invalid_token' })
   // Prefix administrator identifiers so the Flarum bridge can reliably
   // distinguish a main-site admin even if Passport drops unknown profile fields.
-  const identityId = admin ? `admin:${String(admin._id)}` : String(identity._id)
-  res.json({ id: identityId, email: identityEmail, name: identity.nickname, nickname: identity.nickname, avatar: identity.avatar || '', isAdmin: Boolean(admin), role: admin?.role || 'member' })
+  const identityId = admin ? `admin:${String(admin._id)}` : `member:${String(identity._id)}`
+  // Identity-link persistence must never turn a valid OAuth response into a
+  // login outage (for example while MongoDB is temporarily unavailable or a
+  // legacy account creates a uniqueness conflict). The link can be reconciled
+  // from the administrator panel on the next sync.
+  await recordForumIdentityLink(admin ? 'admin' : 'member', identity._id, identityId).catch(() => undefined)
+  res.json({ id: identityId, email: identityEmail, name: identity.nickname, nickname: identity.nickname, avatar: identity.avatar || '', isAdmin: Boolean(admin), isSuperAdmin: admin?.role === 'super_admin', role: admin?.role || 'member' })
 })
 
 router.post('/send-code', codeLimiter, async (req, res) => {
@@ -507,7 +523,45 @@ router.post('/reset-password', authLimiter, async (req, res) => {
 
 router.get('/profile', authenticateMember, async (req, res) => {
   const member = req.member!
-  res.json({ success: true, data: { id: String(member._id), email: member.email, nickname: member.nickname, avatar: member.avatar, createdAt: member.createdAt } })
+  const vehicles = await MemberVehicle.find({ memberId: member._id }).sort({ isDefault: -1, createdAt: 1 }).lean()
+  res.json({ success: true, data: { id: String(member._id), email: member.email, nickname: member.nickname, avatar: member.avatar, createdAt: member.createdAt, vehicles } })
+})
+
+router.get('/vehicles', authenticateMember, async (req, res) => {
+  const vehicles = await MemberVehicle.find({ memberId: req.member!._id }).sort({ isDefault: -1, createdAt: 1 }).lean()
+  res.json({ success: true, data: vehicles })
+})
+
+router.post('/vehicles', authenticateMember, async (req, res) => {
+  const vehicleId = String(req.body?.vehicleId || '')
+  if (!mongoose.isValidObjectId(vehicleId)) return res.status(400).json({ success: false, error: 'invalid_vehicle_id' })
+  if (await MemberVehicle.countDocuments({ memberId: req.member!._id }) >= 10) return res.status(400).json({ success: false, error: 'vehicle_limit_reached' })
+  const source = await Vehicle.findById(vehicleId).lean()
+  if (!source) return res.status(404).json({ success: false, error: 'vehicle_not_found' })
+  if (await MemberVehicle.exists({ memberId: req.member!._id, vehicleId: source._id })) return res.status(409).json({ success: false, error: 'vehicle_already_added' })
+  const isDefault = req.body?.isDefault === true || !(await MemberVehicle.exists({ memberId: req.member!._id }))
+  if (isDefault) await MemberVehicle.updateMany({ memberId: req.member!._id }, { $set: { isDefault: false } })
+  const created = await MemberVehicle.create({ memberId: req.member!._id, vehicleId: source._id, brand: source.brand, modelName: source.modelName, yearRange: source.year, generation: source.generation || '', nickname: String(req.body?.nickname || '').trim().slice(0, 80), isDefault, forumVisibility: req.body?.forumVisibility === 'hidden' ? 'hidden' : 'visible' })
+  res.status(201).json({ success: true, data: created })
+})
+
+router.put('/vehicles/:id', authenticateMember, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, error: 'invalid_vehicle_id' })
+  const vehicle = await MemberVehicle.findOne({ _id: req.params.id, memberId: req.member!._id })
+  if (!vehicle) return res.status(404).json({ success: false, error: 'vehicle_not_found' })
+  if (req.body?.nickname !== undefined) vehicle.nickname = String(req.body.nickname).trim().slice(0, 80)
+  if (req.body?.forumVisibility !== undefined) vehicle.forumVisibility = req.body.forumVisibility === 'hidden' ? 'hidden' : 'visible'
+  if (req.body?.isDefault === true) { await MemberVehicle.updateMany({ memberId: req.member!._id }, { $set: { isDefault: false } }); vehicle.isDefault = true }
+  await vehicle.save()
+  res.json({ success: true, data: vehicle })
+})
+
+router.delete('/vehicles/:id', authenticateMember, async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, error: 'invalid_vehicle_id' })
+  const vehicle = await MemberVehicle.findOneAndDelete({ _id: req.params.id, memberId: req.member!._id })
+  if (!vehicle) return res.status(404).json({ success: false, error: 'vehicle_not_found' })
+  if (vehicle.isDefault) { const replacement = await MemberVehicle.findOne({ memberId: req.member!._id }).sort({ createdAt: 1 }); if (replacement) await MemberVehicle.updateOne({ _id: replacement._id }, { $set: { isDefault: true } }) }
+  res.json({ success: true })
 })
 
 router.get('/forum-summary', authenticateMember, async (req, res) => {

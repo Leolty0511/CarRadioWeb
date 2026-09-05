@@ -55,14 +55,24 @@ final class PassportResponseListener
                 $user->loginProviders()->create(['provider' => 'passport', 'identifier' => $identifier]);
             }
 
-            // Main-site administrators receive moderator access in Flarum while
-            // preserving any existing Admin/Moderator groups already assigned.
+            $mainSiteRole = null;
             if (str_starts_with($identifier, 'admin:') || !empty($profile['isAdmin']) || in_array($profile['role'] ?? null, ['admin', 'super_admin'], true)) {
-                $moderator = Group::whereIn('name_singular', ['Moderator', 'Mod'])->first()
-                    ?: Group::whereIn('name_plural', ['Moderators', 'Mods'])->first()
-                    ?: Group::find(4);
-                if ($moderator && method_exists($user, 'joinGroup')) {
-                    $user->joinGroup($moderator);
+                $mainSiteRole = (($profile['role'] ?? null) === 'super_admin' || !empty($profile['isSuperAdmin'])) ? 'administrator' : 'moderator';
+            }
+            if ($mainSiteRole !== null && method_exists($user, 'groups')) {
+                $group = $mainSiteRole === 'administrator'
+                    ? Group::whereIn('name_singular', ['Administrator', 'Admin'])->first() ?: Group::find(1)
+                    : Group::whereIn('name_singular', ['Moderator', 'Mod'])->first() ?: Group::find(4);
+                if ($group) {
+                    // Main-site role is authoritative for managed groups. Native
+                    // Flarum users (without a Passport identity) are untouched.
+                    $managed = Group::whereIn('name_singular', ['Administrator', 'Admin', 'Moderator', 'Mod'])->get();
+                    $managedIds = $managed->pluck('id')->map(static fn ($id) => (int) $id)->all();
+                    $removeIds = array_values(array_diff($managedIds, [(int) $group->id]));
+                    if ($removeIds) {
+                        $user->groups()->detach($removeIds);
+                    }
+                    $user->groups()->syncWithoutDetaching([(int) $group->id]);
                 }
             }
 

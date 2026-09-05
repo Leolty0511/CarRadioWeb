@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Car, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -37,6 +37,28 @@ const VehicleSelector: React.FC<VehicleSelectorProps> = ({ vehicleData, onSelect
 
   // Get years for selected model
   const years = selectedModel ? Object.keys(vehicleData[selectedBrand][selectedModel]) : []
+
+  // Signed-in members can reuse their default vehicle; anonymous visitors keep
+  // the existing manual selector behaviour.
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/member-auth/vehicles', { credentials: 'include' })
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => {
+        const vehicle = result?.data?.find((item: { isDefault?: boolean }) => item.isDefault)
+        if (cancelled || !vehicle || !vehicleData[vehicle.brand]?.[vehicle.modelName]) {
+          return
+        }
+        const year = Object.keys(vehicleData[vehicle.brand][vehicle.modelName]).find((item) => item === vehicle.yearRange) || Object.keys(vehicleData[vehicle.brand][vehicle.modelName])[0]
+        if (year) {
+          setSelectedBrand(vehicle.brand)
+          setSelectedModel(vehicle.modelName)
+          setSelectedYear(year)
+        }
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [vehicleData])
 
   // Handle brand selection
   const handleBrandSelect = (brand: string) => {

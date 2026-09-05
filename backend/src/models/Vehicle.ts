@@ -5,6 +5,7 @@ export interface IVehicle extends Document {
   brand: string
   modelName: string
   year: string
+  generation?: string
   password: string
   documents: number
   language: 'en' | 'ru'  // 资料体系
@@ -29,6 +30,12 @@ const vehicleSchema = new Schema<IVehicle>({
     type: String,
     required: true,
     trim: true
+  },
+  generation: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: 100
   },
   password: {
     type: String,

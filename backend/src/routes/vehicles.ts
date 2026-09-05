@@ -108,7 +108,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  */
 router.post('/', authenticateUser, requirePermission(PERMISSIONS.vehicles.create), async (req: Request, res: Response) => {
   try {
-    const { brand, modelName, year, password, language } = req.body;
+    const { brand, modelName, year, generation, password, language } = req.body;
     
     // 记录接收到的数据
     systemLogger.info({ 
@@ -116,6 +116,7 @@ router.post('/', authenticateUser, requirePermission(PERMISSIONS.vehicles.create
       brand,
       modelName,
       year,
+      generation: generation || '',
       password: password ? '***' : undefined,
       language 
     }, 'Creating vehicle');
@@ -175,17 +176,18 @@ router.post('/', authenticateUser, requirePermission(PERMISSIONS.vehicles.create
 router.put('/:id', authenticateUser, requirePermission(PERMISSIONS.vehicles.update), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { brand, modelName, year, password, language } = req.body;
+    const { brand, modelName, year, generation, password, language } = req.body;
     
     interface UpdateData {
       brand?: string;
       modelName?: string;
       year?: string;
+      generation?: string;
       password?: string;
       language?: 'en' | 'ru';
     }
     
-    const updateData: UpdateData = { brand, modelName, year, password };
+    const updateData: UpdateData = { brand, modelName, year, generation, password };
     // 允许更新 language 字段
     if (language && ['en', 'ru'].includes(language)) {
       updateData.language = language as 'en' | 'ru';

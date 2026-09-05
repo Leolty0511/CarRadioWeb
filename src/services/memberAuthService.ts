@@ -12,6 +12,19 @@ export interface MemberProfile {
   nickname: string
   avatar: string
   createdAt?: string
+  vehicles?: MemberVehicle[]
+}
+
+export interface MemberVehicle {
+  _id: string
+  vehicleId: string
+  brand: string
+  modelName: string
+  yearRange: string
+  generation: string
+  nickname: string
+  isDefault: boolean
+  forumVisibility: 'visible' | 'hidden'
 }
 
 export interface MemberFavorite {
@@ -96,6 +109,14 @@ export const resetMemberPassword = (email: string, code: string, password: strin
   request('/reset-password', 'POST', { email, code, password })
 export const logoutContentSession = () => request('/logout', 'POST')
 export const getMemberProfile = () => request('/profile')
+export const getMemberVehicles = () => request('/vehicles')
+export async function getAvailableVehicles() {
+  const response = await fetch('/api/vehicles?limit=5000&language=en', { credentials: 'include' })
+  return response.json() as Promise<{ success: boolean; data?: { items?: Array<{ _id: string; brand: string; modelName: string; year: string; generation?: string }> } }>
+}
+export const addMemberVehicle = (vehicleId: string, options?: { nickname?: string; isDefault?: boolean; forumVisibility?: 'visible' | 'hidden' }) => request('/vehicles', 'POST', { vehicleId, ...options })
+export const updateMemberVehicle = (id: string, data: Partial<Pick<MemberVehicle, 'nickname' | 'isDefault' | 'forumVisibility'>>) => request(`/vehicles/${encodeURIComponent(id)}`, 'PUT', data)
+export const removeMemberVehicle = (id: string) => request(`/vehicles/${encodeURIComponent(id)}`, 'DELETE')
 export const getMemberForumSummary = () =>
   request('/forum-summary') as Promise<{
     success: boolean

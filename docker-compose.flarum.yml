@@ -2,7 +2,8 @@
 # 参考: https://github.com/crazy-max/docker-flarum  端口 8000→8888 保持与现有一致
 services:
   flarum:
-    image: crazymax/flarum:edge
+    # 生产基线固定为 Flarum 1.8.17；升级时显式修改并验证扩展兼容性。
+    image: crazymax/flarum:1.8.17
     container_name: flarum_app
     environment:
       - FLARUM_BASE_URL=${FLARUM_BASE_URL}

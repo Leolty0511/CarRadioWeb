@@ -41,7 +41,9 @@ const Forum = () => {
 
   useEffect(() => {
     if (!forumEnabled || deployed !== true || !forumUrl || authLoading) {return}
-    const destination = user?.type === 'member' ? `${forumUrl}/auth/passport` : forumUrl
+    // Both members and administrators must pass through the main-site SSO so
+    // Flarum can create/link the account and synchronize its managed group.
+    const destination = user ? `${forumUrl}/auth/passport` : forumUrl
     window.location.replace(destination)
   }, [authLoading, deployed, forumEnabled, forumUrl, user])
 
@@ -95,7 +97,7 @@ const Forum = () => {
   return (
     <div className="page-container-deep flex flex-col items-center justify-center gap-3">
       <p className="text-lg text-slate-600 dark:text-gray-400">{t('common.redirecting')}</p>
-      <p className="text-sm text-slate-500 dark:text-gray-500">{user?.type === 'member' ? t('forum.oauthRedirecting') : t('forum.redirectingHint')}</p>
+      <p className="text-sm text-slate-500 dark:text-gray-500">{user ? t('forum.oauthRedirecting') : t('forum.redirectingHint')}</p>
     </div>
   )
 }
