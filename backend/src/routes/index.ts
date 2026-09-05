@@ -49,6 +49,7 @@ import newsletterRouter from './newsletter';
 import tokenRefreshRouter from './tokenRefresh';
 import configRouter from './config/configRoutes';
 import forumRouter from './forum';
+import securityRouter from './security';
 import { authenticateUser } from '../middleware/auth';
 import { authenticateContentAccess, authenticateContentOrGuideView } from '../middleware/contentAccess';
 
@@ -111,6 +112,7 @@ router.use('/ai', aiRouter);
 
 router.use('/users', authenticateUser, usersRouter);
 router.use('/audit-logs', authenticateUser, auditLogsRouter);
+router.use('/security', securityRouter);
 router.use('/upload', authenticateUser, uploadRouter);
 router.use('/admin', authenticateUser, adminRouter);
 router.use('/audio', authenticateUser, audioRouter);

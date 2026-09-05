@@ -35,6 +35,7 @@ import {
   ShieldCheck,
   ScrollText,
   Scale,
+  ShieldAlert,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -151,6 +152,15 @@ export const NAV_CONFIG: NavGroup[] = [
       { id: 'oss-storage', label: '存储服务', icon: HardDrive },
       { id: 'notification', label: '消息推送', icon: Send },
       { id: 'compliance-hub', label: '合规与线索', icon: Scale },
+    ]
+  },
+  {
+    group: 'security',
+    label: '安全',
+    icon: ShieldAlert,
+    defaultExpanded: true,
+    items: [
+      { id: 'ip-security', label: 'IP 安全', icon: ShieldAlert },
     ]
   },
   {

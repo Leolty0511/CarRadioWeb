@@ -135,6 +135,10 @@ export const PERMISSIONS = {
     read: 'visitors:read',
     delete: 'visitors:delete',
   },
+  security: {
+    read: 'security:read',
+    manage: 'security:manage',
+  },
 } as const
 
 /** Flat list of all permission strings for schema validation */

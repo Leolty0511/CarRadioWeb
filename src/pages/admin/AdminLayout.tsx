@@ -47,6 +47,7 @@ import { UserManagement } from './modules/users'
 import { MemberManagement } from './modules/members'
 import { AuditLogManagement } from './modules/audit-log'
 import { ComplianceHubManagement } from './modules/compliance-hub'
+import { IpSecurityManagement } from './modules/ip-security'
 import { ChangePasswordDialog } from './components/ChangePasswordDialog'
 import { getFirstAccessibleNavTab, getRequiredPermissionsForNavId } from './constants/navConfig'
 import { userHasPermission } from '@/services/authService'
@@ -82,6 +83,7 @@ const PAGE_TITLES: Record<string, string> = {
   members: '会员管理',
   'audit-log': '操作日志',
   'compliance-hub': '合规与线索',
+  'ip-security': 'IP 安全防护中心',
 }
 
 /** localStorage key for sidebar state */
@@ -330,6 +332,8 @@ export const AdminLayout: React.FC = () => {
         return <AuditLogManagement />
       case 'compliance-hub':
         return <ComplianceHubManagement />
+      case 'ip-security':
+        return <IpSecurityManagement user={user} />
       default:
         return <DashboardPage dataLanguage={dataLanguage} onNavigate={setActiveTab} />
     }

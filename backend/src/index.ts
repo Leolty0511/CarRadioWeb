@@ -78,6 +78,8 @@ import { securityFilters } from './middleware/sanitization';
 import cookieParser from 'cookie-parser'
 import { csrfMiddleware } from './middleware/csrf';
 import { initRedis } from './utils/redisCache';
+import securityRouter from './routes/security';
+import { securityTrackingMiddleware } from './services/securityService';
 import { initSentry, sentryErrorHandler, requestTracing } from './utils/sentry';
 import compression from 'compression';
 
@@ -280,6 +282,9 @@ app.use(session({
 // Audit log middleware — records write operations for authenticated users
 app.use(auditLogMiddleware);
 
+// IP 安全中心：Redis 高频计数、批量聚合落库，不阻塞请求处理。
+app.use(securityTrackingMiddleware);
+
 // 基础请求日志（使用 Pino 结构化日志）
 app.use((req, res, next) => {
   const start = Date.now();
@@ -411,7 +416,7 @@ app.use(sitemapRouter);
 app.get('/', (req, res) => {
   res.json({
     message: 'Knowledge Base Backend API',
-    version: '1.5.1',
+    version: '1.6.0',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     endpoints: {
       health: '/health',
@@ -484,6 +489,7 @@ app.use('/api/ai', aiRouter);
 app.use('/api/users', authenticateUser, usersRouter);
 app.use('/api/members', authenticateUser, membersRouter);
 app.use('/api/audit-logs', authenticateUser, auditLogsRouter);
+app.use('/api/security', securityRouter);
 app.use('/api/upload', authenticateUser, uploadRouter);
 app.use('/api/admin', authenticateUser, adminRouter);
 app.use('/api/audio', authenticateUser, audioRouter);
