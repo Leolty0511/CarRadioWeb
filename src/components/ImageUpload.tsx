@@ -159,7 +159,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({
         `}
         tabIndex={0}
       >
-        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) handleFileSelect(file); e.currentTarget.value = '' }} />
+        <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) { handleFileSelect(file) }; e.currentTarget.value = '' }} />
         {value ? (
           <div className="space-y-2">
             <img
