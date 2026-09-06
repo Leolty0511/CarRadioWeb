@@ -15,6 +15,10 @@
 
 CarRadioWeb 是面向汽车安卓主机和车载电子产品的双语知识库与客户服务平台。它把车型适配、CANBus 设置、主机接线、主机操作教程、用户手册、软件下载、公告、会员中心和论坛支持整合到一个可维护、可扩展的 Web 应用中。
 
+当前稳定版本为 **2.0.0**。本版本完成主站与 Flarum 的统一身份、管理员角色同步、一人多车和默认车辆，以及可配置的 IP 安全防护中心。
+
+> 生产部署前请先阅读 [`docs/security-center.md`](docs/security-center.md)。该文档说明可信代理、Cloudflare 真实 IP、Nginx/CrowdSec、Redis/MongoDB 资源策略和安全中心 API。
+
 项目适合用于：
 
 - 汽车安卓主机、车载导航、车机屏幕和相关配件的产品支持；
@@ -40,7 +44,8 @@ CarRadioWeb 是面向汽车安卓主机和车载电子产品的双语知识库�
 | 软件下载     | 按主机型号筛选软件或固件资源，详情页提供说明、注意事项和下载入口                   |
 | 公告中心     | 有未读公告时铃铛直接打开最新公告；已读后再查看历史公告列表                         |
 | 会员中心     | 支持邮箱、账号或昵称登录，并提供资料、收藏和反馈功能                               |
-| 论坛         | 与 Flarum 论坛桥接，支持主站登录后进入论坛，更新时保留插件启用状态                 |
+| 会员车辆     | 支持一人多车、默认车辆、年份区间、Generation、车辆快照和论坛展示开关               |
+| 论坛         | 与 Flarum 1.8.17 桥接，主站会员/管理员自动 SSO，历史原生论坛账号继续保留           |
 
 #### 后台管理
 
@@ -53,6 +58,28 @@ CarRadioWeb 是面向汽车安卓主机和车载电子产品的双语知识库�
 - 图片上传、缩略图、高清图和 WebP 资源处理；
 - 访问统计、搜索记录、收藏、审计日志和错误监控；
 - 支持 GitHub Actions 构建生产资源包，由官网后台拉取更新。
+
+#### IP 安全防护中心
+
+后台 **Security → IP Security** 只向管理员开放：普通管理员可查看，超级管理员才可执行 Ban/Unban、修改阈值和维护白名单。页面包含活跃 IP、当前封禁、可疑 IP、今日攻击事件、Top 请求 IP、Top 攻击 IP、IP 详情和最近请求。
+
+- 支持 IPv4/IPv6、IP/URL/时间/状态筛选、分页和请求明细；
+- 可配置请求/分钟、API 请求、登录失败、404 Flood、可疑和硬封禁阈值；
+- 支持 1 小时、6 小时、24 小时、7 天和永久封禁，所有操作写入审计日志；
+- 白名单不会被自动封禁；自动检测优先使用 Redis，访问明细异步批量写入 MongoDB；
+- 请求明细默认保留 7 天，安全事件默认保留 90 天，避免每个请求直接写 MongoDB；
+- 生产推荐 Nginx + CrowdSec 作为边界拦截，应用层封禁作为没有 CrowdSec 时的兜底。
+
+## 2.0.0 账户、论坛和车辆规则
+
+| CarRadioWeb 身份 | Flarum 组 | 说明 |
+| --- | --- | --- |
+| 超级管理员 | Administrator | 主站角色是权限最终来源 |
+| 普通管理员 | Moderator | 普通管理员没有安全中心写权限 |
+| 会员 | Member | 会员资料和车辆不向其他论坛用户暴露 |
+| 历史 Flarum 用户（无主站账号） | 保留原组 | 继续使用 Flarum 原生登录 |
+
+管理员使用邮箱或现有后台凭据登录主站；进入论坛时由 FoF Passport 完成 OAuth/SSO。邮箱、地址、内部 ID 等敏感信息不会传给论坛前台。一个会员可保存多辆车，最多 10 辆，设置的默认车辆会自动用于知识库选择器；车型目录使用品牌、车型、年份区间和 Generation，面向跨境用户不依赖中文品牌名。
 
 ### 内容路由与 SEO
 
@@ -181,6 +208,16 @@ npm run dev:stop
 
 Docker Compose 默认包含 Web、MongoDB、Redis、Mailpit 和 Nginx。生产环境应更换强 JWT 密钥、MongoDB 密码和对象存储密钥，并通过 HTTPS 暴露服务。
 
+#### 生产安全部署
+
+- 只允许 Nginx/Cloudflare 访问 Node 端口；在 `TRUSTED_PROXY_IPS` 中填写实际反向代理地址或内网网段。
+- 经过 Cloudflare 时，按 [`docs/security-center.md`](docs/security-center.md) 配置官方 Cloudflare 网段和真实 IP 处理，不能直接信任任意客户端请求头。
+- IP 安全中心使用 Redis 保存分钟级计数和临时封禁，MongoDB 保存事件、聚合 IP、封禁历史和白名单；访问明细默认 7 天、事件默认 90 天 TTL。
+- 生产建议在 Nginx 前接入 CrowdSec；没有 CrowdSec 时，CarRadioWeb 仍提供应用层封禁兜底，但它不替代边界拦截。
+- 更新或迁移前备份 MongoDB、Flarum 数据库和上传文件，低峰期执行健康检查并准备回滚。
+
+Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose 和桥接扩展位于 [`docker-compose.flarum.yml`](docker-compose.flarum.yml) 与 [`forum-extensions/`](forum-extensions/)，部署脚本位于 [`scripts/`](scripts/)。
+
 ### 常用命令
 
 | 命令                                             | 用途                       |
@@ -193,10 +230,17 @@ Docker Compose 默认包含 Web、MongoDB、Redis、Mailpit 和 Nginx。生产�
 | `npm run preview`                                | 预览前端生产构建           |
 | `cd backend && npm run build`                    | 单独构建后端               |
 | `cd backend && npm run migrate:knowledge-images` | 执行知识库图片迁移脚本     |
+| `cd backend && node dist/scripts/runMigration.js status` | 查看数据库迁移状态 |
+| `cd backend && node dist/scripts/runMigration.js run` | 执行待处理数据库迁移 |
+| `cd backend && node dist/scripts/runMigration.js rollback 005` | 回滚指定迁移 |
 
 ### 发布与更新
 
-推送到 `main` 分支后，GitHub Actions 会执行检查、构建并生成生产部署资源包。官网后台可以拉取 `latest` 资源包完成更新。
+推送到 `main` 分支或 `v*` 标签后，GitHub Actions 会执行检查、构建并生成 `caradioweb-deploy.tar.gz` 生产部署资源包。官网后台可以拉取 `latest` 资源包完成更新，正式版本可从对应 Release 下载。
+
+- [最新资源包](https://github.com/Leolty0511/CarRadioWeb/releases/tag/latest)
+- [v2.0.0 资源包](https://github.com/Leolty0511/CarRadioWeb/releases/tag/v2.0.0)
+- 生产流程：备份 → 拉取资源包 → 校验版本和 `/health` → 执行待处理迁移 → 重启 → 验证主站登录、Flarum SSO、车辆接口和安全中心。
 
 版本号与资源包发布相互独立：
 
@@ -258,6 +302,10 @@ It is designed for:
 - Software and firmware resources filtered by head-unit type;
 - Unread-announcement behavior that opens the newest announcement first;
 - Member login with email, account name, or nickname;
+- Multiple vehicles per member, a default vehicle, vehicle snapshots, year ranges, and Generation fields;
+- Flarum 1.8.17 integration with main-site OAuth/SSO, administrator/moderator role sync, and native legacy-user login preservation;
+- Configurable IP Security Center with Redis counters, MongoDB aggregation, IP details, security events, allowlist, temporary/permanent bans, and read-only access for regular administrators;
+- Trusted-proxy and Cloudflare-aware client IP handling, Nginx/CrowdSec deployment guidance, and audit logging;
 - Flarum forum integration with plugin-state preservation during updates;
 - Admin access control for administrators, members, system settings, and version updates;
 - WebP knowledge-image processing with thumbnails and high-resolution assets;
