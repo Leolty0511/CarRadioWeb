@@ -35,7 +35,7 @@ export interface ISecurityRequest extends Document {
   ip: string; time: Date; method: string; url: string; statusCode: number; userAgent: string; referer: string; responseTimeMs: number
 }
 const SecurityRequestSchema = new Schema<ISecurityRequest>({
-  ip: { type: String, required: true, index: true }, time: { type: Date, default: Date.now, index: true },
+  ip: { type: String, required: true, index: true }, time: { type: Date, default: Date.now },
   method: String, url: String, statusCode: Number, userAgent: String, referer: String, responseTimeMs: Number,
 }, { timestamps: false })
 SecurityRequestSchema.index({ time: 1 }, { expireAfterSeconds: 7 * 24 * 60 * 60 })

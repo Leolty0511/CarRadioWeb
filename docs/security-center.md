@@ -37,7 +37,13 @@ sudo systemctl enable --now crowdsec
 sudo cscli metrics
 ```
 
-根据发行版安装 Nginx bouncer，并将 bouncer 配置到 Nginx `http`/`server` 层。应用后台的“安全设置 → CrowdSec 集成”仅表示启用联动记录，不会在开发机执行系统安装或直接修改防火墙。
+根据发行版安装 Nginx bouncer，并将 bouncer 配置到 Nginx `http`/`server` 层。官方 Nginx bouncer 使用 `access_by_lua_file`，命中封禁时返回 `403` 并在本地缓存；请严格按官方文档安装 Lua/OpenResty 依赖，不要把下面的应用层兜底当成 Nginx bouncer 替代品：
+
+- CrowdSec Linux 安装：https://docs.crowdsec.net/u/getting_started/installation/linux
+- CrowdSec Nginx bouncer：https://doc.crowdsec.net/docs/bouncers/nginx
+- 官方 Nginx bouncer 源码说明：https://github.com/crowdsecurity/cs-nginx-bouncer
+
+应用后台的“安全设置 → CrowdSec 联动”仅表示启用联动记录，不会在开发机执行系统安装或直接修改防火墙。未安装 CrowdSec 时，CarRadioWeb 会使用 Redis/内存缓存和 MongoDB 封禁记录提供应用层兜底；生产环境仍应让 Nginx/CrowdSec 在 Node.js 之前拦截。
 
 ## 安全中心接口
 
