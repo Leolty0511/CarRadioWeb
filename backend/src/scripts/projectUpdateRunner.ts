@@ -1,4 +1,5 @@
-import { spawnSync } from 'child_process'
+import { spawn, spawnSync } from 'child_process'
+import { createWriteStream } from 'fs'
 import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
@@ -43,6 +44,7 @@ let merged = false
 let artifactBackupDir: string | null = null
 let artifactApplied = false
 let forumBridgeChanged = false
+let dataBackupDir: string | null = null
 const artifactPaths = [
   'dist',
   path.join('backend', 'dist'),
@@ -63,6 +65,26 @@ const artifactPaths = [
   path.join('scripts', 'install-forum-bridge.sh'),
 ]
 const stableDirectoryPaths = new Set(['forum-extensions'])
+const backupEnabled = process.env.UPDATE_BACKUP_ENABLED === 'true' || (process.env.NODE_ENV === 'production' && process.env.UPDATE_BACKUP_ENABLED !== 'false')
+const backupRequired = process.env.UPDATE_BACKUP_REQUIRED !== 'false'
+const backupRoot = path.resolve(process.env.UPDATE_BACKUP_DIR?.trim() || path.join(payload.repoRoot, '.update-backups'))
+const backupRetentionCount = Math.max(1, Number.parseInt(process.env.UPDATE_BACKUP_RETENTION_COUNT || '7', 10) || 7)
+
+interface BackupManifestItem {
+  name: string
+  status: 'completed' | 'skipped' | 'failed'
+  path?: string
+  method?: string
+  error?: string
+}
+
+interface BackupManifest {
+  jobId: string
+  fromCommit: string
+  targetCommit: string
+  createdAt: string
+  items: BackupManifestItem[]
+}
 
 function getCommandEnvironment(command: string): NodeJS.ProcessEnv {
   const token = payload.githubToken?.trim()
@@ -114,6 +136,229 @@ async function run(command: string, args: string[], stage: string, message: stri
   appendLog(result.stderr || '')
   if (result.error) throw result.error
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed (exit ${result.status})`)
+}
+
+function commandAvailable(command: string): boolean {
+  const result = spawnSync(command, ['--version'], {
+    stdio: 'ignore',
+    windowsHide: true,
+    timeout: 10_000,
+  })
+  return !result.error && result.status === 0
+}
+
+async function runCaptureToFile(command: string, args: string[], outputFile: string, timeout = 30 * 60_000, cwd = payload.repoRoot, env?: NodeJS.ProcessEnv): Promise<void> {
+  await fs.mkdir(path.dirname(outputFile), { recursive: true })
+  await writeStatus({ stage: 'backing_up', message: `Running ${command} backup` })
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd,
+      windowsHide: true,
+      env: env || process.env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    const output = createWriteStream(outputFile, { flags: 'wx' })
+    let stderr = ''
+    let settled = false
+    let exitCode: number | null = null
+    let outputFinished = false
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      setTimeout(() => child.kill('SIGKILL'), 5_000).unref()
+      finish(new Error(`${command} backup timed out`))
+    }, timeout)
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      if (error) output.destroy()
+      if (error) reject(error)
+      else resolve()
+    }
+    const maybeFinish = (): void => {
+      if (exitCode === 0 && outputFinished) finish()
+    }
+    child.stdout.pipe(output)
+    child.stderr.on('data', chunk => {
+      stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2_000)
+    })
+    output.on('error', error => {
+      child.kill('SIGTERM')
+      finish(error)
+    })
+    output.on('finish', () => {
+      outputFinished = true
+      maybeFinish()
+    })
+    child.on('error', error => finish(error))
+    child.on('close', code => {
+      exitCode = code
+      if (code === 0) maybeFinish()
+      else {
+        const detail = stderr.replace(/(password|pwd|secret)\s*[:=]?\s*[^\s]+/gi, '$1=[redacted]').trim()
+        finish(new Error(`${command} backup failed (exit ${code})${detail ? `: ${detail}` : ''}`))
+      }
+    })
+  })
+}
+
+async function runCommand(command: string, args: string[], timeout = 30 * 60_000, cwd = payload.repoRoot, env?: NodeJS.ProcessEnv): Promise<void> {
+  await writeStatus({ stage: 'backing_up', message: `Running ${command} backup` })
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, { cwd, windowsHide: true, env: env || process.env, stdio: ['ignore', 'ignore', 'pipe'] })
+    let stderr = ''
+    let settled = false
+    const timer = setTimeout(() => {
+      child.kill('SIGTERM')
+      setTimeout(() => child.kill('SIGKILL'), 5_000).unref()
+      finish(new Error(`${command} command timed out`))
+    }, timeout)
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      if (error) reject(error)
+      else resolve()
+    }
+    child.stderr.on('data', chunk => { stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2_000) })
+    child.on('error', error => finish(error))
+    child.on('close', code => {
+      if (code === 0) finish()
+      else {
+        const detail = stderr.replace(/(password|pwd|secret)\s*[:=]?\s*[^\s]+/gi, '$1=[redacted]').trim()
+        finish(new Error(`${command} command failed (exit ${code})${detail ? `: ${detail}` : ''}`))
+      }
+    })
+  })
+}
+
+async function backupMongoDatabase(directory: string): Promise<BackupManifestItem> {
+  const output = path.join(directory, 'mongodb.archive.gz')
+  const uri = process.env.MONGODB_URI?.trim()
+  try {
+    if (commandAvailable('mongodump') && uri) {
+      await runCommand('mongodump', [`--uri=${uri}`, `--archive=${output}`, '--gzip'])
+      return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'mongodump' }
+    }
+    const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
+    const container = process.env.UPDATE_MONGO_CONTAINER?.trim()
+    if (container && commandAvailable(docker)) {
+      const database = process.env.UPDATE_MONGO_DATABASE?.trim() || 'knowledge-base'
+      const args = ['exec', container, 'mongodump', `--db=${database}`, '--archive', '--gzip']
+      const username = process.env.UPDATE_MONGO_USERNAME?.trim()
+      const password = process.env.UPDATE_MONGO_PASSWORD
+      if (username) args.push(`--username=${username}`)
+      if (password) args.push(`--password=${password}`, '--authenticationDatabase=admin')
+      await runCaptureToFile(docker, args, output)
+      return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'docker exec mongodump' }
+    }
+    throw new Error('mongodump is unavailable or MONGODB_URI is not configured; set Mongo backup tools or UPDATE_MONGO_CONTAINER')
+  } catch (error) {
+    return { name: 'mongodb', status: 'failed', path: 'mongodb.archive.gz', error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+async function backupFlarumDatabase(directory: string): Promise<BackupManifestItem> {
+  const output = path.join(directory, 'flarum.sql')
+  const host = process.env.UPDATE_FLARUM_DB_HOST?.trim() || '127.0.0.1'
+  const port = process.env.UPDATE_FLARUM_DB_PORT?.trim() || '3306'
+  const database = process.env.UPDATE_FLARUM_DB_NAME?.trim() || 'flarum'
+  const user = process.env.UPDATE_FLARUM_DB_USER?.trim() || 'flarum'
+  const password = process.env.UPDATE_FLARUM_DB_PASSWORD
+  try {
+    const localDump = commandAvailable('mariadb-dump') ? 'mariadb-dump' : commandAvailable('mysqldump') ? 'mysqldump' : null
+    if (localDump) {
+      await runCaptureToFile(localDump, ['--host', host, '--port', port, '--user', user, database], output, 30 * 60_000, payload.repoRoot, { ...process.env, ...(password ? { MYSQL_PWD: password } : {}) })
+      return { name: 'flarumDatabase', status: 'completed', path: 'flarum.sql', method: `${localDump} (streamed)` }
+    }
+    const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
+    const container = process.env.UPDATE_FLARUM_DB_CONTAINER?.trim()
+    if (container && commandAvailable(docker)) {
+      const dumpCommand = process.env.UPDATE_FLARUM_DUMP_COMMAND?.trim() || 'mariadb-dump'
+      const args = ['exec']
+      if (password) args.push('-e', `MYSQL_PWD=${password}`)
+      args.push(container, dumpCommand, '--host', host === '127.0.0.1' ? '127.0.0.1' : host, '--port', port, '--user', user, database)
+      await runCaptureToFile(docker, args, output)
+      return { name: 'flarumDatabase', status: 'completed', path: 'flarum.sql', method: `docker exec ${dumpCommand} (streamed)` }
+    }
+    throw new Error('mariadb-dump/mysqldump is unavailable and UPDATE_FLARUM_DB_CONTAINER is not configured')
+  } catch (error) {
+    return { name: 'flarumDatabase', status: 'failed', path: 'flarum.sql', error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+async function backupDirectory(name: string, source: string, directory: string, required = true): Promise<BackupManifestItem> {
+  const target = path.join(directory, name)
+  try {
+    const relativeTarget = path.relative(path.resolve(source), path.resolve(target))
+    if (!relativeTarget || (!relativeTarget.startsWith(`..${path.sep}`) && relativeTarget !== '..' && !path.isAbsolute(relativeTarget))) {
+      throw new Error(`backup target must not be inside source directory: ${target}`)
+    }
+    await fs.access(source)
+    await fs.cp(source, target, { recursive: true, force: true })
+    return { name, status: 'completed', path: name, method: 'filesystem copy' }
+  } catch (error: any) {
+    if (error?.code === 'ENOENT' && !required) return { name, status: 'skipped', path: name, method: 'source missing' }
+    return { name, status: 'failed', path: name, error: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+async function pruneDataBackups(): Promise<void> {
+  let entries: string[] = []
+  try { entries = await fs.readdir(backupRoot) } catch (error: any) { if (error?.code === 'ENOENT') return; throw error }
+  const backups = (await Promise.all(entries.filter(entry => /^backup-[A-Za-z0-9._-]+$/.test(entry)).map(async entry => {
+    const full = path.join(backupRoot, entry)
+    const stat = await fs.stat(full).catch(() => null)
+    return stat?.isDirectory() ? { full, mtime: stat.mtimeMs } : null
+  }))).filter((entry): entry is { full: string; mtime: number } => Boolean(entry)).sort((a, b) => b.mtime - a.mtime)
+  await Promise.all(backups.slice(backupRetentionCount).map(entry => fs.rm(entry.full, { recursive: true, force: true })))
+}
+
+async function createDataBackup(): Promise<void> {
+  if (!backupEnabled) {
+    appendLog('Pre-update data backup disabled outside production')
+    return
+  }
+  const safeJobId = payload.jobId.replace(/[^A-Za-z0-9._-]/g, '_')
+  dataBackupDir = path.join(backupRoot, `backup-${new Date().toISOString().replace(/[:.]/g, '-')}-${safeJobId}`)
+  await fs.mkdir(dataBackupDir, { recursive: true })
+  const items: BackupManifestItem[] = []
+  const manifestPath = path.join(dataBackupDir, 'backup-manifest.json')
+  const writeManifest = async (): Promise<void> => {
+    const manifest: BackupManifest = { jobId: payload.jobId, fromCommit: payload.previousCommit, targetCommit: payload.targetCommit, createdAt: startedAt, items }
+    await fs.writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8')
+  }
+  items.push(await backupMongoDatabase(dataBackupDir))
+  items.push(await backupFlarumDatabase(dataBackupDir))
+  items.push(await backupDirectory('uploads', process.env.UPDATE_UPLOADS_PATH?.trim() || path.join(payload.repoRoot, 'backend', 'uploads'), dataBackupDir, false))
+  const flarumDataPath = process.env.UPDATE_FLARUM_DATA_PATH?.trim()
+  if (flarumDataPath) {
+    items.push(await backupDirectory('flarum-data', flarumDataPath, dataBackupDir, false))
+  } else {
+    const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
+    const container = process.env.UPDATE_FLARUM_CONTAINER?.trim()
+    const target = path.join(dataBackupDir, 'flarum-data')
+    if (container && commandAvailable(docker)) {
+      try {
+        await runCommand(docker, ['cp', `${container}:/data`, target])
+        items.push({ name: 'flarumData', status: 'completed', path: 'flarum-data', method: 'docker cp' })
+      } catch (error) {
+        items.push({ name: 'flarumData', status: 'failed', path: 'flarum-data', error: error instanceof Error ? error.message : String(error) })
+      }
+    } else {
+      items.push({ name: 'flarumData', status: 'skipped', method: 'not configured' })
+    }
+  }
+  await writeManifest()
+  const failures = items.filter(item => item.status === 'failed')
+  if (failures.length > 0) {
+    const message = `Pre-update data backup failed: ${failures.map(item => `${item.name}: ${item.error || 'unknown error'}`).join('; ')}`
+    if (backupRequired) throw new Error(message)
+    appendLog(`${message}; continuing because UPDATE_BACKUP_REQUIRED=false`)
+  } else {
+    appendLog(`Pre-update data backup completed: ${dataBackupDir}`)
+  }
+  await pruneDataBackups()
 }
 
 async function waitForHealth(timeoutMs = 90_000): Promise<void> {
@@ -358,6 +603,7 @@ async function rollbackLegacy(reason: string): Promise<void> {
 
 async function main(): Promise<void> {
   try {
+    await createDataBackup()
     if (payload.artifactUrl) {
       await writeStatus({ stage: 'downloading', message: 'Downloading the prebuilt package from GitHub' })
       await applyArtifact()

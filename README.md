@@ -214,7 +214,9 @@ Docker Compose 默认包含 Web、MongoDB、Redis、Mailpit 和 Nginx。生产�
 - 经过 Cloudflare 时，按 [`docs/security-center.md`](docs/security-center.md) 配置官方 Cloudflare 网段和真实 IP 处理，不能直接信任任意客户端请求头。
 - IP 安全中心使用 Redis 保存分钟级计数和临时封禁，MongoDB 保存事件、聚合 IP、封禁历史和白名单；访问明细默认 7 天、事件默认 90 天 TTL。
 - 生产建议在 Nginx 前接入 CrowdSec；没有 CrowdSec 时，CarRadioWeb 仍提供应用层封禁兜底，但它不替代边界拦截。
-- 更新或迁移前备份 MongoDB、Flarum 数据库和上传文件，低峰期执行健康检查并准备回滚。
+- 后台一键更新会在拉取资源包或合并代码前自动备份 MongoDB、Flarum 数据库和主站上传文件；可选备份 Flarum `/data`。生产环境默认开启，任一必需备份失败会阻止更新。
+- 将 `UPDATE_BACKUP_DIR` 挂载到独立、持久化的磁盘目录，并按 [`backend/config.env.example`](backend/config.env.example) 配置 `mongodump`、`mariadb-dump`/`mysqldump` 或 Docker 容器导出参数。Docker 重建后仍须保留该目录。
+- 备份目录内会生成 `backup-manifest.json`，默认保留最近 7 份，可用 `UPDATE_BACKUP_RETENTION_COUNT` 调整。备份只保护数据，不会自动把数据库恢复到旧版本；代码回滚和数据恢复是两个独立动作，仍建议额外做异地/云端备份。
 
 Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose 和桥接扩展位于 [`docker-compose.flarum.yml`](docker-compose.flarum.yml) 与 [`forum-extensions/`](forum-extensions/)，部署脚本位于 [`scripts/`](scripts/)。
 
@@ -240,7 +242,7 @@ Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose
 
 - [最新资源包](https://github.com/Leolty0511/CarRadioWeb/releases/tag/latest)
 - [v2.0.0 资源包](https://github.com/Leolty0511/CarRadioWeb/releases/tag/v2.0.0)
-- 生产流程：备份 → 拉取资源包 → 校验版本和 `/health` → 执行待处理迁移 → 重启 → 验证主站登录、Flarum SSO、车辆接口和安全中心。
+- 生产流程：自动备份 → 拉取资源包 → 校验版本和 `/health` → 执行待处理迁移 → 重启 → 验证主站登录、Flarum SSO、车辆接口和安全中心。
 
 版本号与资源包发布相互独立：
 

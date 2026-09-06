@@ -23,6 +23,21 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       SMTP_FROM: ${SMTP_FROM:-noreply@localhost}
+      UPDATE_BACKUP_ENABLED: ${UPDATE_BACKUP_ENABLED:-true}
+      UPDATE_BACKUP_REQUIRED: ${UPDATE_BACKUP_REQUIRED:-true}
+      UPDATE_BACKUP_DIR: ${UPDATE_BACKUP_DIR:-/var/backups/carradioweb}
+      UPDATE_BACKUP_RETENTION_COUNT: ${UPDATE_BACKUP_RETENTION_COUNT:-7}
+      UPDATE_UPLOADS_PATH: ${UPDATE_UPLOADS_PATH:-/app/uploads}
+      UPDATE_MONGO_CONTAINER: ${UPDATE_MONGO_CONTAINER:-automotivehu-mongo}
+      UPDATE_MONGO_DATABASE: ${UPDATE_MONGO_DATABASE:-knowledge-base}
+      UPDATE_MONGO_USERNAME: ${UPDATE_MONGO_USERNAME:-admin}
+      UPDATE_MONGO_PASSWORD: ${UPDATE_MONGO_PASSWORD:-}
+      UPDATE_FLARUM_DB_CONTAINER: ${UPDATE_FLARUM_DB_CONTAINER:-flarum_db}
+      UPDATE_FLARUM_DB_NAME: ${UPDATE_FLARUM_DB_NAME:-flarum}
+      UPDATE_FLARUM_DB_USER: ${UPDATE_FLARUM_DB_USER:-flarum}
+      UPDATE_FLARUM_DB_PASSWORD: ${UPDATE_FLARUM_DB_PASSWORD:-}
+      UPDATE_FLARUM_CONTAINER: ${UPDATE_FLARUM_CONTAINER:-flarum_app}
+      UPDATE_FLARUM_DATA_PATH: ${UPDATE_FLARUM_DATA_PATH:-}
     depends_on:
       - mongo
       - redis
@@ -32,6 +47,7 @@ services:
       - app-network
     volumes:
       - ./backend/uploads:/app/uploads
+      - ./backups:/var/backups/carradioweb
 
   mongo:
     image: mongo:6

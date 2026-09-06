@@ -55,3 +55,29 @@ sudo cscli metrics
 - `POST /api/security/ban`、`POST /api/security/unban`：封禁/解封（仅超级管理员）
 
 自动规则默认使用每分钟 120 次可疑阈值和 300 次硬封禁阈值，可在后台调整。请求明细只保留 7 天，安全事件保留 90 天；高频请求先进入 Redis，后台每 5 秒批量写入 MongoDB，避免每个请求产生单独数据库写入。
+
+## 后台更新前自动备份
+
+生产环境后台执行一键更新时，更新器会在下载资源包或执行 `git merge` 之前创建独立备份目录，包含：
+
+- MongoDB：优先使用更新器环境中的 `mongodump --archive --gzip`；也可通过 `docker exec` 调用 Mongo 容器内的 `mongodump`。
+- Flarum 数据库：优先使用 `mariadb-dump` 或 `mysqldump`，密码通过 `MYSQL_PWD` 传递，不写入命令行日志；也可通过 `docker exec flarum_db` 导出。
+- 主站上传文件：默认复制 `backend/uploads`，可用 `UPDATE_UPLOADS_PATH` 指定持久化目录。
+- Flarum `/data`：配置 `UPDATE_FLARUM_DATA_PATH` 复制宿主机目录；未配置时可用 `UPDATE_FLARUM_CONTAINER` 通过 `docker cp` 备份。
+
+示例配置：
+
+```env
+UPDATE_BACKUP_ENABLED=true
+UPDATE_BACKUP_REQUIRED=true
+UPDATE_BACKUP_DIR=/var/backups/carradioweb
+UPDATE_BACKUP_RETENTION_COUNT=7
+MONGODB_URI=mongodb://user:password@127.0.0.1:27017/knowledge-base?authSource=admin
+UPDATE_FLARUM_DB_HOST=127.0.0.1
+UPDATE_FLARUM_DB_PORT=3306
+UPDATE_FLARUM_DB_NAME=flarum
+UPDATE_FLARUM_DB_USER=flarum
+UPDATE_FLARUM_DB_PASSWORD=change-me
+```
+
+备份使用流式导出或文件复制，不会把数据库或上传目录一次性读入 Node.js 内存。每次备份都会写入 `backup-manifest.json`，并按 `UPDATE_BACKUP_RETENTION_COUNT` 清理更新器自己创建的旧目录。生产中必须将 `UPDATE_BACKUP_DIR` 放在持久化挂载盘，并确保更新器进程有写权限；若缺少导出工具或数据库参数，且 `UPDATE_BACKUP_REQUIRED=true`，更新会在代码变更前失败并保留失败清单。该机制不自动恢复数据库，恢复操作应根据清单由管理员执行。
