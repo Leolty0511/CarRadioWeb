@@ -201,8 +201,10 @@ const DocumentDetail: React.FC = () => {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <KnowledgeHomeLink className="mb-5" />
-        {user && <div className="mb-5 flex justify-end"><button type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy} className={`inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors ${favorited ? 'border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300' : 'border-slate-300 text-slate-600 hover:border-rose-200 hover:text-rose-500 dark:border-slate-600 dark:text-slate-300 dark:hover:border-rose-800 dark:hover:text-rose-300'} disabled:opacity-50`}><Heart className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />{t(favorited ? 'memberProfile.favorited' : 'memberProfile.addFavorite')}</button></div>}
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <KnowledgeHomeLink />
+          {user && <button type="button" onClick={() => void toggleFavorite()} disabled={favoriteBusy} className={`inline-flex min-h-10 items-center gap-2 rounded-md border bg-white px-4 py-2 text-sm font-medium shadow-sm transition-colors dark:bg-slate-900 ${favorited ? 'border-rose-200 text-rose-600 dark:border-rose-800 dark:text-rose-300' : 'border-slate-300 text-slate-700 hover:border-rose-300 hover:text-rose-600 dark:border-slate-600 dark:text-slate-200 dark:hover:border-rose-700 dark:hover:text-rose-300'} disabled:opacity-50`}><Heart className={`h-4 w-4 ${favorited ? 'fill-current' : ''}`} />{t(favorited ? 'memberProfile.favorited' : 'memberProfile.addFavorite')}</button>}
+        </div>
         {/* 根据文档类型渲染不同的查看器 */}
         {document.documentType === 'structured' || document.type === 'structured' ? (
           <StructuredDocumentViewer document={document} onBack={handleBack} />

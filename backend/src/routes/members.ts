@@ -1,5 +1,6 @@
 import { Router } from 'express'
 import Member from '../models/Member'
+import MemberVehicle from '../models/MemberVehicle'
 
 const router = Router()
 
@@ -50,10 +51,22 @@ router.get('/', async (req, res) => {
     Member.countDocuments({ ...filter, status: 'active' }),
     Member.countDocuments({ ...filter, status: 'active', lastSeenAt: { $gte: onlineSince } }),
   ])
+  const vehicles = items.length > 0
+    ? await MemberVehicle.find({ memberId: { $in: items.map(item => item._id) } })
+      .select('memberId vehicleId brand modelName yearRange generation nickname isDefault forumVisibility createdAt')
+      .sort({ isDefault: -1, createdAt: 1 })
+      .lean()
+    : []
+  const vehiclesByMember = new Map<string, typeof vehicles>()
+  for (const vehicle of vehicles) {
+    const memberId = String(vehicle.memberId)
+    vehiclesByMember.set(memberId, [...(vehiclesByMember.get(memberId) || []), vehicle])
+  }
   const normalizedItems = items.map((item) => {
     const lastActivityAt = item.lastSeenAt || item.lastLoginAt || null
     const isOnline = item.status === 'active' && !!lastActivityAt && new Date(lastActivityAt).getTime() >= onlineSince.getTime()
-    return { ...item, lastActivityAt, isOnline }
+    const memberVehicles = vehiclesByMember.get(String(item._id)) || []
+    return { ...item, lastActivityAt, isOnline, vehicles: memberVehicles, vehicleCount: memberVehicles.length }
   })
   res.json({ success: true, data: {
     items: normalizedItems,

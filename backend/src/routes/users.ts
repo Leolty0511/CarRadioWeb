@@ -11,6 +11,7 @@ import multer from 'multer'
 import sharp from 'sharp'
 import User from '../models/User'
 import AdminFavorite from '../models/AdminFavorite'
+import ForumIdentityLink from '../models/ForumIdentityLink'
 import BaseDocument from '../models/Document'
 import AdminInvitation from '../models/AdminInvitation'
 import { requireSuperAdmin } from '../middleware/auth'
@@ -20,6 +21,7 @@ import { isDuplicateKeyOnField } from '../utils/mongoErrors'
 import emailVerificationService from '../services/emailVerificationService'
 import { classifyTransferState, type TransferRole } from '../services/superAdminTransferState'
 import { uploadImageToOSS } from '../services/uploadService'
+import { getForumMemberSummary } from '../services/forumService'
 
 const logger = createLogger('users-route')
 
@@ -380,6 +382,19 @@ router.get('/me/favorites', async (req: Request, res: Response) => {
     }]
   })
   return res.json({ success: true, data: items })
+})
+
+router.get('/me/forum-summary', async (req: Request, res: Response) => {
+  if (!req.user) return res.status(401).json({ success: false, error: 'not_authenticated' })
+  const link = await ForumIdentityLink.findOne({ principalType: 'admin', principalId: req.user._id, status: 'linked' }).lean()
+  const summary = await getForumMemberSummary(link?.flarumUserId, req.user.email || req.user.loginUsername || '')
+  if (summary.linked && summary.forumUserId) {
+    await ForumIdentityLink.updateOne(
+      { principalType: 'admin', principalId: req.user._id },
+      { $set: { flarumUserId: summary.forumUserId, flarumUsername: summary.username || '', lastSyncAt: new Date() } },
+    ).catch(() => undefined)
+  }
+  return res.json({ success: true, data: summary })
 })
 
 router.get('/me/favorites/status/:documentId', async (req: Request, res: Response) => {

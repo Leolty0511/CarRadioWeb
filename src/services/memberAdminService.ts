@@ -23,6 +23,21 @@ export interface MemberRecord {
   lastSeenBrowserVersion: string
   isOnline: boolean
   loginHistory: { ip: string; country: string; region: string; city: string; userAgent: string; createdAt: string }[]
+  vehicles: AdminMemberVehicle[]
+  vehicleCount: number
+  createdAt: string
+}
+
+export interface AdminMemberVehicle {
+  _id: string
+  vehicleId: string
+  brand: string
+  modelName: string
+  yearRange: string
+  generation: string
+  nickname: string
+  isDefault: boolean
+  forumVisibility: 'visible' | 'hidden'
   createdAt: string
 }
 

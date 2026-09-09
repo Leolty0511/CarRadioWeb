@@ -236,6 +236,8 @@ Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose
 | `cd backend && node dist/scripts/runMigration.js run` | 执行待处理数据库迁移 |
 | `cd backend && node dist/scripts/runMigration.js rollback 005` | 回滚指定迁移 |
 
+车型目录内置迁移为 `006`：资源包更新时会自动执行待处理数据库迁移，将 `整理_修正版_v2` 清洗后的 536 条英文车型按幂等方式写入 `Vehicle` 集合。品牌或车型为空的表格行不会导入；已有相同品牌、车型和年份区间的生产记录不会覆盖。迁移回滚不会删除车型，以保护已经关联文档、密码或会员车辆的数据。
+
 ### 发布与更新
 
 推送到 `main` 分支或 `v*` 标签后，GitHub Actions 会执行检查、构建并生成 `caradioweb-deploy.tar.gz` 生产部署资源包。官网后台可以拉取 `latest` 资源包完成更新，正式版本可从对应 Release 下载。

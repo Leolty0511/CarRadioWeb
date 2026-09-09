@@ -47,7 +47,7 @@ router.get('/', async (req: Request, res: Response) => {
     const skip = (Number(page) - 1) * Number(limit);
     const total = await Vehicle.countDocuments(query);
     const vehicles = await Vehicle.find(query)
-      .sort({ createdAt: -1 })
+      .sort({ brand: 1, modelName: 1, year: 1, _id: 1 })
       .skip(skip)
       .limit(Number(limit));
     

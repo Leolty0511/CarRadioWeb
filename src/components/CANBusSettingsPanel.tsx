@@ -7,6 +7,7 @@ import ReferenceImageModal from '@/components/ReferenceImageModal'
 import HeadUnitTypeIdentifier from '@/components/knowledge/HeadUnitTypeIdentifier'
 import canbusSettingsService, { type CANBoxType, type HeadUnitType } from '@/services/canbusSettingsService'
 import { getVehicles } from '@/services/vehicleService'
+import { compareVehicleYears } from '@/utils/vehicleSorting'
 import { getKnowledgeImageThumbnailUrl } from '@/utils/knowledgeImage'
 
 /** 文档语言固定英文 */
@@ -184,10 +185,10 @@ const CANBusSettingsPanel: React.FC<CANBusSettingsPanelProps> = () => {
     setShowDropdown(null)
   }
 
-  const brands = Object.keys(vehicleData)
-  const models = selectedBrand ? Object.keys(vehicleData[selectedBrand] || {}) : []
+  const brands = Object.keys(vehicleData).sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
+  const models = selectedBrand ? Object.keys(vehicleData[selectedBrand] || {}).sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })) : []
   const years = selectedBrand && selectedModel
-    ? Object.keys(vehicleData[selectedBrand]?.[selectedModel] || {})
+    ? Object.keys(vehicleData[selectedBrand]?.[selectedModel] || {}).sort(compareVehicleYears)
     : []
 
   const closeDropdowns = () => setShowDropdown(null)

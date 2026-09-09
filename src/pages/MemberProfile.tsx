@@ -3,12 +3,16 @@ import { useTranslation } from 'react-i18next'
 import {
   Bell,
   Camera,
+  CarFront,
   CheckCircle2,
   ExternalLink,
   Heart,
   LockKeyhole,
   LogOut,
+  MessageSquare,
   Save,
+  Search,
+  Star,
   Trash2,
   UserRound,
 } from 'lucide-react'
@@ -18,10 +22,13 @@ import {
   getMemberFavorites,
   getMemberForumSummary,
   getMemberProfile,
+  getMemberVehicles,
   addMemberVehicle,
   getAvailableVehicles,
   type MemberVehicle,
   removeMemberFavorite,
+  removeMemberVehicle,
+  updateMemberVehicle,
   updateMemberPassword,
   updateMemberProfile,
   uploadMemberAvatar,
@@ -31,6 +38,7 @@ import {
 } from '@/services/memberAuthService'
 import {
   getAdminFavorites,
+  getAdminForumSummary,
   getAdminProfile,
   removeAdminFavorite,
   updateAdminPassword,
@@ -55,6 +63,12 @@ const forumNotificationKey = (type: string) => {
   return keys[type] || 'activity'
 }
 
+const forumDiscussionHref = (discussionId: string, slug: string, postNumber?: number) => {
+  const suffix = slug ? `-${encodeURIComponent(slug)}` : ''
+  const near = postNumber ? `/${postNumber}` : ''
+  return `${getForumBaseUrl()}/d/${encodeURIComponent(discussionId)}${suffix}${near}`
+}
+
 export default function MemberProfilePage() {
   const { t, i18n } = useTranslation()
   const { user, loading: authLoading, refresh, logout } = useAuth()
@@ -73,6 +87,8 @@ export default function MemberProfilePage() {
   const [vehicles, setVehicles] = useState<MemberVehicle[]>([])
   const [availableVehicles, setAvailableVehicles] = useState<Array<{ _id: string; brand: string; modelName: string; year: string; generation?: string }>>([])
   const [vehicleToAdd, setVehicleToAdd] = useState('')
+  const [vehicleSearch, setVehicleSearch] = useState('')
+  const [vehiclesLoading, setVehiclesLoading] = useState(false)
 
   const translateError = (errorCode?: string, fallbackKey = 'errors.generic') =>
     errorCode
@@ -88,7 +104,7 @@ export default function MemberProfilePage() {
     const forumRequest =
       user.type === 'member'
         ? getMemberForumSummary()
-        : Promise.resolve({ success: true, data: null })
+        : getAdminForumSummary()
     Promise.all([profileRequest, favoritesRequest, forumRequest])
       .then(([profileResult, favoriteResult, forumResult]) => {
         if (profileResult.success) {
@@ -109,10 +125,29 @@ export default function MemberProfilePage() {
         }
       })
       .catch(() => setError(t('memberProfile.profileLoadFailed')))
-    if (user.type === 'member') {
-      getAvailableVehicles().then((result) => setAvailableVehicles(result.data?.items || [])).catch(() => undefined)
-    }
   }, [t, user])
+
+  useEffect(() => {
+    if (user?.type !== 'member') {return}
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      setVehiclesLoading(true)
+      getAvailableVehicles(vehicleSearch)
+        .then((result) => {
+          if (!cancelled) {setAvailableVehicles(result.data?.items || [])}
+        })
+        .catch(() => {
+          if (!cancelled) {setAvailableVehicles([])}
+        })
+        .finally(() => {
+          if (!cancelled) {setVehiclesLoading(false)}
+        })
+    }, 250)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [user?.type, vehicleSearch])
 
   if (authLoading) {
     return (
@@ -198,6 +233,49 @@ export default function MemberProfilePage() {
     if (result.success) {
       setFavorites((items) => items.filter((item) => item.documentId !== documentId))
     }
+  }
+
+  const addVehicle = async () => {
+    if (!vehicleToAdd) {return}
+    setBusy(true)
+    setError('')
+    const result = await addMemberVehicle(vehicleToAdd)
+    if (result.success && result.data) {
+      setVehicles((items) => [...items, result.data])
+      setVehicleToAdd('')
+      setMessage(t('memberProfile.vehicleAdded'))
+    } else {
+      setError(translateError(result.error, 'vehicleUpdateFailed'))
+    }
+    setBusy(false)
+  }
+
+  const setDefaultVehicle = async (vehicleId: string) => {
+    setBusy(true)
+    setError('')
+    const result = await updateMemberVehicle(vehicleId, { isDefault: true })
+    if (result.success) {
+      setVehicles((items) => items.map((vehicle) => ({ ...vehicle, isDefault: vehicle._id === vehicleId })))
+      setMessage(t('memberProfile.defaultVehicleUpdated'))
+    } else {
+      setError(translateError(result.error, 'vehicleUpdateFailed'))
+    }
+    setBusy(false)
+  }
+
+  const deleteVehicle = async (vehicleId: string) => {
+    if (!window.confirm(t('memberProfile.removeVehicleConfirm'))) {return}
+    setBusy(true)
+    setError('')
+    const result = await removeMemberVehicle(vehicleId)
+    if (result.success) {
+      const refreshed = await getMemberVehicles()
+      setVehicles(refreshed.success ? refreshed.data || [] : vehicles.filter((vehicle) => vehicle._id !== vehicleId))
+      setMessage(t('memberProfile.vehicleRemoved'))
+    } else {
+      setError(translateError(result.error, 'vehicleUpdateFailed'))
+    }
+    setBusy(false)
   }
 
   const dateLocale = i18n.language === 'zh' ? 'zh-CN' : 'en-US'
@@ -330,7 +408,7 @@ export default function MemberProfilePage() {
         </section>
 
         {tab === 'overview' && (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="space-y-6">
             <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
               <h2 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-white">
                 <UserRound className="h-5 w-5 text-blue-600 dark:text-blue-400" />
@@ -381,23 +459,63 @@ export default function MemberProfilePage() {
               </div>
             </section>
             {user.type === 'member' && (
-              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:col-span-2 sm:p-6">
-                <h2 className="font-semibold text-slate-950 dark:text-white">{t('memberProfile.vehicles', { defaultValue: '我的车辆' })}</h2>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  {vehicles.map((vehicle) => (
-                    <div key={vehicle._id} className="rounded-md border border-slate-200 p-3 text-sm dark:border-slate-700">
-                      <p className="font-medium text-slate-900 dark:text-white">{vehicle.nickname || `${vehicle.brand} ${vehicle.modelName}`}</p>
-                      <p className="mt-1 text-slate-500 dark:text-slate-400">{vehicle.brand} · {vehicle.modelName} · {vehicle.yearRange}{vehicle.generation ? ` · ${vehicle.generation}` : ''}</p>
-                      {vehicle.isDefault && <span className="mt-2 inline-block text-xs text-blue-600">{t('memberProfile.defaultVehicle', { defaultValue: '默认车辆' })}</span>}
-                    </div>
-                  ))}
+              <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-white">
+                      <CarFront className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      {t('memberProfile.vehicles')}
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{t('memberProfile.vehiclesDescription')}</p>
+                  </div>
+                  <span className="flex h-8 min-w-8 items-center justify-center rounded-md bg-slate-100 px-2 text-sm font-semibold text-slate-700 dark:bg-slate-800 dark:text-slate-200">{vehicles.length}</span>
                 </div>
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <select value={vehicleToAdd} onChange={(event) => setVehicleToAdd(event.target.value)} className={inputClassName}>
-                    <option value="">{t('memberProfile.selectVehicle', { defaultValue: '选择车辆' })}</option>
-                    {availableVehicles.filter((item) => !vehicles.some((v) => v.vehicleId === item._id)).map((item) => <option key={item._id} value={item._id}>{item.brand} {item.modelName} · {item.year}</option>)}
-                  </select>
-                  <button type="button" disabled={!vehicleToAdd || busy} onClick={async () => { setBusy(true); const result = await addMemberVehicle(vehicleToAdd); if (result.success && result.data) { setVehicles((items) => [...items, result.data]); setVehicleToAdd('') } setBusy(false) }} className="rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{t('memberProfile.addVehicle', { defaultValue: '添加车辆' })}</button>
+                {vehicles.length > 0 ? (
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    {vehicles.map((vehicle) => (
+                      <div key={vehicle._id} className="flex min-h-36 flex-col justify-between rounded-md border border-slate-200 bg-slate-50/60 p-4 text-sm dark:border-slate-700 dark:bg-slate-800/50">
+                        <div>
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="font-semibold text-slate-900 dark:text-white">{vehicle.nickname || `${vehicle.brand} ${vehicle.modelName}`}</p>
+                            {vehicle.isDefault && <span className="shrink-0 rounded bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700 dark:bg-blue-950 dark:text-blue-300">{t('memberProfile.defaultVehicle')}</span>}
+                          </div>
+                          <p className="mt-2 text-slate-600 dark:text-slate-300">{vehicle.brand} {vehicle.modelName}</p>
+                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{vehicle.yearRange}{vehicle.generation ? ` · ${vehicle.generation}` : ''}</p>
+                        </div>
+                        <div className="mt-4 flex items-center gap-2 border-t border-slate-200 pt-3 dark:border-slate-700">
+                          {!vehicle.isDefault && (
+                            <button type="button" disabled={busy} onClick={() => void setDefaultVehicle(vehicle._id)} className="inline-flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50 dark:text-blue-400">
+                              <Star className="h-3.5 w-3.5" />{t('memberProfile.setDefaultVehicle')}
+                            </button>
+                          )}
+                          <button type="button" disabled={busy} onClick={() => void deleteVehicle(vehicle._id)} className="ml-auto rounded-md p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50 dark:hover:bg-red-950/30" title={t('memberProfile.removeVehicle')} aria-label={t('memberProfile.removeVehicle')}>
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-md border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">{t('memberProfile.emptyVehicles')}</div>
+                )}
+                <div className="mt-5 space-y-3 border-t border-slate-100 pt-5 dark:border-slate-800">
+                  <label className="relative block">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="search"
+                      value={vehicleSearch}
+                      onChange={(event) => { setVehicleSearch(event.target.value); setVehicleToAdd('') }}
+                      placeholder={t('memberProfile.searchVehicles')}
+                      className="min-h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+                    />
+                  </label>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <select value={vehicleToAdd} onChange={(event) => setVehicleToAdd(event.target.value)} disabled={vehiclesLoading} className="min-h-11 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-white">
+                      <option value="">{vehiclesLoading ? t('common.loading') : t('memberProfile.selectVehicle')}</option>
+                      {availableVehicles.filter((item) => !vehicles.some((v) => v.vehicleId === item._id)).map((item) => <option key={item._id} value={item._id}>{item.brand} {item.modelName} · {item.year}{item.generation ? ` · ${item.generation}` : ''}</option>)}
+                    </select>
+                    <button type="button" disabled={!vehicleToAdd || busy || vehiclesLoading} onClick={() => void addVehicle()} className="min-h-11 shrink-0 rounded-md bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 sm:min-w-32">{t('memberProfile.addVehicle')}</button>
+                  </div>
                 </div>
               </section>
             )}
@@ -445,6 +563,40 @@ export default function MemberProfilePage() {
                       </div>
                     ))}
                   </div>
+                  <div className="mt-5 grid gap-5 border-t border-slate-100 pt-5 dark:border-slate-800 sm:grid-cols-2">
+                    <div className="min-w-0">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                        <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        {t('memberProfile.myForumDiscussions')}
+                      </h3>
+                      {(forum.discussions || []).length ? (
+                        <div className="mt-3 space-y-3">
+                          {(forum.discussions || []).slice(0, 3).map((item) => (
+                            <a key={item.id} href={forumDiscussionHref(item.id, item.slug)} target="_blank" rel="noreferrer" className="block min-w-0 text-sm">
+                              <span className="block truncate font-medium text-slate-800 hover:text-blue-600 dark:text-slate-200 dark:hover:text-blue-400">{item.title}</span>
+                              <span className="mt-1 block text-xs text-slate-400">{t('memberProfile.forumDiscussionMeta', { replies: Math.max(0, item.commentCount - 1), time: new Date(item.createdAt).toLocaleString(dateLocale) })}</span>
+                            </a>
+                          ))}
+                        </div>
+                      ) : <p className="mt-3 text-sm text-slate-400">{t('memberProfile.noForumDiscussions')}</p>}
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
+                        <MessageSquare className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        {t('memberProfile.myForumReplies')}
+                      </h3>
+                      {(forum.replies || []).length ? (
+                        <div className="mt-3 space-y-3">
+                          {(forum.replies || []).slice(0, 3).map((item) => (
+                            <a key={item.id} href={forumDiscussionHref(item.discussionId, item.discussionSlug, item.number)} target="_blank" rel="noreferrer" className="block min-w-0 text-sm">
+                              <span className="block truncate font-medium text-slate-800 hover:text-blue-600 dark:text-slate-200 dark:hover:text-blue-400">{item.discussionTitle}</span>
+                              <span className="mt-1 block text-xs text-slate-400">{t('memberProfile.forumReplyMeta', { number: item.number, time: new Date(item.createdAt).toLocaleString(dateLocale) })}</span>
+                            </a>
+                          ))}
+                        </div>
+                      ) : <p className="mt-3 text-sm text-slate-400">{t('memberProfile.noForumReplies')}</p>}
+                    </div>
+                  </div>
                   <a
                     href={getForumBaseUrl()}
                     target="_blank"
@@ -476,7 +628,7 @@ export default function MemberProfilePage() {
         )}
 
         {tab === 'security' && supportsPassword && (
-          <section className="max-w-3xl rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+          <section className="w-full rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
             <h2 className="flex items-center gap-2 font-semibold text-slate-950 dark:text-white">
               <LockKeyhole className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               {t('memberProfile.changePassword')}

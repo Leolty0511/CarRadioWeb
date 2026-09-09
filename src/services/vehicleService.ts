@@ -4,6 +4,7 @@
  */
 
 import { BaseCrudService } from './apiClient';
+import { sortVehicles } from '@/utils/vehicleSorting';
 
 export interface Vehicle {
   _id?: string;
@@ -100,7 +101,7 @@ class VehicleService extends BaseCrudService<Vehicle, CreateVehicleData, UpdateV
 
     // response.data 是 PaginatedResponse<Vehicle>，包含 items 数组
     const vehicles = response.data.items || [];
-    return vehicles.map((vehicle: any) => this.mapFromBackend(vehicle));
+    return sortVehicles(vehicles.map((vehicle: any) => this.mapFromBackend(vehicle)));
   }
 
   /**

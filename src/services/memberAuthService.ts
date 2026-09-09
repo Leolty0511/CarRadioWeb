@@ -46,6 +46,24 @@ export interface ForumMemberNotification {
   readAt: string | null
 }
 
+export interface ForumMemberDiscussion {
+  id: string
+  title: string
+  slug: string
+  commentCount: number
+  createdAt: string
+  lastPostedAt: string | null
+}
+
+export interface ForumMemberReply {
+  id: string
+  number: number
+  discussionId: string
+  discussionTitle: string
+  discussionSlug: string
+  createdAt: string
+}
+
 export interface ForumMemberSummary {
   available: boolean
   linked: boolean
@@ -54,6 +72,8 @@ export interface ForumMemberSummary {
   nickname?: string
   unreadCount: number
   notifications: ForumMemberNotification[]
+  discussions: ForumMemberDiscussion[]
+  replies: ForumMemberReply[]
 }
 
 function csrfHeader(): Record<string, string> {
@@ -110,8 +130,10 @@ export const resetMemberPassword = (email: string, code: string, password: strin
 export const logoutContentSession = () => request('/logout', 'POST')
 export const getMemberProfile = () => request('/profile')
 export const getMemberVehicles = () => request('/vehicles')
-export async function getAvailableVehicles() {
-  const response = await fetch('/api/vehicles?limit=5000&language=en', { credentials: 'include' })
+export async function getAvailableVehicles(search = '') {
+  const params = new URLSearchParams({ limit: '100', language: 'en' })
+  if (search.trim()) {params.set('search', search.trim())}
+  const response = await fetch(`/api/vehicles?${params.toString()}`, { credentials: 'include' })
   return response.json() as Promise<{ success: boolean; data?: { items?: Array<{ _id: string; brand: string; modelName: string; year: string; generation?: string }> } }>
 }
 export const addMemberVehicle = (vehicleId: string, options?: { nickname?: string; isDefault?: boolean; forumVisibility?: 'visible' | 'hidden' }) => request('/vehicles', 'POST', { vehicleId, ...options })

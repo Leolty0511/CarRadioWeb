@@ -8,7 +8,7 @@ export interface SecuritySettings { requestsPerMinute: number; hardLimit: number
 export const securityApi = {
   dashboard: () => apiClient.get<DashboardData>('/security/dashboard'),
   ips: (params: Record<string, string | number>) => apiClient.get<{ items: SecurityIp[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>('/security/ips', params),
-  detail: (ip: string) => apiClient.get<{ summary: SecurityIp; requests: Array<{ time: string; method: string; url: string; statusCode: number; userAgent: string; responseTimeMs: number }>; events: SecurityEvent[]; ban?: { reason: string; expiresAt?: string } }>('/security/ips/' + encodeURIComponent(ip)),
+  detail: (ip: string) => apiClient.get<{ summary: SecurityIp; requests: Array<{ time: string; method: string; url: string; statusCode: number; userAgent: string; responseTimeMs: number }>; events: SecurityEvent[]; ban?: { reason: string; source: 'manual' | 'automatic' | 'crowdsec'; bannedAt: string; expiresAt?: string | null } }>('/security/ips/' + encodeURIComponent(ip)),
   ban: (ip: string, reason: string, durationHours?: number) => apiClient.post('/security/ban', { ip, reason, durationHours }),
   unban: (ip: string) => apiClient.post('/security/unban', { ip }),
   settings: () => apiClient.get<SecuritySettings>('/security/settings'),

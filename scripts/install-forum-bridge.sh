@@ -163,6 +163,20 @@ if [[ -s "$FORUM_ENABLED_STATE_FILE" ]]; then
   PRESERVE_FORUM_ENABLED_STATE=1
 fi
 
+rollback_forum_update() {
+  local exit_code=$?
+  trap - ERR
+  set +e
+  echo "Forum update failed; restoring the pre-update extension state."
+  restore_forum_composer_state
+  restore_forum_enabled_state
+  fix_forum_runtime_permissions
+  docker exec --user 1000:1000 flarum_app php flarum cache:clear >/dev/null 2>&1
+  docker exec --user 1000:1000 flarum_app php flarum assets:publish >/dev/null 2>&1
+  exit "$exit_code"
+}
+trap rollback_forum_update ERR
+
 # Older artifact updates replaced the bind-mounted directory inode. Docker
 # keeps serving that detached (and now empty) inode until the container is
 # recreated, even though the current host directory contains the extension.
@@ -219,6 +233,7 @@ if [[ ${#OAUTH_CLIENT_SECRET} -ge 32 && -n "$FRONTEND_URL" && -n "$OAUTH_REDIREC
       $key = chr(96) . "key" . chr(96);
       $sql = "INSERT INTO " . $table . " (" . $key . ", value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value=VALUES(value)";
       $statement = $pdo->prepare($sql);
+      $insertDefault = $pdo->prepare("INSERT IGNORE INTO " . $table . " (" . $key . ", value) VALUES (?, ?)");
       $base = rtrim(getenv("CARRADIOWEB_FRONTEND_URL"), "/");
       $settings = [
         "fof-passport.app_id" => getenv("CARRADIOWEB_OAUTH_CLIENT_ID"),
@@ -227,12 +242,17 @@ if [[ ${#OAUTH_CLIENT_SECRET} -ge 32 && -n "$FRONTEND_URL" && -n "$OAUTH_REDIREC
         "fof-passport.app_token_url" => $base . "/api/member-auth/forum/oauth/token",
         "fof-passport.app_user_url" => $base . "/api/member-auth/forum/oauth/user",
         "fof-passport.app_oauth_scopes" => "read",
+      ];
+      $defaults = [
         "fof-passport.button_title" => "Main site login",
         "fof-passport.button_icon" => "",
         "display_name_driver" => "nickname",
       ];
       foreach ($settings as $setting => $value) {
         $statement->execute([$setting, $value]);
+      }
+      foreach ($defaults as $setting => $value) {
+        $insertDefault->execute([$setting, $value]);
       }
     '
   echo "FoF Passport settings synchronized with the backend."
@@ -252,8 +272,12 @@ fi
 if ! docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show carradioweb/forum-bridge >/dev/null 2>&1; then
   docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require carradioweb/forum-bridge:1.0.0 --with-dependencies --no-interaction --no-progress
 fi
-docker exec flarum_app php flarum extension:enable fof-passport
-docker exec flarum_app php flarum extension:enable carradioweb-forum-bridge
+if [[ "$PRESERVE_FORUM_ENABLED_STATE" == "1" ]]; then
+  restore_forum_enabled_state
+else
+  docker exec flarum_app php flarum extension:enable fof-passport
+  docker exec flarum_app php flarum extension:enable carradioweb-forum-bridge
+fi
 docker exec flarum_app php flarum migrate --no-interaction
 docker exec flarum_app php flarum cache:clear
 # The bridge source is bind-mounted; restart PHP workers so opcache loads the
@@ -368,5 +392,6 @@ docker exec --user 1000:1000 flarum_app php flarum assets:publish >/dev/null
 fix_forum_runtime_permissions
 
 save_forum_composer_state
+trap - ERR
 
 echo "Forum bridge extension is installed and enabled."

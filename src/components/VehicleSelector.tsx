@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Car, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { compareVehicleYears } from '@/utils/vehicleSorting'
 
 interface VehicleData {
   [brand: string]: {
@@ -30,13 +31,13 @@ const VehicleSelector: React.FC<VehicleSelectorProps> = ({ vehicleData, onSelect
   const [showYearDropdown, setShowYearDropdown] = useState(false)
 
   // Get all brands
-  const brands = Object.keys(vehicleData)
+  const brands = Object.keys(vehicleData).sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
 
   // Get models for selected brand
-  const models = selectedBrand ? Object.keys(vehicleData[selectedBrand]) : []
+  const models = selectedBrand ? Object.keys(vehicleData[selectedBrand]).sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' })) : []
 
   // Get years for selected model
-  const years = selectedModel ? Object.keys(vehicleData[selectedBrand][selectedModel]) : []
+  const years = selectedModel ? Object.keys(vehicleData[selectedBrand][selectedModel]).sort(compareVehicleYears) : []
 
   // Signed-in members can reuse their default vehicle; anonymous visitors keep
   // the existing manual selector behaviour.

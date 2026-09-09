@@ -14,6 +14,7 @@ import {
 } from '@/services/vehicleService'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
 import type { VehicleFormData, VehicleFilters, VehicleStatistics } from './types'
+import { compareVehicleYears, sortVehicles } from '@/utils/vehicleSorting'
 
 interface UseVehiclesOptions {
   language: DataLanguage
@@ -100,7 +101,7 @@ export function useVehicles({ language }: UseVehiclesOptions) {
         language
       })
 
-      setVehicles(prev => [...prev, vehicle])
+      setVehicles(prev => sortVehicles([...prev, vehicle]))
 
       showToast({
         type: 'success',
@@ -151,9 +152,9 @@ export function useVehicles({ language }: UseVehiclesOptions) {
         password: formData.hasPassword ? formData.password : ''
       })
 
-      setVehicles(prev => prev.map(v =>
+      setVehicles(prev => sortVehicles(prev.map(v =>
         (v._id || v.id?.toString()) === id ? updatedVehicle : v
-      ))
+      )))
 
       showToast({
         type: 'success',
@@ -220,7 +221,7 @@ export function useVehicles({ language }: UseVehiclesOptions) {
     vehicles.forEach(v => {
       if (v.brand) {brands.add(v.brand)}
     })
-    return Array.from(brands).sort()
+    return Array.from(brands).sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
   }, [vehicles])
 
   // 派生数据：根据品牌获取可用的车型列表
@@ -231,7 +232,7 @@ export function useVehicles({ language }: UseVehiclesOptions) {
         models.add(v.model)
       }
     })
-    return Array.from(models).sort()
+    return Array.from(models).sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' }))
   }, [vehicles])
 
   // 派生数据：可用的年份列表
@@ -240,12 +241,12 @@ export function useVehicles({ language }: UseVehiclesOptions) {
     vehicles.forEach(v => {
       if (v.year) {years.add(v.year)}
     })
-    return Array.from(years).sort().reverse()
+    return Array.from(years).sort(compareVehicleYears)
   }, [vehicles])
 
   // 派生数据：筛选后的车型列表
   const filteredVehicles = useMemo(() => {
-    return vehicles.filter(vehicle => {
+    return sortVehicles(vehicles.filter(vehicle => {
       // 搜索词筛选
       if (filters.searchTerm) {
         const search = filters.searchTerm.toLowerCase()
@@ -265,7 +266,7 @@ export function useVehicles({ language }: UseVehiclesOptions) {
       if (filters.year !== 'all' && vehicle.year !== filters.year) {return false}
 
       return true
-    })
+    }))
   }, [vehicles, filters])
 
   // 统计数据
@@ -301,4 +302,3 @@ export function useVehicles({ language }: UseVehiclesOptions) {
     statistics
   }
 }
-

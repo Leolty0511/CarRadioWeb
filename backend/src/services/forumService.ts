@@ -17,6 +17,24 @@ export interface ForumMemberNotification {
   readAt: string | null
 }
 
+export interface ForumMemberDiscussion {
+  id: string
+  title: string
+  slug: string
+  commentCount: number
+  createdAt: string
+  lastPostedAt: string | null
+}
+
+export interface ForumMemberReply {
+  id: string
+  number: number
+  discussionId: string
+  discussionTitle: string
+  discussionSlug: string
+  createdAt: string
+}
+
 export interface ForumMemberSummary {
   available: boolean
   linked: boolean
@@ -25,6 +43,8 @@ export interface ForumMemberSummary {
   nickname?: string
   unreadCount: number
   notifications: ForumMemberNotification[]
+  discussions: ForumMemberDiscussion[]
+  replies: ForumMemberReply[]
 }
 
 /** 项目根目录（绝对路径），与启动时的 cwd 无关，开发/生产一致 */
@@ -190,7 +210,7 @@ export const getForumDeployCredentials = (): { dbPassword: string } => {
 export async function getForumMemberSummary(forumUserId?: string, email?: string): Promise<ForumMemberSummary> {
   const normalizedId = String(forumUserId || '').trim()
   const normalizedEmail = String(email || '').trim().toLowerCase()
-  const empty: ForumMemberSummary = { available: true, linked: false, unreadCount: 0, notifications: [] }
+  const empty: ForumMemberSummary = { available: true, linked: false, unreadCount: 0, notifications: [], discussions: [], replies: [] }
   if (!/^\d+$/.test(normalizedId) && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) return empty
   const { dbPassword } = getForumDeployCredentials()
   if (!dbPassword.trim()) return { ...empty, available: false, linked: true, forumUserId: normalizedId }
@@ -199,11 +219,15 @@ export async function getForumMemberSummary(forumUserId?: string, email?: string
     '$id=(int)getenv("FORUM_USER_ID");$email=strtolower(trim((string)getenv("FORUM_EMAIL")));',
     '$pdo=new PDO("mysql:host=".getenv("DB_HOST").";dbname=".getenv("DB_NAME").";charset=utf8mb4",getenv("DB_USER"),getenv("DB_PASSWORD"),[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);',
     '$u=$pdo->prepare("SELECT id,username,nickname FROM flarum_users WHERE (id>0 AND id=?) OR (email<>\'\' AND LOWER(email)=?) LIMIT 1");$u->execute([$id,$email]);$user=$u->fetch(PDO::FETCH_ASSOC);',
-    'if(!$user){echo json_encode(["linked"=>false,"unreadCount"=>0,"notifications"=>[]]);exit;}',
-    '$c=$pdo->prepare("SELECT COUNT(*) FROM flarum_notifications WHERE user_id=? AND is_deleted=0 AND read_at IS NULL");$c->execute([$id]);',
-    '$n=$pdo->prepare("SELECT id,type,subject_id,created_at,read_at FROM flarum_notifications WHERE user_id=? AND is_deleted=0 ORDER BY created_at DESC LIMIT 5");$n->execute([$id]);',
+    'if(!$user){echo json_encode(["linked"=>false,"unreadCount"=>0,"notifications"=>[],"discussions"=>[],"replies"=>[]]);exit;}$userId=(int)$user["id"];',
+    '$c=$pdo->prepare("SELECT COUNT(*) FROM flarum_notifications WHERE user_id=? AND is_deleted=0 AND read_at IS NULL");$c->execute([$userId]);',
+    '$n=$pdo->prepare("SELECT id,type,subject_id,created_at,read_at FROM flarum_notifications WHERE user_id=? AND is_deleted=0 ORDER BY created_at DESC LIMIT 5");$n->execute([$userId]);',
     '$rows=[];foreach($n->fetchAll(PDO::FETCH_ASSOC) as $r){$rows[]=["id"=>(string)$r["id"],"type"=>(string)$r["type"],"subjectId"=>$r["subject_id"]===null?null:(string)$r["subject_id"],"createdAt"=>(string)$r["created_at"],"readAt"=>$r["read_at"]===null?null:(string)$r["read_at"]];}',
-    'echo json_encode(["linked"=>true,"forumUserId"=>(string)$user["id"],"username"=>(string)$user["username"],"nickname"=>(string)($user["nickname"]??""),"unreadCount"=>(int)$c->fetchColumn(),"notifications"=>$rows],JSON_UNESCAPED_UNICODE);',
+    '$d=$pdo->prepare("SELECT id,title,slug,comment_count,created_at,last_posted_at FROM flarum_discussions WHERE user_id=? AND hidden_at IS NULL AND is_private=0 ORDER BY created_at DESC LIMIT 5");$d->execute([$userId]);',
+    '$discussions=[];foreach($d->fetchAll(PDO::FETCH_ASSOC) as $r){$discussions[]=["id"=>(string)$r["id"],"title"=>(string)$r["title"],"slug"=>(string)($r["slug"]??""),"commentCount"=>(int)$r["comment_count"],"createdAt"=>(string)$r["created_at"],"lastPostedAt"=>$r["last_posted_at"]===null?null:(string)$r["last_posted_at"]];}',
+    '$p=$pdo->prepare("SELECT p.id,p.number,p.created_at,d.id discussion_id,d.title discussion_title,d.slug discussion_slug FROM flarum_posts p INNER JOIN flarum_discussions d ON d.id=p.discussion_id WHERE p.user_id=? AND p.type=\'comment\' AND p.number>1 AND p.hidden_at IS NULL AND p.is_private=0 AND d.hidden_at IS NULL AND d.is_private=0 ORDER BY p.created_at DESC LIMIT 5");$p->execute([$userId]);',
+    '$replies=[];foreach($p->fetchAll(PDO::FETCH_ASSOC) as $r){$replies[]=["id"=>(string)$r["id"],"number"=>(int)$r["number"],"discussionId"=>(string)$r["discussion_id"],"discussionTitle"=>(string)$r["discussion_title"],"discussionSlug"=>(string)($r["discussion_slug"]??""),"createdAt"=>(string)$r["created_at"]];}',
+    'echo json_encode(["linked"=>true,"forumUserId"=>(string)$user["id"],"username"=>(string)$user["username"],"nickname"=>(string)($user["nickname"]??""),"unreadCount"=>(int)$c->fetchColumn(),"notifications"=>$rows,"discussions"=>$discussions,"replies"=>$replies],JSON_UNESCAPED_UNICODE);',
   ].join('')
   try {
     const result = await spawnDockerExec(['php', '-r', phpCode], {
@@ -221,6 +245,8 @@ export async function getForumMemberSummary(forumUserId?: string, email?: string
       nickname: parsed.nickname,
       unreadCount: Number(parsed.unreadCount || 0),
       notifications: Array.isArray(parsed.notifications) ? parsed.notifications as ForumMemberNotification[] : [],
+      discussions: Array.isArray(parsed.discussions) ? parsed.discussions as ForumMemberDiscussion[] : [],
+      replies: Array.isArray(parsed.replies) ? parsed.replies as ForumMemberReply[] : [],
     }
   } catch (error) {
     logger.warn({ error }, 'Unable to read Flarum member notifications')

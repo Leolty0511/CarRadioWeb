@@ -410,8 +410,13 @@ async function installForumBridge(): Promise<void> {
   try {
     await run('bash', [path.join(payload.repoRoot, 'scripts', 'install-forum-bridge.sh')], 'updating_forum_bridge', 'Updating the forum login bridge', 10 * 60_000)
   } catch (error) {
-    appendLog(`Forum bridge update skipped: ${error instanceof Error ? error.message : String(error)}`)
+    appendLog(`Forum bridge update failed: ${error instanceof Error ? error.message : String(error)}`)
+    throw error
   }
+}
+
+async function runDatabaseMigrations(): Promise<void> {
+  await run('node', [path.join('dist', 'scripts', 'runMigration.js'), 'run'], 'running_migrations', 'Running pending database migrations', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
 }
 
 async function downloadArtifact(url: string): Promise<string> {
@@ -482,6 +487,14 @@ async function directoryFingerprint(directory: string): Promise<string> {
   return hash.digest('hex')
 }
 
+async function fileFingerprint(file: string): Promise<string> {
+  try {
+    return crypto.createHash('sha256').update(await fs.readFile(file)).digest('hex')
+  } catch {
+    return ''
+  }
+}
+
 async function replaceStableDirectory(relativePath: string, sourceRoot: string, backupCurrent: boolean): Promise<void> {
   if (!artifactBackupDir) throw new Error('artifact backup directory is not initialized')
   const current = path.join(payload.repoRoot, relativePath)
@@ -533,10 +546,15 @@ async function applyArtifact(): Promise<void> {
   })
 
   for (const relative of artifactPaths) {
+    if (relative === 'docker-compose.flarum.yml' || relative === path.join('scripts', 'install-forum-bridge.sh')) {
+      forumBridgeChanged = forumBridgeChanged ||
+        (await fileFingerprint(path.join(payload.repoRoot, relative))) !== (await fileFingerprint(path.join(stagingDir, relative)))
+    }
     if (stableDirectoryPaths.has(relative)) {
       if (relative === 'forum-extensions') {
-        forumBridgeChanged = (await directoryFingerprint(path.join(payload.repoRoot, relative))) !==
-          (await directoryFingerprint(path.join(stagingDir, relative)))
+        forumBridgeChanged = forumBridgeChanged ||
+          (await directoryFingerprint(path.join(payload.repoRoot, relative))) !==
+            (await directoryFingerprint(path.join(stagingDir, relative)))
       }
       await replaceStableDirectory(relative, stagingDir, true)
       continue
@@ -610,8 +628,9 @@ async function main(): Promise<void> {
       if (forumBridgeChanged) {
         await installForumBridge()
       } else {
-        await writeStatus({ stage: 'forum_bridge_unchanged', message: 'Forum login bridge unchanged; skipping bridge reinstall' })
+        await writeStatus({ stage: 'forum_unchanged', message: 'Forum files unchanged; preserving the current forum installation' })
       }
+      await runDatabaseMigrations()
       await restartFrontend()
       await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
       await writeStatus({ stage: 'health_check', message: 'Checking the new version health' })
@@ -629,6 +648,15 @@ async function main(): Promise<void> {
     await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_frontend', 'Installing frontend dependencies')
     await run(npmCommand, ['ci', '--include=dev', '--no-audit', '--no-fund'], 'installing_backend', 'Installing backend dependencies', 15 * 60_000, path.join(payload.repoRoot, 'backend'))
     await run(npmCommand, ['run', 'build'], 'building', 'Building the new version', 20 * 60_000)
+    await runDatabaseMigrations()
+    const forumDiff = spawnSync('git', [
+      'diff', '--quiet', payload.previousCommit, payload.targetCommit, '--',
+      'forum-extensions', 'docker-compose.flarum.yml', 'scripts/install-forum-bridge.sh',
+    ], { cwd: payload.repoRoot, windowsHide: true })
+    if (forumDiff.error || forumDiff.status === null || forumDiff.status > 1) {
+      throw forumDiff.error || new Error('Unable to determine whether forum files changed')
+    }
+    if (forumDiff.status === 1) await installForumBridge()
     await restartFrontend()
     await run(pm2Command, ['restart', payload.pm2Target, '--update-env'], 'restarting', 'Restarting the backend service', 2 * 60_000)
     await waitForHealth()

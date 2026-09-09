@@ -43,7 +43,7 @@ export const getVehicles = async (language?: 'en' | 'ru'): Promise<VehicleData[]
     if (language) {
       filter.language = language
     }
-    const vehicles = await Vehicle.find(filter).sort({ createdAt: -1 }).lean()
+    const vehicles = await Vehicle.find(filter).sort({ brand: 1, modelName: 1, year: 1, _id: 1 }).lean()
     return vehicles as unknown as VehicleData[]
   } catch (error) {
     systemLogger.error({ error, language }, '获取车型失败')

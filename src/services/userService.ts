@@ -4,7 +4,7 @@
  */
 
 import { apiClient } from './apiClient'
-import type { MemberFavorite } from './memberAuthService'
+import type { ForumMemberSummary, MemberFavorite } from './memberAuthService'
 
 export interface AdminUserRecord {
   _id: string
@@ -137,6 +137,10 @@ export async function updateAdminPassword(currentPassword: string, newPassword: 
 
 export async function getAdminFavorites() {
   return apiClient.get<MemberFavorite[]>('/users/me/favorites')
+}
+
+export async function getAdminForumSummary() {
+  return apiClient.get<ForumMemberSummary>('/users/me/forum-summary')
 }
 
 export async function getAdminFavoriteStatus(documentId: string) {
