@@ -173,7 +173,8 @@ const updateRecord = async (record: { model: any; doc: any; fields: string[] }):
 }
 
 async function main(): Promise<void> {
-  const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/official-website'
+  const mongoUri = process.env.MONGODB_URI?.trim()
+  if (!mongoUri) throw new Error('MONGODB_URI is required; configure backend/config.env before running this migration')
   await mongoose.connect(mongoUri)
 
   const records = await collectDocuments()

@@ -4,14 +4,19 @@
  */
 
 import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import path from 'path';
 import { migrationRunner } from './migrationRunner';
+
+dotenv.config({ path: path.join(__dirname, '../../config.env') });
 
 /**
  * 数据库连接配置
  */
 const connectToDatabase = async () => {
   try {
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/official-website';
+    const mongoUri = process.env.MONGODB_URI?.trim();
+    if (!mongoUri) throw new Error('MONGODB_URI is required; configure backend/config.env before running migrations');
     await mongoose.connect(mongoUri);
     console.log('✅ 数据库连接成功');
   } catch (error) {

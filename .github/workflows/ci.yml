@@ -196,6 +196,20 @@ jobs:
         working-directory: .
         run: bash -n scripts/install-latest-release.sh
 
+      - name: Validate Docker Compose configuration
+        working-directory: .
+        env:
+          MONGODB_URI: mongodb://admin:test-password@mongo:27017/carradioweb?authSource=admin
+          MONGO_USERNAME: admin
+          MONGO_PASSWORD: test-password
+          MONGO_DATABASE: carradioweb
+          JWT_SECRET: ci-only-secret-at-least-32-characters
+          FLARUM_BASE_URL: https://forum.example.com
+          DB_PASSWORD: test-password
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose.flarum.yml config --quiet
+
       - name: Build
         run: npm run build
 

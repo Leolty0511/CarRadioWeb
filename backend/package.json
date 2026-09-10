@@ -1,7 +1,7 @@
 {
-  "name": "knowledge-base-backend",
+  "name": "carradioweb-backend",
   "version": "2.0.0",
-  "description": "Knowledge Base Backend API",
+  "description": "CarRadioWeb Backend API",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

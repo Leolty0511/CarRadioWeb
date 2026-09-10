@@ -159,7 +159,10 @@ const app = express();
 app.set('trust proxy', 1);
 
 const PORT = process.env.PORT || 3000;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/official-website';
+const MONGODB_URI = process.env.MONGODB_URI?.trim();
+if (!MONGODB_URI) {
+  throw new Error('MONGODB_URI is required; configure the local backend/config.env before starting CarRadioWeb');
+}
 
 // 就绪状态标记（用于 /health/ready 探针）
 let isSystemReady = false;

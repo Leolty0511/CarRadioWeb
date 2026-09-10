@@ -13,7 +13,8 @@ import path from 'path';
 dotenv.config({ path: path.join(__dirname, '../../../config.env') });
 
 async function migrate() {
-  const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/official-website';
+  const MONGODB_URI = process.env.MONGODB_URI?.trim();
+  if (!MONGODB_URI) throw new Error('MONGODB_URI is required; configure backend/config.env before running this migration');
   
   console.log('🔄 开始迁移：修复访客统计索引...');
   console.log(`📦 连接数据库: ${MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);

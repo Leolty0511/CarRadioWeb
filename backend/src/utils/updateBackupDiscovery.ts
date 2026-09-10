@@ -12,6 +12,11 @@ export interface DockerContainerInfo {
   environment: Record<string, string>
 }
 
+export interface DockerComposeServiceInfo {
+  containerName?: string
+  environment: Record<string, string>
+}
+
 type SpawnSyncLike = typeof spawnSync
 
 interface DiscoverOptions {
@@ -19,7 +24,6 @@ interface DiscoverOptions {
   repoRoot: string
   kind: BackupContainerKind
   explicitName?: string
-  defaultNames: string[]
   spawn?: SpawnSyncLike
 }
 
@@ -44,6 +48,11 @@ function normalizePath(value: string): string {
 }
 
 function parseEnvironment(values: unknown): Record<string, string> {
+  if (values && typeof values === 'object' && !Array.isArray(values)) {
+    return Object.fromEntries(Object.entries(values as Record<string, unknown>)
+      .filter((entry): entry is [string, string | number | boolean] => ['string', 'number', 'boolean'].includes(typeof entry[1]))
+      .map(([key, value]) => [key, String(value)]))
+  }
   if (!Array.isArray(values)) return {}
   const environment: Record<string, string> = {}
   for (const entry of values) {
@@ -53,6 +62,38 @@ function parseEnvironment(values: unknown): Record<string, string> {
     environment[entry.slice(0, separator)] = entry.slice(separator + 1)
   }
   return environment
+}
+
+export function readDockerComposeService(
+  docker: string,
+  repoRoot: string,
+  composeFile: string,
+  envFile: string | undefined,
+  service: string,
+  spawn: SpawnSyncLike = spawnSync
+): DockerComposeServiceInfo | null {
+  const args = ['compose', '--file', composeFile]
+  if (envFile) args.push('--env-file', envFile)
+  args.push('config', '--format', 'json')
+  const result = spawn(docker, args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    windowsHide: true,
+    timeout: 10_000,
+    maxBuffer: 2 * 1024 * 1024,
+  })
+  if (result.error || result.status !== 0 || typeof result.stdout !== 'string') return null
+  try {
+    const document = JSON.parse(result.stdout) as Record<string, any>
+    const serviceConfig = document.services?.[service]
+    if (!serviceConfig || typeof serviceConfig !== 'object') return null
+    return {
+      containerName: typeof serviceConfig.container_name === 'string' ? serviceConfig.container_name : undefined,
+      environment: parseEnvironment(serviceConfig.environment),
+    }
+  } catch {
+    return null
+  }
 }
 
 export function inspectDockerContainer(
@@ -106,25 +147,16 @@ function scoreContainer(container: DockerContainerInfo, kind: BackupContainerKin
   const expectedService = kind === 'mongo' ? 'mongo' : kind === 'flarumApp' ? 'flarum' : 'db'
   if (sameProject && service === expectedService) return 100
   if (sameProject) return 80
-  const name = container.name.toLowerCase()
-  if (kind === 'mongo' && name.includes('mongo')) return 60
-  if (kind === 'flarumDatabase' && (name.includes('flarum') || name.includes('mariadb'))) return 60
-  if (kind === 'flarumApp' && name.includes('flarum')) return 60
-  return 10
+  return -1
 }
 
 export function discoverDockerContainer(options: DiscoverOptions): DockerContainerInfo | null {
   const spawn = options.spawn || spawnSync
-  const directCandidates = [options.explicitName, ...options.defaultNames]
-    .filter((value): value is string => Boolean(value?.trim()))
-    .map(value => value.trim())
-    .filter((value, index, values) => values.indexOf(value) === index)
-
-  for (const [index, candidate] of directCandidates.entries()) {
+  const explicitName = options.explicitName?.trim()
+  if (explicitName) {
+    const candidate = explicitName
     const inspected = inspectDockerContainer(options.docker, candidate, spawn)
-    if (!inspected?.running) continue
-    if (index === 0 && options.explicitName?.trim() === candidate) return inspected
-    if (matchesKind(inspected, options.kind)) return inspected
+    if (inspected?.running && matchesKind(inspected, options.kind)) return inspected
   }
 
   const listed = spawn(options.docker, ['ps', '--filter', 'status=running', '--format', '{{.ID}}'], {
@@ -142,8 +174,9 @@ export function discoverDockerContainer(options: DiscoverOptions): DockerContain
     .map(id => inspectDockerContainer(options.docker, id, spawn))
     .filter((value): value is DockerContainerInfo => Boolean(value))
     .map(container => ({ container, score: scoreContainer(container, options.kind, options.repoRoot) }))
-    .filter(candidate => candidate.score >= 60)
+    .filter(candidate => candidate.score >= 80)
     .sort((left, right) => right.score - left.score)
 
+  if (scored.length > 1 && scored[0].score === scored[1].score) return null
   return scored[0]?.container || null
 }

@@ -16,7 +16,8 @@ async function initStorageConfig() {
     console.log('🔧 开始初始化存储配置...');
     
     // 连接数据库
-    const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/official-website';
+    const mongoUri = process.env.MONGODB_URI?.trim();
+    if (!mongoUri) throw new Error('MONGODB_URI is required; configure backend/config.env before initializing storage');
     await mongoose.connect(mongoUri);
     console.log('✅ 数据库连接成功');
     
@@ -117,4 +118,3 @@ if (require.main === module) {
 }
 
 export default initStorageConfig;
-

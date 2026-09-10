@@ -80,7 +80,7 @@ process.stdout.write(Buffer.from(JSON.stringify(payload)).toString("base64url"))
 ')"
 
 echo "Backing up production data and installing commit $target_commit..."
-if ! NODE_ENV=production UPDATE_BACKUP_ENABLED=true UPDATE_BACKUP_REQUIRED=true \
+if ! NODE_ENV=production UPDATE_BACKUP_ENABLED=true UPDATE_BACKUP_REQUIRED=true UPDATE_RUNNER_CONSOLE=true \
   node "$runner" "$payload"; then
   echo "CarRadioWeb update failed. Status: $status_file" >&2
   if [[ -f "$status_file" ]]; then

@@ -1,14 +1,15 @@
 import { spawn, spawnSync } from 'child_process'
 import { createWriteStream } from 'fs'
 import { promises as fs } from 'fs'
+import dotenv from 'dotenv'
 import os from 'os'
 import path from 'path'
 import crypto from 'crypto'
-import { Readable } from 'stream'
+import { Readable, Transform } from 'stream'
 import { pipeline } from 'stream/promises'
 import { createGzip } from 'zlib'
 import mongoose from 'mongoose'
-import { discoverDockerContainer, mongoDatabaseFromUri } from '../utils/updateBackupDiscovery'
+import { discoverDockerContainer, mongoDatabaseFromUri, readDockerComposeService } from '../utils/updateBackupDiscovery'
 
 interface RunnerPayload {
   jobId: string
@@ -42,6 +43,23 @@ const payloadRaw = process.argv[2]
 if (!payloadRaw) process.exit(1)
 
 const payload = JSON.parse(Buffer.from(payloadRaw, 'base64url').toString('utf8')) as RunnerPayload
+// The updater can run from a temporary release directory. Load connection
+// settings from the target checkout and discard inherited database overrides,
+// while preserving safety flags explicitly supplied by the updater command.
+const runnerControlKeys = ['NODE_ENV', 'UPDATE_BACKUP_ENABLED', 'UPDATE_BACKUP_REQUIRED', 'UPDATE_RUNNER_CONSOLE'] as const
+const runnerControls = Object.fromEntries(runnerControlKeys.map(key => [key, process.env[key]]))
+for (const key of Object.keys(process.env)) {
+  if (key === 'MONGODB_URI' || key === 'DB_PASSWORD' || key === 'FLARUM_DB_PASSWORD' || /^UPDATE_(MONGO|FLARUM)_/.test(key)) {
+    delete process.env[key]
+  }
+}
+const targetEnvironment: Record<string, string> = {}
+dotenv.config({ path: path.join(payload.repoRoot, 'backend', 'config.env'), processEnv: targetEnvironment })
+Object.assign(process.env, targetEnvironment)
+for (const key of runnerControlKeys) {
+  const value = runnerControls[key]
+  if (value !== undefined) process.env[key] = value
+}
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm'
 const pm2Command = process.platform === 'win32' ? 'pm2.cmd' : 'pm2'
 const startedAt = new Date().toISOString()
@@ -76,6 +94,13 @@ const backupEnabled = process.env.UPDATE_BACKUP_ENABLED === 'true' || (process.e
 const backupRequired = process.env.UPDATE_BACKUP_REQUIRED !== 'false'
 const backupRoot = path.resolve(process.env.UPDATE_BACKUP_DIR?.trim() || path.join(payload.repoRoot, '.update-backups'))
 const backupRetentionCount = Math.max(1, Number.parseInt(process.env.UPDATE_BACKUP_RETENTION_COUNT || '7', 10) || 7)
+const mongoBackupBatchSize = Math.min(100, Math.max(10, Number.parseInt(process.env.UPDATE_MONGO_BACKUP_BATCH_SIZE || '25', 10) || 25))
+const mongoBackupThrottleMs = Math.min(1_000, Math.max(0, Number.parseInt(process.env.UPDATE_MONGO_BACKUP_THROTTLE_MS || '10', 10) || 0))
+const backupMaxBytesPerSecond = Math.min(
+  64 * 1024 * 1024,
+  Math.max(1024 * 1024, Number.parseInt(process.env.UPDATE_BACKUP_MAX_BYTES_PER_SECOND || `${8 * 1024 * 1024}`, 10) || 8 * 1024 * 1024)
+)
+let lastConsoleStatus = ''
 
 interface BackupManifestItem {
   name: string
@@ -127,6 +152,23 @@ async function writeStatus(patch: Partial<RunnerStatus>): Promise<void> {
   await fs.mkdir(path.dirname(payload.statusFile), { recursive: true })
   await fs.writeFile(tempFile, JSON.stringify(status, null, 2), 'utf8')
   await fs.rename(tempFile, payload.statusFile)
+  const consoleStatus = `[${status.stage}] ${status.message}`
+  if (process.env.UPDATE_RUNNER_CONSOLE === 'true' && consoleStatus !== lastConsoleStatus) {
+    console.log(consoleStatus)
+    lastConsoleStatus = consoleStatus
+  }
+}
+
+function createBackupThrottle(): Transform {
+  let availableAt = Date.now()
+  return new Transform({
+    transform(chunk: Buffer, _encoding, callback) {
+      const now = Date.now()
+      const delay = Math.max(0, availableAt - now)
+      availableAt = Math.max(now, availableAt) + (chunk.length / backupMaxBytesPerSecond) * 1_000
+      setTimeout(() => callback(null, chunk), delay)
+    },
+  })
 }
 
 async function run(command: string, args: string[], stage: string, message: string, timeout = 15 * 60_000, cwd = payload.repoRoot): Promise<void> {
@@ -171,9 +213,17 @@ async function readEnvFileValue(filePath: string, key: string): Promise<string |
   }
 }
 
-async function runCaptureToFile(command: string, args: string[], outputFile: string, timeout = 30 * 60_000, cwd = payload.repoRoot, env?: NodeJS.ProcessEnv): Promise<void> {
+async function runCaptureToFile(
+  command: string,
+  args: string[],
+  outputFile: string,
+  timeout = 30 * 60_000,
+  cwd = payload.repoRoot,
+  env?: NodeJS.ProcessEnv,
+  statusMessage = `正在执行 ${command} 流式备份`
+): Promise<void> {
   await fs.mkdir(path.dirname(outputFile), { recursive: true })
-  await writeStatus({ stage: 'backing_up', message: `Running ${command} backup` })
+  await writeStatus({ stage: 'backing_up', message: statusMessage })
   await new Promise<void>((resolve, reject) => {
     const child = spawn(command, args, {
       cwd,
@@ -202,11 +252,16 @@ async function runCaptureToFile(command: string, args: string[], outputFile: str
     const maybeFinish = (): void => {
       if (exitCode === 0 && outputFinished) finish()
     }
-    child.stdout.pipe(output)
+    const throttle = createBackupThrottle()
+    child.stdout.pipe(throttle).pipe(output)
     child.stderr.on('data', chunk => {
       stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2_000)
     })
     output.on('error', error => {
+      child.kill('SIGTERM')
+      finish(error)
+    })
+    throttle.on('error', error => {
       child.kill('SIGTERM')
       finish(error)
     })
@@ -226,47 +281,62 @@ async function runCaptureToFile(command: string, args: string[], outputFile: str
   })
 }
 
-async function runCommand(command: string, args: string[], timeout = 30 * 60_000, cwd = payload.repoRoot, env?: NodeJS.ProcessEnv): Promise<void> {
-  await writeStatus({ stage: 'backing_up', message: `Running ${command} backup` })
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { cwd, windowsHide: true, env: env || process.env, stdio: ['ignore', 'ignore', 'pipe'] })
-    let stderr = ''
-    let settled = false
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM')
-      setTimeout(() => child.kill('SIGKILL'), 5_000).unref()
-      finish(new Error(`${command} command timed out`))
-    }, timeout)
-    const finish = (error?: Error): void => {
-      if (settled) return
-      settled = true
-      clearTimeout(timer)
-      if (error) reject(error)
-      else resolve()
-    }
-    child.stderr.on('data', chunk => { stderr = `${stderr}${chunk.toString('utf8')}`.slice(-2_000) })
-    child.on('error', error => finish(error))
-    child.on('close', code => {
-      if (code === 0) finish()
-      else {
-        const detail = stderr.replace(/(password|pwd|secret)\s*[:=]?\s*[^\s]+/gi, '$1=[redacted]').trim()
-        finish(new Error(`${command} command failed (exit ${code})${detail ? `: ${detail}` : ''}`))
-      }
-    })
-  })
-}
-
 async function backupMongoDatabase(directory: string): Promise<BackupManifestItem> {
   const archiveOutput = path.join(directory, 'mongodb.archive.gz')
   const uri = process.env.MONGODB_URI?.trim()
   const failures: string[] = []
-  if (commandAvailable('mongodump') && uri) {
+  if (uri) {
+    const streamOutput = path.join(directory, 'mongodb.ejson.ndjson.gz')
+    const client = new mongoose.mongo.MongoClient(uri, {
+      maxPoolSize: 1,
+      minPoolSize: 0,
+      maxConnecting: 1,
+      serverSelectionTimeoutMS: 10_000,
+    })
     try {
-      await runCommand('mongodump', [`--uri=${uri}`, `--archive=${archiveOutput}`, '--gzip'])
-      return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'mongodump' }
+      await writeStatus({ stage: 'backing_up_mongodb', message: '正在以低资源模式连接 MongoDB' })
+      await client.connect()
+      const db = client.db()
+      const collections = (await db.listCollections({}, { nameOnly: true }).toArray())
+        .filter(collectionInfo => collectionInfo.type === 'collection')
+      let exportedDocuments = 0
+      let lastProgressUpdate = 0
+      const exportRows = async function* (): AsyncGenerator<string> {
+        yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'manifest', format: 'carradioweb-mongodb-ejson-v1', database: db.databaseName, createdAt: new Date() }, { relaxed: false })}\n`
+        for (const [collectionIndex, collectionInfo] of collections.entries()) {
+          const collection = db.collection(collectionInfo.name)
+          const indexes = await collection.indexes()
+          yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'collection', collection: collectionInfo.name, indexes }, { relaxed: false })}\n`
+          let collectionDocuments = 0
+          for await (const document of collection.find({}).batchSize(mongoBackupBatchSize)) {
+            yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'document', collection: collectionInfo.name, document }, { relaxed: false })}\n`
+            exportedDocuments += 1
+            collectionDocuments += 1
+            if (collectionDocuments % mongoBackupBatchSize === 0 && mongoBackupThrottleMs > 0) {
+              await new Promise(resolve => setTimeout(resolve, mongoBackupThrottleMs))
+            }
+            if (Date.now() - lastProgressUpdate >= 15_000) {
+              lastProgressUpdate = Date.now()
+              await writeStatus({
+                stage: 'backing_up_mongodb',
+                message: `低资源备份 MongoDB：集合 ${collectionIndex + 1}/${collections.length}，已导出 ${exportedDocuments} 条`,
+              })
+            }
+          }
+        }
+      }
+      await pipeline(
+        Readable.from(exportRows(), { highWaterMark: 1 }),
+        createGzip({ level: 1 }),
+        createBackupThrottle(),
+        createWriteStream(streamOutput, { flags: 'wx' })
+      )
+      return { name: 'mongodb', status: 'completed', path: 'mongodb.ejson.ndjson.gz', method: 'MongoDB driver EJSON stream (low resource)' }
     } catch (error) {
-      failures.push(`local mongodump: ${error instanceof Error ? error.message : String(error)}`)
-      await fs.rm(archiveOutput, { force: true })
+      failures.push(`MongoDB driver stream: ${error instanceof Error ? error.message : String(error)}`)
+      await fs.rm(streamOutput, { force: true })
+    } finally {
+      await client.close().catch(() => undefined)
     }
   }
 
@@ -276,51 +346,22 @@ async function backupMongoDatabase(directory: string): Promise<BackupManifestIte
     repoRoot: payload.repoRoot,
     kind: 'mongo',
     explicitName: process.env.UPDATE_MONGO_CONTAINER,
-    defaultNames: ['automotivehu-mongo'],
   }) : null
   if (mongoContainer) {
     try {
-      const database = process.env.UPDATE_MONGO_DATABASE?.trim() || mongoDatabaseFromUri(uri) || mongoContainer.environment.MONGO_INITDB_DATABASE || 'knowledge-base'
-      const args = ['exec', mongoContainer.name, 'mongodump', `--db=${database}`, '--archive', '--gzip']
+      const database = process.env.UPDATE_MONGO_DATABASE?.trim() || mongoDatabaseFromUri(uri) || mongoContainer.environment.MONGO_INITDB_DATABASE
+      if (!database) throw new Error('MongoDB database name is unavailable in local configuration and container environment')
+      const args = ['exec', mongoContainer.name, 'mongodump', `--db=${database}`, '--archive', '--gzip', '--numParallelCollections=1']
       const username = process.env.UPDATE_MONGO_USERNAME?.trim() || mongoContainer.environment.MONGO_INITDB_ROOT_USERNAME
       const password = process.env.UPDATE_MONGO_PASSWORD || mongoContainer.environment.MONGO_INITDB_ROOT_PASSWORD
       if (username) args.push(`--username=${username}`)
       if (password) args.push(`--password=${password}`)
       if (username) args.push(`--authenticationDatabase=${process.env.UPDATE_MONGO_AUTH_DATABASE?.trim() || 'admin'}`)
-      await runCaptureToFile(docker, args, archiveOutput)
+      await runCaptureToFile(docker, args, archiveOutput, 30 * 60_000, payload.repoRoot, undefined, '正在以单集合模式备份 MongoDB（Docker 兜底）')
       return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'docker exec mongodump' }
     } catch (error) {
       failures.push(`Docker mongodump: ${error instanceof Error ? error.message : String(error)}`)
       await fs.rm(archiveOutput, { force: true })
-    }
-  }
-
-  if (uri) {
-    const streamOutput = path.join(directory, 'mongodb.ejson.ndjson.gz')
-    const client = new mongoose.mongo.MongoClient(uri)
-    try {
-      await client.connect()
-      const db = client.db()
-      const collections = (await db.listCollections({}, { nameOnly: true }).toArray())
-        .filter(collectionInfo => collectionInfo.type === 'collection')
-      const exportRows = async function* (): AsyncGenerator<string> {
-        yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'manifest', format: 'carradioweb-mongodb-ejson-v1', database: db.databaseName, createdAt: new Date() }, { relaxed: false })}\n`
-        for (const collectionInfo of collections) {
-          const collection = db.collection(collectionInfo.name)
-          const indexes = await collection.indexes()
-          yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'collection', collection: collectionInfo.name, indexes }, { relaxed: false })}\n`
-          for await (const document of collection.find({}).batchSize(100)) {
-            yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'document', collection: collectionInfo.name, document }, { relaxed: false })}\n`
-          }
-        }
-      }
-      await pipeline(Readable.from(exportRows()), createGzip({ level: 6 }), createWriteStream(streamOutput, { flags: 'wx' }))
-      return { name: 'mongodb', status: 'completed', path: 'mongodb.ejson.ndjson.gz', method: 'MongoDB driver EJSON stream' }
-    } catch (error) {
-      failures.push(`MongoDB driver stream: ${error instanceof Error ? error.message : String(error)}`)
-      await fs.rm(streamOutput, { force: true })
-    } finally {
-      await client.close().catch(() => undefined)
     }
   }
 
@@ -330,19 +371,37 @@ async function backupMongoDatabase(directory: string): Promise<BackupManifestIte
 
 async function backupFlarumDatabase(directory: string): Promise<BackupManifestItem> {
   const output = path.join(directory, 'flarum.sql')
+  const flarumEnvPath = path.join(payload.repoRoot, '.env.flarum')
+  const flarumComposePath = path.join(payload.repoRoot, 'docker-compose.flarum.yml')
+  const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
+  const dockerAvailable = commandAvailable(docker)
+  const composeFlarum = dockerAvailable
+    ? readDockerComposeService(docker, payload.repoRoot, flarumComposePath, flarumEnvPath, 'flarum')
+    : null
+  const composeDatabase = dockerAvailable
+    ? readDockerComposeService(docker, payload.repoRoot, flarumComposePath, flarumEnvPath, 'db')
+    : null
+  const envFileHost = await readEnvFileValue(flarumEnvPath, 'DB_HOST')
+  const envFilePort = await readEnvFileValue(flarumEnvPath, 'DB_PORT')
+  const envFileDatabase = await readEnvFileValue(flarumEnvPath, 'DB_NAME')
+  const envFileUser = await readEnvFileValue(flarumEnvPath, 'DB_USER')
+  const envFilePassword = await readEnvFileValue(flarumEnvPath, 'DB_PASSWORD')
   const host = process.env.UPDATE_FLARUM_DB_HOST?.trim() || '127.0.0.1'
-  const port = process.env.UPDATE_FLARUM_DB_PORT?.trim() || '3306'
-  const envFilePassword = await readEnvFileValue(path.join(payload.repoRoot, '.env.flarum'), 'DB_PASSWORD')
+  const port = process.env.UPDATE_FLARUM_DB_PORT?.trim() || envFilePort || composeFlarum?.environment.DB_PORT || '3306'
+  const configuredDatabase = process.env.UPDATE_FLARUM_DB_NAME?.trim() || envFileDatabase || composeFlarum?.environment.DB_NAME || composeDatabase?.environment.MYSQL_DATABASE || composeDatabase?.environment.MARIADB_DATABASE
+  const configuredUser = process.env.UPDATE_FLARUM_DB_USER?.trim() || envFileUser || composeFlarum?.environment.DB_USER || composeDatabase?.environment.MYSQL_USER || composeDatabase?.environment.MARIADB_USER
   const configuredPassword = [process.env.UPDATE_FLARUM_DB_PASSWORD, process.env.FLARUM_DB_PASSWORD, process.env.DB_PASSWORD]
     .find(value => typeof value === 'string' && value.length > 0)
+    || envFilePassword
+    || composeFlarum?.environment.DB_PASSWORD
+    || composeDatabase?.environment.MYSQL_PASSWORD
+    || composeDatabase?.environment.MARIADB_PASSWORD
   const failures: string[] = []
   const localDump = commandAvailable('mariadb-dump') ? 'mariadb-dump' : commandAvailable('mysqldump') ? 'mysqldump' : null
   if (localDump) {
     try {
-      const database = process.env.UPDATE_FLARUM_DB_NAME?.trim() || 'flarum'
-      const user = process.env.UPDATE_FLARUM_DB_USER?.trim() || 'flarum'
-      const password = configuredPassword || envFilePassword
-      await runCaptureToFile(localDump, ['--single-transaction', '--quick', '--host', host, '--port', port, '--user', user, database], output, 30 * 60_000, payload.repoRoot, { ...process.env, ...(password ? { MYSQL_PWD: password } : {}) })
+      if (!configuredDatabase || !configuredUser) throw new Error('Flarum database name or user is unavailable in local configuration')
+      await runCaptureToFile(localDump, ['--single-transaction', '--quick', '--host', host, '--port', port, '--user', configuredUser, configuredDatabase], output, 30 * 60_000, payload.repoRoot, { ...process.env, ...(configuredPassword ? { MYSQL_PWD: configuredPassword } : {}) }, '正在流式备份 Flarum 数据库')
       return { name: 'flarumDatabase', status: 'completed', path: 'flarum.sql', method: `${localDump} (streamed)` }
     } catch (error) {
       failures.push(`local ${localDump}: ${error instanceof Error ? error.message : String(error)}`)
@@ -350,20 +409,19 @@ async function backupFlarumDatabase(directory: string): Promise<BackupManifestIt
     }
   }
 
-  const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
-  const databaseContainer = commandAvailable(docker) ? discoverDockerContainer({
+  const databaseContainer = dockerAvailable ? discoverDockerContainer({
     docker,
     repoRoot: payload.repoRoot,
     kind: 'flarumDatabase',
-    explicitName: process.env.UPDATE_FLARUM_DB_CONTAINER,
-    defaultNames: ['flarum_db'],
+    explicitName: process.env.UPDATE_FLARUM_DB_CONTAINER || composeDatabase?.containerName || envFileHost || composeFlarum?.environment.DB_HOST,
   }) : null
   if (databaseContainer) {
     try {
       const container = databaseContainer.name
-      const database = process.env.UPDATE_FLARUM_DB_NAME?.trim() || databaseContainer.environment.MYSQL_DATABASE || databaseContainer.environment.MARIADB_DATABASE || 'flarum'
-      const user = process.env.UPDATE_FLARUM_DB_USER?.trim() || databaseContainer.environment.MYSQL_USER || databaseContainer.environment.MARIADB_USER || 'flarum'
-      const password = configuredPassword || envFilePassword || databaseContainer.environment.MYSQL_PASSWORD || databaseContainer.environment.MARIADB_PASSWORD
+      const database = configuredDatabase || databaseContainer.environment.MYSQL_DATABASE || databaseContainer.environment.MARIADB_DATABASE
+      const user = configuredUser || databaseContainer.environment.MYSQL_USER || databaseContainer.environment.MARIADB_USER
+      if (!database || !user) throw new Error('Flarum database name or user is unavailable in local configuration and container environment')
+      const password = configuredPassword || databaseContainer.environment.MYSQL_PASSWORD || databaseContainer.environment.MARIADB_PASSWORD
       let dumpCommand = process.env.UPDATE_FLARUM_DUMP_COMMAND?.trim()
       if (!dumpCommand) {
         const detected = spawnSync(docker, ['exec', container, 'sh', '-lc', 'command -v mariadb-dump >/dev/null 2>&1 && echo mariadb-dump || (command -v mysqldump >/dev/null 2>&1 && echo mysqldump)'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 })
@@ -373,7 +431,7 @@ async function backupFlarumDatabase(directory: string): Promise<BackupManifestIt
       const args = ['exec']
       if (password) args.push('-e', `MYSQL_PWD=${password}`)
       args.push(container, dumpCommand, '--single-transaction', '--quick', '--host', host === '127.0.0.1' ? '127.0.0.1' : host, '--port', port, '--user', user, database)
-      await runCaptureToFile(docker, args, output)
+      await runCaptureToFile(docker, args, output, 30 * 60_000, payload.repoRoot, undefined, '正在流式备份 Flarum 数据库（Docker）')
       return { name: 'flarumDatabase', status: 'completed', path: 'flarum.sql', method: `docker exec ${dumpCommand} (streamed)` }
     } catch (error) {
       failures.push(`Docker database dump: ${error instanceof Error ? error.message : String(error)}`)
@@ -386,16 +444,14 @@ async function backupFlarumDatabase(directory: string): Promise<BackupManifestIt
 }
 
 async function backupDirectory(name: string, source: string, directory: string, required = true): Promise<BackupManifestItem> {
-  const target = path.join(directory, name)
+  const target = path.join(directory, `${name}.tar`)
   try {
-    const relativeTarget = path.relative(path.resolve(source), path.resolve(target))
-    if (!relativeTarget || (!relativeTarget.startsWith(`..${path.sep}`) && relativeTarget !== '..' && !path.isAbsolute(relativeTarget))) {
-      throw new Error(`backup target must not be inside source directory: ${target}`)
-    }
     await fs.access(source)
-    await fs.cp(source, target, { recursive: true, force: true })
-    return { name, status: 'completed', path: name, method: 'filesystem copy' }
+    if (!commandAvailable('tar')) throw new Error('tar is unavailable')
+    await runCaptureToFile('tar', ['-C', source, '-cf', '-', '.'], target, 30 * 60_000, payload.repoRoot, undefined, `正在限速备份 ${name}`)
+    return { name, status: 'completed', path: `${name}.tar`, method: 'rate-limited tar stream' }
   } catch (error: any) {
+    await fs.rm(target, { force: true }).catch(() => undefined)
     if (error?.code === 'ENOENT' && !required) return { name, status: 'skipped', path: name, method: 'source missing' }
     return { name, status: 'failed', path: name, error: error instanceof Error ? error.message : String(error) }
   }
@@ -434,20 +490,32 @@ async function createDataBackup(): Promise<void> {
     items.push(await backupDirectory('flarum-data', flarumDataPath, dataBackupDir, false))
   } else {
     const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
+    const flarumEnvPath = path.join(payload.repoRoot, '.env.flarum')
+    const composeFlarum = commandAvailable(docker)
+      ? readDockerComposeService(docker, payload.repoRoot, path.join(payload.repoRoot, 'docker-compose.flarum.yml'), flarumEnvPath, 'flarum')
+      : null
     const container = commandAvailable(docker) ? discoverDockerContainer({
       docker,
       repoRoot: payload.repoRoot,
       kind: 'flarumApp',
-      explicitName: process.env.UPDATE_FLARUM_CONTAINER,
-      defaultNames: ['flarum_app'],
+      explicitName: process.env.UPDATE_FLARUM_CONTAINER || composeFlarum?.containerName,
     })?.name : undefined
-    const target = path.join(dataBackupDir, 'flarum-data')
+    const target = path.join(dataBackupDir, 'flarum-data.tar')
     if (container && commandAvailable(docker)) {
       try {
-        await runCommand(docker, ['cp', `${container}:/data`, target])
-        items.push({ name: 'flarumData', status: 'completed', path: 'flarum-data', method: 'docker cp' })
+        await runCaptureToFile(
+          docker,
+          ['exec', container, 'tar', '-C', '/data', '-cf', '-', 'assets', 'extensions'],
+          target,
+          30 * 60_000,
+          payload.repoRoot,
+          undefined,
+          '正在限速备份 Flarum 上传资源与扩展清单'
+        )
+        items.push({ name: 'flarumData', status: 'completed', path: 'flarum-data.tar', method: 'rate-limited Docker tar stream' })
       } catch (error) {
-        items.push({ name: 'flarumData', status: 'failed', path: 'flarum-data', error: error instanceof Error ? error.message : String(error) })
+        await fs.rm(target, { force: true }).catch(() => undefined)
+        items.push({ name: 'flarumData', status: 'failed', path: 'flarum-data.tar', error: error instanceof Error ? error.message : String(error) })
       }
     } else {
       items.push({ name: 'flarumData', status: 'skipped', method: 'not configured' })
