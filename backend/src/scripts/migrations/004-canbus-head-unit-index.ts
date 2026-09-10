@@ -21,7 +21,7 @@ export async function up(): Promise<void> {
   if (!db) throw new Error('Database connection not available')
 
   const collection = db.collection('canbussettings')
-  const indexes = await collection.indexes()
+  const indexes = await collection.indexes().catch(() => [])
   const legacy = indexes.find(index => index.name === 'vehicleId_1')
   if (legacy?.name) {
     await collection.dropIndex(legacy.name)
@@ -40,7 +40,7 @@ export async function down(): Promise<void> {
   const db = mongoose.connection.db
   if (!db) throw new Error('Database connection not available')
   const collection = db.collection('canbussettings')
-  const indexes = await collection.indexes()
+  const indexes = await collection.indexes().catch(() => [])
   const compound = indexes.find(index => index.name === 'vehicleId_1_headUnitTypeId_1')
   if (compound?.name) await collection.dropIndex(compound.name)
   if (!indexes.some(index => index.name === 'vehicleId_1')) {

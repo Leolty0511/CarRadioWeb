@@ -120,16 +120,23 @@ export class MigrationRunner {
     executionTime: number,
     error?: string
   ): Promise<void> {
-    const record = new MigrationRecord({
-      version: migration.migrationInfo.version,
-      name: migration.migrationInfo.name,
-      description: migration.migrationInfo.description,
-      executionTime,
-      status,
-      error
-    });
-    
-    await record.save();
+    const update: Record<string, Record<string, unknown>> = {
+      $set: {
+        name: migration.migrationInfo.name,
+        description: migration.migrationInfo.description,
+        executedAt: new Date(),
+        executionTime,
+        status
+      }
+    };
+    if (error) update.$set.error = error;
+    else update.$unset = { error: 1 };
+
+    await MigrationRecord.findOneAndUpdate(
+      { version: migration.migrationInfo.version },
+      update,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
   }
   
   /**

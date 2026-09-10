@@ -9,9 +9,24 @@
 
 import mongoose from 'mongoose'
 
+export const migrationInfo = {
+  version: '003',
+  name: 'drop-username-index',
+  description: 'Remove obsolete username indexes from the users collection.',
+  author: 'CarRadioWeb',
+  createdAt: '2026-08-28',
+  estimatedTime: '1 minute',
+}
+
 export async function up(): Promise<void> {
   const db = mongoose.connection.db
   if (!db) throw new Error('Database connection not available')
+
+  const exists = await db.listCollections({ name: 'users' }, { nameOnly: true }).hasNext()
+  if (!exists) {
+    console.log('users collection does not exist; skipping username index migration')
+    return
+  }
 
   const collection = db.collection('users')
 

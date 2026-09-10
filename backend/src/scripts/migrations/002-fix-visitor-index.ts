@@ -1,89 +1,84 @@
 /**
- * 迁移脚本：修复访客统计索引
- * 
- * 问题：旧版本使用 ip 作为唯一索引，新版本使用 visitorId（IP + 设备指纹）
- * 解决：删除旧的 ip_1 唯一索引
+ * Migration 002: replace the legacy unique IP index with visitorId.
  */
 
-import mongoose from 'mongoose';
-import dotenv from 'dotenv';
-import path from 'path';
+import mongoose from 'mongoose'
 
-// 加载环境变量
-dotenv.config({ path: path.join(__dirname, '../../../config.env') });
+export const migrationInfo = {
+  version: '002',
+  name: 'fix-visitor-index',
+  description: 'Replace the legacy unique IP index with the visitor fingerprint index.',
+  author: 'CarRadioWeb',
+  createdAt: '2026-08-28',
+  estimatedTime: '1 minute',
+}
 
-async function migrate() {
-  const MONGODB_URI = process.env.MONGODB_URI?.trim();
-  if (!MONGODB_URI) throw new Error('MONGODB_URI is required; configure backend/config.env before running this migration');
-  
-  console.log('🔄 开始迁移：修复访客统计索引...');
-  console.log(`📦 连接数据库: ${MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')}`);
-  
-  try {
-    await mongoose.connect(MONGODB_URI);
-    console.log('✅ 数据库连接成功');
-    
-    const db = mongoose.connection.db;
-    if (!db) {
-      throw new Error('数据库连接失败');
+export async function up(): Promise<void> {
+  const db = mongoose.connection.db
+  if (!db) throw new Error('Database connection not available')
+
+  const exists = await db.listCollections({ name: 'visitorsummaries' }, { nameOnly: true }).hasNext()
+  if (!exists) {
+    console.log('visitorsummaries collection does not exist; skipping visitor index migration')
+    return
+  }
+
+  const collection = db.collection('visitorsummaries')
+  let indexes = await collection.indexes()
+  const legacyIpIndex = indexes.find(index => index.name === 'ip_1' && index.unique)
+
+  const missingVisitorIds = collection.find({
+    $or: [
+      { visitorId: { $exists: false } },
+      { visitorId: null },
+      { visitorId: '' },
+    ],
+  }, {
+    projection: { _id: 1, ip: 1, deviceType: 1, os: 1, browser: 1 },
+  }).batchSize(25)
+
+  for await (const visitor of missingVisitorIds) {
+    const fallbackIp = typeof visitor.ip === 'string' && visitor.ip.trim()
+      ? visitor.ip.trim()
+      : `legacy-${visitor._id.toString()}`
+    const baseVisitorId = [
+      fallbackIp,
+      visitor.deviceType || 'unknown',
+      visitor.os || 'unknown',
+      visitor.browser || 'unknown',
+    ].join('_')
+    const conflict = await collection.findOne({ visitorId: baseVisitorId, _id: { $ne: visitor._id } }, { projection: { _id: 1 } })
+    const visitorId = conflict ? `${baseVisitorId}_${visitor._id.toString()}` : baseVisitorId
+    await collection.updateOne({ _id: visitor._id }, { $set: { visitorId } })
+  }
+
+  const duplicateVisitorIds = collection.aggregate([
+    { $match: { visitorId: { $type: 'string', $ne: '' } } },
+    { $group: { _id: '$visitorId', ids: { $push: '$_id' }, count: { $sum: 1 } } },
+    { $match: { count: { $gt: 1 } } },
+  ], { allowDiskUse: true, batchSize: 25 })
+  for await (const duplicate of duplicateVisitorIds) {
+    for (const duplicateId of duplicate.ids.slice(1)) {
+      await collection.updateOne(
+        { _id: duplicateId },
+        { $set: { visitorId: `${duplicate._id}_${duplicateId.toString()}` } },
+      )
     }
-    
-    // 检查 visitorsummaries 集合是否存在
-    const collections = await db.listCollections({ name: 'visitorsummaries' }).toArray();
-    
-    if (collections.length === 0) {
-      console.log('ℹ️ visitorsummaries 集合不存在，无需迁移');
-      return;
-    }
-    
-    const collection = db.collection('visitorsummaries');
-    
-    // 获取当前索引
-    const indexes = await collection.indexes();
-    console.log('📋 当前索引:', indexes.map(i => i.name));
-    
-    // 查找并删除 ip_1 唯一索引
-    const ipIndex = indexes.find(i => i.name === 'ip_1' && i.unique);
-    
-    if (ipIndex) {
-      console.log('🗑️ 发现旧的 ip_1 唯一索引，正在删除...');
-      await collection.dropIndex('ip_1');
-      console.log('✅ ip_1 唯一索引已删除');
-    } else {
-      console.log('ℹ️ 未发现 ip_1 唯一索引，无需删除');
-    }
-    
-    // 确保 visitorId_1 唯一索引存在
-    const visitorIdIndex = indexes.find(i => i.name === 'visitorId_1');
-    
-    if (!visitorIdIndex) {
-      console.log('📝 创建 visitorId_1 唯一索引...');
-      await collection.createIndex({ visitorId: 1 }, { unique: true });
-      console.log('✅ visitorId_1 唯一索引已创建');
-    } else {
-      console.log('ℹ️ visitorId_1 索引已存在');
-    }
-    
-    // 显示最终索引
-    const finalIndexes = await collection.indexes();
-    console.log('📋 最终索引:', finalIndexes.map(i => i.name));
-    
-    console.log('✅ 迁移完成！');
-    
-  } catch (error) {
-    console.error('❌ 迁移失败:', error);
-    throw error;
-  } finally {
-    await mongoose.disconnect();
-    console.log('🔌 数据库连接已关闭');
+  }
+
+  if (legacyIpIndex?.name) await collection.dropIndex(legacyIpIndex.name)
+  indexes = await collection.indexes()
+  const visitorIdIndex = indexes.find(index => index.name === 'visitorId_1')
+  if (visitorIdIndex && !visitorIdIndex.unique) {
+    await collection.dropIndex('visitorId_1')
+  }
+  if (!visitorIdIndex?.unique) {
+    await collection.createIndex({ visitorId: 1 }, { unique: true, name: 'visitorId_1' })
   }
 }
 
-// 如果直接运行此脚本
-if (require.main === module) {
-  migrate()
-    .then(() => process.exit(0))
-    .catch(() => process.exit(1));
+export async function down(): Promise<void> {
+  // Multiple devices may share one IP after this migration. Recreating the
+  // legacy unique IP index could reject valid production data.
+  console.log('Visitor index rollback skipped to preserve multi-device visitor data')
 }
-
-export default migrate;

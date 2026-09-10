@@ -73,11 +73,10 @@ async function updateDocumentCollection(): Promise<void> {
   
   // 为现有文档添加默认的新字段
   const updateResult = await GeneralDocument.updateMany(
-    { documentType: { $exists: true } },
+    { documentType: { $exists: true }, status: { $exists: false } },
     {
       $set: {
-        status: 'published', // 现有文档默认为已发布
-        updatedAt: new Date()
+        status: 'published' // 只补齐旧数据，不覆盖现有草稿或归档状态
       }
     }
   );
@@ -154,18 +153,30 @@ async function createDefaultContentSettings(): Promise<void> {
  */
 async function createIndexes(): Promise<void> {
   console.log('创建数据库索引...');
+
+  const hasKey = (indexes: Array<{ key?: Record<string, unknown> }>, key: Record<string, unknown>): boolean =>
+    indexes.some(index => index.key && JSON.stringify(index.key) === JSON.stringify(key));
   
   // Document集合索引
-  await GeneralDocument.collection.createIndex({ documentType: 1, status: 1 });
-  await GeneralDocument.collection.createIndex({ category: 1, status: 1 });
-  await GeneralDocument.collection.createIndex({ createdAt: -1 });
-  await GeneralDocument.collection.createIndex({ updatedAt: -1 });
-  await GeneralDocument.collection.createIndex({ title: 'text', content: 'text', summary: 'text' });
+  const documentIndexes = await GeneralDocument.collection.indexes().catch(() => []);
+  const documentIndexKeys: Array<Record<string, 1 | -1>> = [
+    { documentType: 1, status: 1 },
+    { category: 1, status: 1 },
+    { createdAt: -1 },
+    { updatedAt: -1 },
+  ];
+  for (const key of documentIndexKeys) {
+    if (!hasKey(documentIndexes, key)) await GeneralDocument.collection.createIndex(key);
+  }
+  if (!documentIndexes.some(index => index.weights)) {
+    await GeneralDocument.collection.createIndex({ title: 'text', content: 'text', summary: 'text' });
+  }
   
   // 设置集合索引
-  await ModuleSettings.collection.createIndex({ updatedAt: -1 });
-  await StorageSettings.collection.createIndex({ updatedAt: -1 });
-  await ContentSettings.collection.createIndex({ updatedAt: -1 });
+  for (const collection of [ModuleSettings.collection, StorageSettings.collection, ContentSettings.collection]) {
+    const indexes = await collection.indexes().catch(() => []);
+    if (!hasKey(indexes, { updatedAt: -1 })) await collection.createIndex({ updatedAt: -1 });
+  }
   
   console.log('数据库索引创建成功');
 }
