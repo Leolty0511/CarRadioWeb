@@ -9,6 +9,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export type NotificationChannelType = 'dingtalk' | 'wecom' | 'feishu' | 'serverchan' | 'smtp' | 'webhook';
 
 export interface NotificationEventSettings {
+  forumActivity: boolean;
   memberRegistration: boolean;
   knowledgeFeedback: boolean;
 }

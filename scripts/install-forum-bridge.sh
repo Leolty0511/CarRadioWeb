@@ -31,8 +31,8 @@ if [[ ${#BRIDGE_SECRET} -lt 32 ]]; then
 fi
 
 COOKIE_DOMAIN="$(read_env_value backend/config.env FORUM_SSO_BRIDGE_COOKIE_DOMAIN)"
+FRONTEND_URL="$(read_env_value backend/config.env FRONTEND_URL)"
 if [[ -z "$COOKIE_DOMAIN" ]]; then
-  FRONTEND_URL="$(read_env_value backend/config.env FRONTEND_URL)"
   FRONTEND_HOST="$(printf '%s' "$FRONTEND_URL" | sed -E 's#^https?://##; s#[:/].*$##')"
   COOKIE_DOMAIN=".$(printf '%s' "$FRONTEND_HOST" | sed -E 's/^www\.//')"
 fi
@@ -41,11 +41,16 @@ if [[ -n "$COOKIE_DOMAIN" ]]; then
 fi
 
 touch .env.flarum
-grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN)=' .env.flarum > .env.flarum.tmp || true
+FORUM_EVENT_URL="$(read_env_value .env.flarum FORUM_EVENT_URL)"
+if [[ -z "$FORUM_EVENT_URL" && -n "$FRONTEND_URL" ]]; then
+  FORUM_EVENT_URL="${FRONTEND_URL%/}/api/forum-events"
+fi
+grep -v -E '^(FORUM_SSO_BRIDGE_SECRET|FORUM_SSO_BRIDGE_COOKIE_DOMAIN|FORUM_EVENT_URL)=' .env.flarum > .env.flarum.tmp || true
 {
   cat .env.flarum.tmp
   printf 'FORUM_SSO_BRIDGE_SECRET=%s\n' "$BRIDGE_SECRET"
   printf 'FORUM_SSO_BRIDGE_COOKIE_DOMAIN=%s\n' "$COOKIE_DOMAIN"
+  printf 'FORUM_EVENT_URL=%s\n' "$FORUM_EVENT_URL"
 } > .env.flarum
 rm -f .env.flarum.tmp
 
@@ -270,7 +275,7 @@ if ! docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show fof/passpo
   docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require fof/passport:1.1.1 --with-all-dependencies --no-interaction --no-progress
 fi
 if ! docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer show carradioweb/forum-bridge >/dev/null 2>&1; then
-  docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require carradioweb/forum-bridge:1.0.0 --with-dependencies --no-interaction --no-progress
+  docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer require carradioweb/forum-bridge:2.0.0 --with-dependencies --no-interaction --no-progress
 fi
 if [[ "$PRESERVE_FORUM_ENABLED_STATE" == "1" ]]; then
   restore_forum_enabled_state
@@ -297,7 +302,7 @@ restore_project_extensions() {
   manifest_file="$(mktemp)"
   if ! node --input-type=module -e '
     const { FORUM_EXTENSIONS = [] } = await import("./backend/dist/data/forumExtensions.js");
-    for (const extension of FORUM_EXTENSIONS) {
+    for (const extension of FORUM_EXTENSIONS.filter((item) => item.restoreByDefault !== false)) {
       console.log([extension.id, extension.composerPackage, extension.vcsUrl || ""].join("\t"));
     }
   ' > "$manifest_file"; then

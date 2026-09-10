@@ -79,6 +79,7 @@ import cookieParser from 'cookie-parser'
 import { csrfMiddleware } from './middleware/csrf';
 import { initRedis } from './utils/redisCache';
 import securityRouter from './routes/security';
+import forumEventsRouter, { forumEventRateLimiter } from './routes/forumEvents';
 import { securityBlockMiddleware, securityTrackingMiddleware } from './services/securityService';
 import { initSentry, sentryErrorHandler, requestTracing } from './utils/sentry';
 import compression from 'compression';
@@ -243,6 +244,10 @@ app.use('/api/oss-files/upload', express.urlencoded({ extended: true, limit: '50
 // 为图片上传路由设置更大的限制
 app.use('/api/upload', express.json({ limit: '50mb' }));
 app.use('/api/upload', express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Forum events are server-to-server HMAC messages. Parse them with a small
+// independent limit and a dedicated rate bucket before the general API stack.
+app.use('/api/forum-events', forumEventRateLimiter, express.json({ limit: '32kb', strict: true }), forumEventsRouter);
 
 // 其他路由使用较小的限制
 app.use(express.json({ limit: '10mb' }));

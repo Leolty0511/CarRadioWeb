@@ -85,6 +85,7 @@ FLARUM_BASE_URL=$finalFlarumUrl
 DB_PASSWORD=$dbPassword
 FORUM_SSO_BRIDGE_SECRET=$bridgeSecret
 FORUM_SSO_BRIDGE_COOKIE_DOMAIN=$bridgeCookieDomain
+FORUM_EVENT_URL=$($appUrl.TrimEnd('/'))/api/forum-events
 "@ | Set-Content -Path ".\.env.flarum" -Encoding UTF8
 
 # Re-deployment must preserve the forum database and uploaded assets.

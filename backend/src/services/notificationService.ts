@@ -39,9 +39,15 @@ interface SendResult {
 export type NotificationEventType = keyof NotificationEventSettings;
 
 const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
+  forumActivity: false,
   memberRegistration: true,
   knowledgeFeedback: true,
 };
+const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000;
+
+function notificationRequestSignal(): AbortSignal {
+  return AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS);
+}
 
 // ==================== Channel senders ====================
 
@@ -66,6 +72,7 @@ async function sendDingtalk(config: DingtalkConfig, payload: NotificationPayload
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: notificationRequestSignal(),
     });
     const result = (await res.json()) as { errcode?: number; errmsg?: string };
 
@@ -94,6 +101,7 @@ async function sendWecom(config: WecomConfig, payload: NotificationPayload): Pro
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: notificationRequestSignal(),
     });
     const result = (await res.json()) as { errcode?: number; errmsg?: string };
 
@@ -153,6 +161,7 @@ async function sendFeishu(config: FeishuConfig, payload: NotificationPayload): P
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: notificationRequestSignal(),
     });
     const result = (await res.json()) as {
       code?: number;
@@ -211,6 +220,7 @@ async function sendServerChan(config: ServerChanConfig, payload: NotificationPay
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: body.toString(),
+      signal: notificationRequestSignal(),
     });
     const result = (await res.json()) as { code?: number; message?: string };
 
@@ -235,6 +245,9 @@ async function sendSmtp(config: SmtpConfig, payload: NotificationPayload): Promi
       port: config.port,
       secure: config.secure,
       auth: { user: config.user, pass: config.pass },
+      connectionTimeout: NOTIFICATION_REQUEST_TIMEOUT_MS,
+      greetingTimeout: NOTIFICATION_REQUEST_TIMEOUT_MS,
+      socketTimeout: NOTIFICATION_REQUEST_TIMEOUT_MS,
     });
 
     await transporter.sendMail({
@@ -281,6 +294,7 @@ async function sendWebhook(config: WebhookConfig, payload: NotificationPayload):
       method: config.method,
       headers,
       body: config.method === 'POST' ? body : undefined,
+      signal: notificationRequestSignal(),
     });
 
     if (res.ok) {
@@ -315,6 +329,9 @@ class NotificationService {
   async getEventSettings(): Promise<NotificationEventSettings> {
     const stored = (await SystemConfig.getConfig('notification_events')) as Partial<NotificationEventSettings> | null;
     return {
+      // Keep this off for existing installations until the legacy forum
+      // notifier has been disabled, otherwise the same event is sent twice.
+      forumActivity: stored?.forumActivity === true,
       memberRegistration: stored?.memberRegistration !== false,
       knowledgeFeedback: stored?.knowledgeFeedback !== false,
     };
@@ -327,6 +344,9 @@ class NotificationService {
     const current = await this.getEventSettings();
     const input = updates && typeof updates === 'object' ? updates : {};
     const settings: NotificationEventSettings = {
+      forumActivity: typeof input.forumActivity === 'boolean'
+        ? input.forumActivity
+        : current.forumActivity,
       memberRegistration: typeof input.memberRegistration === 'boolean'
         ? input.memberRegistration
         : current.memberRegistration,

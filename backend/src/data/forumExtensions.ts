@@ -14,6 +14,8 @@ export interface ForumExtensionMeta {
   legacyComposerPackages?: string[];
   logNameVariants?: string[];
   vcsUrl?: string;
+  /** Keep legacy/optional packages visible without installing them during a full restore. */
+  restoreByDefault?: boolean;
 }
 
 // Composer 包名以 Flarum 官方 composer.json / Packagist 为准：flarum/tags、flarum/lang-english 等（非 flarum/flarum-*）
@@ -54,7 +56,7 @@ export const FORUM_EXTENSIONS: ForumExtensionMeta[] = [
   { id: 'fof-online-users-widget', name: 'Online Users Widget', nameZh: '在线用户小部件', description: 'Show online users in the sidebar.', descriptionZh: '在侧边栏显示在线用户。', developer: 'Friends of Flarum', composerPackage: 'fof/online-users-widget', legacyComposerPackages: ['afrux/online-users-widget'], logNameVariants: ['afrux-onlineusers'] },
   { id: 'ziiven-post-number', name: 'Post Number', nameZh: '帖子编号', description: 'Display post numbers in discussions.', descriptionZh: '在讨论中显示帖子编号。', developer: 'Ziiven', composerPackage: 'ziiven/flarum-post-number' },
   { id: 'michaelbelgium-discussion-views', name: 'Discussion Views', nameZh: '讨论浏览量', description: 'Track and display discussion view counts.', descriptionZh: '统计并显示讨论浏览量。', developer: 'Michael Belgium', composerPackage: 'michaelbelgium/flarum-discussion-views' },
-  { id: 'leo-t-flarum-notify-push', name: 'Notify Push', nameZh: '推送通知', description: 'Push forum notifications to WeCom, DingTalk, ServerChan, Email and Webhook.', descriptionZh: '将论坛动态推送到企业微信、钉钉、Server酱、邮件与 Webhook。', developer: 'Leo-ttt', composerPackage: 'leo-t/flarum-notify-push', vcsUrl: 'https://github.com/Leo-ttt/Notify-Push' },
+  { id: 'leo-t-flarum-notify-push', name: 'Notify Push (Legacy)', nameZh: '推送通知（旧版）', description: 'Legacy standalone forum push channels. CarRadioWeb now includes forum event forwarding.', descriptionZh: '旧版论坛独立推送渠道；主站现已内置论坛事件推送，新部署无需安装。', developer: 'Leo-ttt', composerPackage: 'leo-t/flarum-notify-push', vcsUrl: 'https://github.com/Leo-ttt/Notify-Push', restoreByDefault: false },
   { id: 'justoverclock-thread-read-time', name: 'Thread Read Time', nameZh: '阅读时间', description: 'Show estimated read time for discussions.', descriptionZh: '显示讨论的预估阅读时间。', developer: 'JustOverclock', composerPackage: 'justoverclock/thread-read-time' },
   { id: 'justoverclock-guestengagement', name: 'Guest Engagement', nameZh: '访客引导', description: 'Encourage guests to sign up with call-to-action boxes.', descriptionZh: '通过引导框鼓励访客注册。', developer: 'JustOverclock', composerPackage: 'justoverclock/flarum-ext-guestengagement' },
   { id: 'jslirola-login2seeplus', name: 'Login to See Plus', nameZh: '登录后可见', description: 'Hide post content or media until user logs in.', descriptionZh: '未登录时隐藏部分帖子内容或媒体。', developer: 'Jslirola', composerPackage: 'jslirola/flarum-ext-login2seeplus' },
