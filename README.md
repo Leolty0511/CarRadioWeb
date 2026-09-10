@@ -251,6 +251,12 @@ Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose
 - [v2.0.0 资源包](https://github.com/Leolty0511/CarRadioWeb/releases/tag/v2.0.0)
 - 生产流程：自动备份 → 拉取资源包 → 校验版本和 `/health` → 执行待处理迁移 → 重启 → 验证主站登录、Flarum SSO、车辆接口和安全中心。
 
+若旧版后台更新器在拉取新版前被备份检查阻断，可通过服务器远程连接执行一次资源包引导更新。脚本固定作用于 `/opt/CarRadioWeb`，仍会先流式备份 MongoDB、Flarum 数据库、主站上传文件和 Flarum 数据，再应用资源包、执行迁移、重启并检查健康状态：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Leolty0511/CarRadioWeb/main/scripts/install-latest-release.sh | bash -s -- /opt/CarRadioWeb
+```
+
 版本号与资源包发布相互独立：
 
 - 普通功能修复可以不修改版本号；

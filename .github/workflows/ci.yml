@@ -192,8 +192,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate release installer shell syntax
+        working-directory: .
+        run: bash -n scripts/install-latest-release.sh
+
       - name: Build
         run: npm run build
+
+      - name: Test update backup container discovery
+        run: node --test test/updateBackupDiscovery.test.cjs
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
