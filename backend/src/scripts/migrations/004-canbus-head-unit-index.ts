@@ -37,13 +37,7 @@ export async function up(): Promise<void> {
 }
 
 export async function down(): Promise<void> {
-  const db = mongoose.connection.db
-  if (!db) throw new Error('Database connection not available')
-  const collection = db.collection('canbussettings')
-  const indexes = await collection.indexes().catch(() => [])
-  const compound = indexes.find(index => index.name === 'vehicleId_1_headUnitTypeId_1')
-  if (compound?.name) await collection.dropIndex(compound.name)
-  if (!indexes.some(index => index.name === 'vehicleId_1')) {
-    await collection.createIndex({ vehicleId: 1 }, { unique: true, name: 'vehicleId_1' })
-  }
+  // 新版本允许同一车型为不同主机类型保存多条设置。恢复旧的 vehicleId
+  // 唯一索引会拒绝这些合法数据，因此回滚代码时保留兼容新结构的索引。
+  console.log('CANBus 索引回滚跳过：保留车型与主机类型复合唯一索引。')
 }

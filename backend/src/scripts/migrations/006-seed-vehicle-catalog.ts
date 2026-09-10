@@ -28,8 +28,10 @@ export async function up(): Promise<void> {
     })
   }
 
-  if (documents.length > 0) {
-    await Vehicle.insertMany(documents, { ordered: false })
+  // 小批量写入，限制升级期间的 MongoDB 峰值内存和磁盘压力。
+  const batchSize = 25
+  for (let offset = 0; offset < documents.length; offset += batchSize) {
+    await Vehicle.insertMany(documents.slice(offset, offset + batchSize), { ordered: true })
   }
   console.log(`车型目录迁移完成：新增 ${documents.length} 条，跳过已存在 ${catalog.length - documents.length} 条`)
 }

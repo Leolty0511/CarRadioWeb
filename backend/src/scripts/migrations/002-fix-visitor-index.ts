@@ -26,6 +26,13 @@ export async function up(): Promise<void> {
   const collection = db.collection('visitorsummaries')
   let indexes = await collection.indexes()
   const legacyIpIndex = indexes.find(index => index.name === 'ip_1' && index.unique)
+  const existingVisitorIdIndex = indexes.find(index => index.name === 'visitorId_1')
+
+  // 当前生产结构已经完成迁移时直接返回，避免再次扫描访问统计集合。
+  if (!legacyIpIndex && existingVisitorIdIndex?.unique) {
+    console.log('访问者索引已是最新结构，跳过数据扫描')
+    return
+  }
 
   const missingVisitorIds = collection.find({
     $or: [

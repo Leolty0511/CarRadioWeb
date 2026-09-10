@@ -44,25 +44,8 @@ export async function up(): Promise<void> {
  * 回滚函数
  */
 export async function down(): Promise<void> {
-  console.log('开始回滚迁移：移除新内容类型支持...');
-  
-  try {
-    // 1. 删除新增的设置集合
-    const db = mongoose.connection.db;
-    if (db) {
-      await db.collection('module_settings').drop().catch(() => {});
-      await db.collection('storage_settings').drop().catch(() => {});
-      await db.collection('content_settings').drop().catch(() => {});
-    }
-    
-    // 2. 移除Document集合中的新字段（可选，保留数据兼容性）
-    // await Document.updateMany({}, { $unset: { newField: 1 } });
-    
-    console.log('迁移回滚成功！');
-  } catch (error) {
-    console.error('迁移回滚失败：', error);
-    throw error;
-  }
+  // 无法区分迁移创建的设置与管理员后来编辑的设置，因此回滚时保留生产配置。
+  console.log('内容类型迁移回滚跳过：为保护现有内容状态和后台设置，不删除生产数据。');
 }
 
 /**
@@ -188,24 +171,7 @@ export async function validate(): Promise<boolean> {
   console.log('验证迁移结果...');
   
   try {
-    // 检查集合是否存在
-    const db = mongoose.connection.db;
-    if (!db) {
-      console.error('数据库连接未就绪');
-      return false;
-    }
-    const collections = await db.listCollections().toArray();
-    const collectionNames = collections.map(c => c.name);
-    
-    const requiredCollections = ['documents', 'module_settings', 'storage_settings', 'content_settings'];
-    const missingCollections = requiredCollections.filter(name => !collectionNames.includes(name));
-    
-    if (missingCollections.length > 0) {
-      console.error('缺少集合：', missingCollections);
-      return false;
-    }
-    
-    // 检查设置文档是否存在
+    // 通过模型查询，避免 Mongoose 默认集合命名导致有效数据被误判为缺失。
     const moduleSettings = await ModuleSettings.findOne();
     const storageSettings = await StorageSettings.findOne();
     const contentSettings = await ContentSettings.findOne();
