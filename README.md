@@ -215,7 +215,7 @@ Docker Compose 默认包含 Web、MongoDB、Redis、Mailpit 和 Nginx。生产�
 - IP 安全中心使用 Redis 保存分钟级计数和临时封禁，MongoDB 保存事件、聚合 IP、封禁历史和白名单；访问明细默认 7 天、事件默认 90 天 TTL。
 - 生产建议在 Nginx 前接入 CrowdSec；没有 CrowdSec 时，CarRadioWeb 仍提供应用层封禁兜底，但它不替代边界拦截。
 - 后台一键更新会在拉取资源包或合并代码前自动备份 MongoDB、Flarum 数据库和主站上传文件；可选备份 Flarum `/data`。生产环境默认开启，任一必需备份失败会阻止更新。
-- 将 `UPDATE_BACKUP_DIR` 挂载到独立、持久化的磁盘目录，并按 [`backend/config.env.example`](backend/config.env.example) 配置 `mongodump`、`mariadb-dump`/`mysqldump` 或 Docker 容器导出参数。Docker 重建后仍须保留该目录。
+- 将 `UPDATE_BACKUP_DIR` 挂载到独立、持久化的磁盘目录。MongoDB 优先使用 `mongodump`，未安装时自动通过现有 `MONGODB_URI` 流式导出压缩 EJSON；Flarum 默认识别 `flarum_db` 容器，并复用后台环境或项目根目录 `.env.flarum` 中的现有数据库密码。数据库导出采用低内存流式方式，Flarum 的 InnoDB 数据使用一致性事务备份。自定义容器名可在 [`backend/config.env.example`](backend/config.env.example) 覆盖。Docker 重建后仍须保留备份目录。
 - 备份目录内会生成 `backup-manifest.json`，默认保留最近 7 份，可用 `UPDATE_BACKUP_RETENTION_COUNT` 调整。备份只保护数据，不会自动把数据库恢复到旧版本；代码回滚和数据恢复是两个独立动作，仍建议额外做异地/云端备份。
 
 Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose 和桥接扩展位于 [`docker-compose.flarum.yml`](docker-compose.flarum.yml) 与 [`forum-extensions/`](forum-extensions/)，部署脚本位于 [`scripts/`](scripts/)。
@@ -235,6 +235,7 @@ Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose
 | `cd backend && node dist/scripts/runMigration.js status` | 查看数据库迁移状态 |
 | `cd backend && node dist/scripts/runMigration.js run` | 执行待处理数据库迁移 |
 | `cd backend && node dist/scripts/runMigration.js rollback 005` | 回滚指定迁移 |
+| `cd backend && node dist/scripts/restoreMongoEjsonBackup.js <备份文件>` | 恢复流式 EJSON MongoDB 文档和集合索引备份 |
 
 车型目录内置迁移为 `006`：资源包更新时会自动执行待处理数据库迁移，将 `整理_修正版_v2` 清洗后的 536 条英文车型按幂等方式写入 `Vehicle` 集合。品牌或车型为空的表格行不会导入；已有相同品牌、车型和年份区间的生产记录不会覆盖。迁移回滚不会删除车型，以保护已经关联文档、密码或会员车辆的数据。
 

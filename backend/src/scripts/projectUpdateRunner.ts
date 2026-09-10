@@ -4,6 +4,10 @@ import { promises as fs } from 'fs'
 import os from 'os'
 import path from 'path'
 import crypto from 'crypto'
+import { Readable } from 'stream'
+import { pipeline } from 'stream/promises'
+import { createGzip } from 'zlib'
+import mongoose from 'mongoose'
 
 interface RunnerPayload {
   jobId: string
@@ -147,6 +151,23 @@ function commandAvailable(command: string): boolean {
   return !result.error && result.status === 0
 }
 
+async function readEnvFileValue(filePath: string, key: string): Promise<string | undefined> {
+  try {
+    const content = await fs.readFile(filePath, 'utf8')
+    const line = content.split(/\r?\n/).find(candidate => candidate.trimStart().startsWith(`${key}=`))
+    if (!line) return undefined
+    const value = line.slice(line.indexOf('=') + 1).trim()
+    if (!value) return undefined
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      return value.slice(1, -1)
+    }
+    return value
+  } catch (error: any) {
+    if (error?.code === 'ENOENT') return undefined
+    throw error
+  }
+}
+
 async function runCaptureToFile(command: string, args: string[], outputFile: string, timeout = 30 * 60_000, cwd = payload.repoRoot, env?: NodeJS.ProcessEnv): Promise<void> {
   await fs.mkdir(path.dirname(outputFile), { recursive: true })
   await writeStatus({ stage: 'backing_up', message: `Running ${command} backup` })
@@ -233,11 +254,11 @@ async function runCommand(command: string, args: string[], timeout = 30 * 60_000
 }
 
 async function backupMongoDatabase(directory: string): Promise<BackupManifestItem> {
-  const output = path.join(directory, 'mongodb.archive.gz')
+  const archiveOutput = path.join(directory, 'mongodb.archive.gz')
   const uri = process.env.MONGODB_URI?.trim()
   try {
     if (commandAvailable('mongodump') && uri) {
-      await runCommand('mongodump', [`--uri=${uri}`, `--archive=${output}`, '--gzip'])
+      await runCommand('mongodump', [`--uri=${uri}`, `--archive=${archiveOutput}`, '--gzip'])
       return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'mongodump' }
     }
     const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
@@ -249,12 +270,36 @@ async function backupMongoDatabase(directory: string): Promise<BackupManifestIte
       const password = process.env.UPDATE_MONGO_PASSWORD
       if (username) args.push(`--username=${username}`)
       if (password) args.push(`--password=${password}`, '--authenticationDatabase=admin')
-      await runCaptureToFile(docker, args, output)
+      await runCaptureToFile(docker, args, archiveOutput)
       return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'docker exec mongodump' }
     }
-    throw new Error('mongodump is unavailable or MONGODB_URI is not configured; set Mongo backup tools or UPDATE_MONGO_CONTAINER')
+    if (!uri) throw new Error('MONGODB_URI is not configured and no MongoDB backup container was provided')
+
+    const streamOutput = path.join(directory, 'mongodb.ejson.ndjson.gz')
+    const client = new mongoose.mongo.MongoClient(uri)
+    try {
+      await client.connect()
+      const db = client.db()
+      const collections = (await db.listCollections({}, { nameOnly: true }).toArray())
+        .filter(collectionInfo => collectionInfo.type === 'collection')
+      const exportRows = async function* (): AsyncGenerator<string> {
+        yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'manifest', format: 'carradioweb-mongodb-ejson-v1', database: db.databaseName, createdAt: new Date() }, { relaxed: false })}\n`
+        for (const collectionInfo of collections) {
+          const collection = db.collection(collectionInfo.name)
+          const indexes = await collection.indexes()
+          yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'collection', collection: collectionInfo.name, indexes }, { relaxed: false })}\n`
+          for await (const document of collection.find({}).batchSize(100)) {
+            yield `${mongoose.mongo.BSON.EJSON.stringify({ type: 'document', collection: collectionInfo.name, document }, { relaxed: false })}\n`
+          }
+        }
+      }
+      await pipeline(Readable.from(exportRows()), createGzip({ level: 6 }), createWriteStream(streamOutput, { flags: 'wx' }))
+      return { name: 'mongodb', status: 'completed', path: 'mongodb.ejson.ndjson.gz', method: 'MongoDB driver EJSON stream' }
+    } finally {
+      await client.close().catch(() => undefined)
+    }
   } catch (error) {
-    return { name: 'mongodb', status: 'failed', path: 'mongodb.archive.gz', error: error instanceof Error ? error.message : String(error) }
+    return { name: 'mongodb', status: 'failed', error: error instanceof Error ? error.message : String(error) }
   }
 }
 
@@ -264,24 +309,31 @@ async function backupFlarumDatabase(directory: string): Promise<BackupManifestIt
   const port = process.env.UPDATE_FLARUM_DB_PORT?.trim() || '3306'
   const database = process.env.UPDATE_FLARUM_DB_NAME?.trim() || 'flarum'
   const user = process.env.UPDATE_FLARUM_DB_USER?.trim() || 'flarum'
-  const password = process.env.UPDATE_FLARUM_DB_PASSWORD
+  const configuredPassword = [process.env.UPDATE_FLARUM_DB_PASSWORD, process.env.FLARUM_DB_PASSWORD, process.env.DB_PASSWORD]
+    .find(value => typeof value === 'string' && value.length > 0)
+  const password = configuredPassword ?? await readEnvFileValue(path.join(payload.repoRoot, '.env.flarum'), 'DB_PASSWORD')
   try {
     const localDump = commandAvailable('mariadb-dump') ? 'mariadb-dump' : commandAvailable('mysqldump') ? 'mysqldump' : null
     if (localDump) {
-      await runCaptureToFile(localDump, ['--host', host, '--port', port, '--user', user, database], output, 30 * 60_000, payload.repoRoot, { ...process.env, ...(password ? { MYSQL_PWD: password } : {}) })
+      await runCaptureToFile(localDump, ['--single-transaction', '--quick', '--host', host, '--port', port, '--user', user, database], output, 30 * 60_000, payload.repoRoot, { ...process.env, ...(password ? { MYSQL_PWD: password } : {}) })
       return { name: 'flarumDatabase', status: 'completed', path: 'flarum.sql', method: `${localDump} (streamed)` }
     }
     const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
-    const container = process.env.UPDATE_FLARUM_DB_CONTAINER?.trim()
+    const container = process.env.UPDATE_FLARUM_DB_CONTAINER?.trim() || 'flarum_db'
     if (container && commandAvailable(docker)) {
-      const dumpCommand = process.env.UPDATE_FLARUM_DUMP_COMMAND?.trim() || 'mariadb-dump'
+      let dumpCommand = process.env.UPDATE_FLARUM_DUMP_COMMAND?.trim()
+      if (!dumpCommand) {
+        const detected = spawnSync(docker, ['exec', container, 'sh', '-lc', 'command -v mariadb-dump >/dev/null 2>&1 && echo mariadb-dump || (command -v mysqldump >/dev/null 2>&1 && echo mysqldump)'], { encoding: 'utf8', windowsHide: true, timeout: 10_000 })
+        dumpCommand = detected.status === 0 ? detected.stdout.trim() : ''
+      }
+      if (!dumpCommand) throw new Error(`no mariadb-dump or mysqldump executable found in ${container}`)
       const args = ['exec']
       if (password) args.push('-e', `MYSQL_PWD=${password}`)
-      args.push(container, dumpCommand, '--host', host === '127.0.0.1' ? '127.0.0.1' : host, '--port', port, '--user', user, database)
+      args.push(container, dumpCommand, '--single-transaction', '--quick', '--host', host === '127.0.0.1' ? '127.0.0.1' : host, '--port', port, '--user', user, database)
       await runCaptureToFile(docker, args, output)
       return { name: 'flarumDatabase', status: 'completed', path: 'flarum.sql', method: `docker exec ${dumpCommand} (streamed)` }
     }
-    throw new Error('mariadb-dump/mysqldump is unavailable and UPDATE_FLARUM_DB_CONTAINER is not configured')
+    throw new Error('mariadb-dump/mysqldump is unavailable and the flarum_db container could not be used')
   } catch (error) {
     return { name: 'flarumDatabase', status: 'failed', path: 'flarum.sql', error: error instanceof Error ? error.message : String(error) }
   }
