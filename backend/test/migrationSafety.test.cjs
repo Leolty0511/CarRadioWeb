@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const path = require('node:path')
 const test = require('node:test')
 
 const migration = require('../dist/scripts/migrations/001-add-content-types.js')
@@ -201,4 +203,19 @@ test('vehicle catalog migration limits MongoDB writes to batches of 25', async (
     Vehicle.findOne = originals.findOne
     Vehicle.insertMany = originals.insertMany
   }
+})
+
+test('forum installer never runs writable Flarum commands as root', () => {
+  const installer = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'install-forum-bridge.sh'), 'utf8')
+
+  assert.match(installer, /runtime_uid="\$\{PUID:-\}"/)
+  assert.match(installer, /runtime_gid="\$\{PGID:-\}"/)
+  assert.match(installer, /id -u flarum/)
+  assert.match(installer, /id -g flarum/)
+  assert.match(installer, /docker exec --user 0:0 -e FORUM_RUNTIME_USER=/)
+  assert.match(installer, /docker exec --user "\$FORUM_RUNTIME_USER" flarum_app php flarum "\$@"/)
+  assert.match(installer, /docker exec --user "\$FORUM_RUNTIME_USER" -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer "\$@"/)
+  assert.doesNotMatch(installer, /docker exec flarum_app php flarum/)
+  assert.doesNotMatch(installer, /docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer/)
+  assert.doesNotMatch(installer, /--user 1000:1000/)
 })
