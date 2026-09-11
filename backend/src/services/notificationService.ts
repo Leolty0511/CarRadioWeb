@@ -9,6 +9,7 @@ import nodemailer from 'nodemailer';
 import { getDualTime, formatDualTime } from './geoLocationService';
 import SystemConfig, {
   type DingtalkConfig,
+  type DingtalkMessageStyle,
   type WecomConfig,
   type FeishuConfig,
   type ServerChanConfig,
@@ -68,6 +69,77 @@ function markdownWithAction(payload: NotificationPayload): string | undefined {
   return actionUrl ? `${payload.markdown}\n\n[🔗 ${payload.actionLabel || '查看详情'}](${actionUrl})` : payload.markdown;
 }
 
+function dingtalkMessageStyle(value: unknown): DingtalkMessageStyle {
+  return value === 'actionCard' || value === 'link' ? value : 'markdown';
+}
+
+function normalizeDingtalkConfig(config: DingtalkConfig): DingtalkConfig {
+  if (config.messageStyle !== undefined && !['markdown', 'actionCard', 'link'].includes(config.messageStyle)) {
+    throw new Error('钉钉推送样式无效');
+  }
+  if (config.imageUrl !== undefined && typeof config.imageUrl !== 'string') {
+    throw new Error('钉钉卡片图片 URL 无效');
+  }
+  const imageUrl = config.imageUrl?.trim() ?? '';
+  if (imageUrl && !normalizeActionUrl(imageUrl)) {
+    throw new Error('钉钉卡片图片必须是有效的 HTTP(S) URL');
+  }
+  return {
+    ...config,
+    messageStyle: dingtalkMessageStyle(config.messageStyle),
+    imageUrl,
+  };
+}
+
+function dingtalkMarkdownBody(payload: NotificationPayload): Record<string, unknown> {
+  const markdown = markdownWithAction(payload);
+  return markdown
+    ? { msgtype: 'markdown', markdown: { title: payload.title, text: `## ${payload.title}\n${markdown}`.replace(/\n/g, '\n\n') } }
+    : { msgtype: 'text', text: { content: `${payload.title}\n${payload.content}` } };
+}
+
+function dingtalkActionUrl(payload: NotificationPayload): string | undefined {
+  return normalizeActionUrl(payload.actionUrl)
+    ?? normalizeActionUrl(process.env.FRONTEND_URL)
+    ?? normalizeActionUrl(process.env.VITE_APP_URL);
+}
+
+/** Build one of DingTalk's native message formats from the shared notification payload. */
+export function buildDingtalkMessage(config: DingtalkConfig, payload: NotificationPayload): Record<string, unknown> {
+  const style = dingtalkMessageStyle(config.messageStyle);
+  if (style === 'markdown') return dingtalkMarkdownBody(payload);
+
+  const actionUrl = dingtalkActionUrl(payload);
+  if (!actionUrl) return dingtalkMarkdownBody(payload);
+
+  const imageUrl = normalizeActionUrl(config.imageUrl);
+  if (style === 'actionCard') {
+    const image = imageUrl ? `![${payload.title}](${imageUrl})\n\n` : '';
+    const content = payload.markdown ?? payload.content;
+    return {
+      msgtype: 'actionCard',
+      actionCard: {
+        title: payload.title,
+        text: `${image}## ${payload.title}\n\n${content}`,
+        btnOrientation: '0',
+        singleTitle: payload.actionLabel || '查看详情',
+        singleURL: actionUrl,
+      },
+    };
+  }
+
+  const summary = payload.content.replace(/\s+/g, ' ').trim().slice(0, 1000);
+  return {
+    msgtype: 'link',
+    link: {
+      title: payload.title,
+      text: summary,
+      ...(imageUrl ? { picUrl: imageUrl } : {}),
+      messageUrl: actionUrl,
+    },
+  };
+}
+
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
@@ -96,11 +168,7 @@ async function sendDingtalk(config: DingtalkConfig, payload: NotificationPayload
       url = `${url}${separator}timestamp=${timestamp}&sign=${sign}`;
     }
 
-    // DingTalk markdown: single \n doesn't break lines, use \n\n for paragraphs
-    const markdown = markdownWithAction(payload);
-    const body = markdown
-      ? { msgtype: 'markdown', markdown: { title: payload.title, text: `## ${payload.title}\n${markdown}`.replace(/\n/g, '\n\n') } }
-      : { msgtype: 'text', text: { content: `${payload.title}\n${payload.content}` } };
+    const body = buildDingtalkMessage(config, payload);
 
     const res = await fetch(url, {
       method: 'POST',
@@ -458,7 +526,10 @@ class NotificationService {
   ): Promise<SendResult> {
     const sender = CHANNEL_SENDERS[channel];
     if (!sender) return { channel, success: false, message: `Unknown channel: ${channel}` };
-    return sender(config, payload);
+    const normalizedConfig = channel === 'dingtalk'
+      ? normalizeDingtalkConfig(config as DingtalkConfig)
+      : config;
+    return sender(normalizedConfig, payload);
   }
 
   /**
@@ -481,15 +552,19 @@ class NotificationService {
       return { channel, success: false, message: `Unknown channel: ${channel}` };
     }
 
-    return sender(config, testPayload);
+    const normalizedConfig = channel === 'dingtalk'
+      ? normalizeDingtalkConfig(config as DingtalkConfig)
+      : config;
+    return sender(normalizedConfig, testPayload);
   }
 
   /**
    * Get config for a notification channel (with sensitive data masked)
    */
   async getChannelConfig(channel: NotificationChannelType): Promise<NotificationConfig | null> {
-    const config = (await SystemConfig.getConfig(channel)) as NotificationConfig | null;
+    let config = (await SystemConfig.getConfig(channel)) as NotificationConfig | null;
     if (!config) return null;
+    if (channel === 'dingtalk') config = normalizeDingtalkConfig(config as DingtalkConfig);
     return this.maskConfig(channel, { ...config });
   }
 
@@ -497,7 +572,9 @@ class NotificationService {
    * Get config for editing (unmasked)
    */
   async getChannelConfigForEdit(channel: NotificationChannelType): Promise<NotificationConfig | null> {
-    return (await SystemConfig.getConfig(channel)) as NotificationConfig | null;
+    const config = (await SystemConfig.getConfig(channel)) as NotificationConfig | null;
+    if (!config) return null;
+    return channel === 'dingtalk' ? normalizeDingtalkConfig(config as DingtalkConfig) : config;
   }
 
   /**
@@ -508,7 +585,10 @@ class NotificationService {
     config: NotificationConfig,
     updatedBy: string = 'admin'
   ): Promise<NotificationConfig> {
-    const result = await SystemConfig.updateConfig(channel, config, updatedBy);
+    const normalizedConfig = channel === 'dingtalk'
+      ? normalizeDingtalkConfig(config as DingtalkConfig)
+      : config;
+    const result = await SystemConfig.updateConfig(channel, normalizedConfig, updatedBy);
     return result.config as NotificationConfig;
   }
 

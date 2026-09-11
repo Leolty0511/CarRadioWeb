@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Input } from '@/components/ui/Input'
 import { apiClient } from '@/services/apiClient'
+import { DingtalkStyleFields, type DingtalkMessageStyle } from '@/components/admin/DingtalkStyleFields'
 
 type Channel = 'wecom' | 'dingtalk' | 'serverchan' | 'email' | 'webhook'
 
@@ -15,7 +16,7 @@ interface ForumNotificationSettings {
   skipAdminMod: boolean
   channels: {
     wecom: { enabled: boolean; webhook: string }
-    dingtalk: { enabled: boolean; webhook: string; secret: string }
+    dingtalk: { enabled: boolean; webhook: string; secret: string; messageStyle: DingtalkMessageStyle; imageUrl: string }
     serverchan: { enabled: boolean; uid: string; sendKey: string }
     email: { enabled: boolean; recipients: string; host: string; port: number; secure: boolean; user: string; pass: string; from: string }
     webhook: { enabled: boolean; url: string; method: 'POST' | 'PUT'; headers: string }
@@ -29,7 +30,7 @@ const DEFAULT_SETTINGS: ForumNotificationSettings = {
   skipAdminMod: false,
   channels: {
     wecom: { enabled: false, webhook: '' },
-    dingtalk: { enabled: false, webhook: '', secret: '' },
+    dingtalk: { enabled: false, webhook: '', secret: '', messageStyle: 'markdown', imageUrl: '' },
     serverchan: { enabled: false, uid: '', sendKey: '' },
     email: { enabled: false, recipients: '', host: '', port: 465, secure: true, user: '', pass: '', from: '' },
     webhook: { enabled: false, url: '', method: 'POST', headers: '' },
@@ -198,7 +199,7 @@ export function ForumNotificationPanel({ showToast }: { showToast: (value: { typ
           </div>
 
           {activeChannel === 'wecom' && <label className="block space-y-2 text-sm font-medium"><span>Webhook URL</span><Input value={settings.channels.wecom.webhook} onChange={(event) => updateChannel('wecom', { webhook: event.target.value })} placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." /></label>}
-          {activeChannel === 'dingtalk' && <div className="grid gap-4 lg:grid-cols-2"><label className="space-y-2 text-sm font-medium"><span>Webhook URL</span><Input value={settings.channels.dingtalk.webhook} onChange={(event) => updateChannel('dingtalk', { webhook: event.target.value })} placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." /></label><label className="space-y-2 text-sm font-medium"><span>加签密钥（可选）</span><SecretInput value={settings.channels.dingtalk.secret} onChange={(secret) => updateChannel('dingtalk', { secret })} placeholder="SEC..." /></label></div>}
+          {activeChannel === 'dingtalk' && <div className="space-y-4"><div className="grid gap-4 lg:grid-cols-2"><label className="space-y-2 text-sm font-medium"><span>Webhook URL</span><Input value={settings.channels.dingtalk.webhook} onChange={(event) => updateChannel('dingtalk', { webhook: event.target.value })} placeholder="https://oapi.dingtalk.com/robot/send?access_token=..." /></label><label className="space-y-2 text-sm font-medium"><span>加签密钥（可选）</span><SecretInput value={settings.channels.dingtalk.secret} onChange={(secret) => updateChannel('dingtalk', { secret })} placeholder="SEC..." /></label></div><DingtalkStyleFields messageStyle={settings.channels.dingtalk.messageStyle} imageUrl={settings.channels.dingtalk.imageUrl} onChange={(patch) => updateChannel('dingtalk', patch)} /></div>}
           {activeChannel === 'serverchan' && <div className="grid gap-4 lg:grid-cols-2"><label className="space-y-2 text-sm font-medium"><span>UID（ServerChan3，可留空）</span><Input value={settings.channels.serverchan.uid} onChange={(event) => updateChannel('serverchan', { uid: event.target.value })} /></label><label className="space-y-2 text-sm font-medium"><span>SendKey</span><SecretInput value={settings.channels.serverchan.sendKey} onChange={(sendKey) => updateChannel('serverchan', { sendKey })} placeholder="SCT... 或 sctp..." /></label></div>}
           {activeChannel === 'email' && <div className="grid gap-4 lg:grid-cols-2"><label className="space-y-2 text-sm font-medium lg:col-span-2"><span>收件邮箱</span><Input value={settings.channels.email.recipients} onChange={(event) => updateChannel('email', { recipients: event.target.value })} placeholder="admin@example.com, manager@example.com" /><span className="block text-xs font-normal text-slate-500">多个邮箱使用英文逗号分隔。</span></label><label className="space-y-2 text-sm font-medium"><span>SMTP 主机</span><Input value={settings.channels.email.host} onChange={(event) => updateChannel('email', { host: event.target.value })} placeholder="smtp.example.com" /></label><label className="space-y-2 text-sm font-medium"><span>端口</span><Input type="number" value={String(settings.channels.email.port)} onChange={(event) => updateChannel('email', { port: Number(event.target.value) })} /></label><label className="space-y-2 text-sm font-medium"><span>SMTP 账号</span><Input value={settings.channels.email.user} onChange={(event) => updateChannel('email', { user: event.target.value })} /></label><label className="space-y-2 text-sm font-medium"><span>密码 / 授权码</span><SecretInput value={settings.channels.email.pass} onChange={(pass) => updateChannel('email', { pass })} placeholder="密码或授权码" /></label><label className="space-y-2 text-sm font-medium"><span>发件地址</span><Input value={settings.channels.email.from} onChange={(event) => updateChannel('email', { from: event.target.value })} placeholder="默认使用 SMTP 账号" /></label><div className="flex items-center justify-between rounded-md bg-slate-100 p-3 dark:bg-gray-800/50"><span className="text-sm font-medium">SSL/TLS</span><Toggle checked={settings.channels.email.secure} onChange={(secure) => updateChannel('email', { secure })} label="SMTP SSL/TLS" /></div></div>}
           {activeChannel === 'webhook' && <div className="space-y-4"><label className="block space-y-2 text-sm font-medium"><span>Webhook URL</span><Input value={settings.channels.webhook.url} onChange={(event) => updateChannel('webhook', { url: event.target.value })} placeholder="https://example.com/webhook" /></label><div className="flex gap-2">{(['POST', 'PUT'] as const).map((method) => <Button key={method} type="button" size="sm" variant={settings.channels.webhook.method === method ? 'primary' : 'outline'} onClick={() => updateChannel('webhook', { method })}>{method}</Button>)}</div><label className="block space-y-2 text-sm font-medium"><span>自定义请求头</span><textarea rows={4} value={settings.channels.webhook.headers} onChange={(event) => updateChannel('webhook', { headers: event.target.value })} placeholder={'Authorization: Bearer token\nX-Custom-Header: value'} className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-mono text-sm dark:border-slate-600 dark:bg-slate-800" /><span className="block text-xs font-normal text-slate-500">每行一个，格式为 Header-Name: value。</span></label></div>}

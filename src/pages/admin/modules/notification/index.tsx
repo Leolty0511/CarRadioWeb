@@ -26,6 +26,7 @@ import {
   MessageCircle,
 } from 'lucide-react'
 import { apiClient } from '@/services/apiClient'
+import { DingtalkStyleFields } from '@/components/admin/DingtalkStyleFields'
 
 // ==================== Types ====================
 
@@ -72,7 +73,7 @@ const CHANNEL_LIST: ChannelMeta[] = [
 // ==================== Default configs ====================
 
 const DEFAULT_CONFIGS: Record<ChannelType, Record<string, unknown>> = {
-  dingtalk: { webhook: '', secret: '', enabled: false },
+  dingtalk: { webhook: '', secret: '', enabled: false, messageStyle: 'markdown', imageUrl: '' },
   wecom: { webhook: '', enabled: false },
   feishu: { webhook: '', secret: '', enabled: false },
   serverchan: { uid: '', sendKey: '', enabled: false },
@@ -181,6 +182,11 @@ function DingtalkFields({ config, setConfig }: { config: Record<string, unknown>
         placeholder="SEC..."
         hint="钉钉机器人的加签密钥"
         required
+      />
+      <DingtalkStyleFields
+        messageStyle={config.messageStyle}
+        imageUrl={config.imageUrl}
+        onChange={(patch) => setConfig({ ...config, ...patch })}
       />
     </>
   )

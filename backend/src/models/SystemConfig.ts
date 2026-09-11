@@ -14,10 +14,16 @@ export interface NotificationEventSettings {
 }
 
 // Dingtalk robot config
+export type DingtalkMessageStyle = 'markdown' | 'actionCard' | 'link';
+
 export interface DingtalkConfig {
   webhook: string;
   secret: string;
   enabled: boolean;
+  /** Defaults to markdown for configs saved before message styles were added. */
+  messageStyle?: DingtalkMessageStyle;
+  /** Public HTTP(S) image used by ActionCard and Link messages. */
+  imageUrl?: string;
 }
 
 // WeCom (企业微信) robot config

@@ -45,7 +45,10 @@ const forumNotificationSchema = z.object({
   skipAdminMod: z.boolean(),
   channels: z.object({
     wecom: z.object({ enabled: z.boolean(), webhook: optionalHttpUrl }),
-    dingtalk: z.object({ enabled: z.boolean(), webhook: optionalHttpUrl, secret: z.string().max(512) }),
+    dingtalk: z.object({
+      enabled: z.boolean(), webhook: optionalHttpUrl, secret: z.string().max(512),
+      messageStyle: z.enum(['markdown', 'actionCard', 'link']), imageUrl: optionalHttpUrl,
+    }),
     serverchan: z.object({ enabled: z.boolean(), uid: z.string().max(100), sendKey: z.string().max(512) }),
     email: z.object({
       enabled: z.boolean(), recipients: z.string().max(2000), host: z.string().max(500),
@@ -63,7 +66,7 @@ export const DEFAULT_FORUM_NOTIFICATION_SETTINGS: ForumNotificationSettings = {
   skipAdminMod: false,
   channels: {
     wecom: { enabled: false, webhook: '' },
-    dingtalk: { enabled: false, webhook: '', secret: '' },
+    dingtalk: { enabled: false, webhook: '', secret: '', messageStyle: 'markdown', imageUrl: '' },
     serverchan: { enabled: false, uid: '', sendKey: '' },
     email: { enabled: false, recipients: '', host: '', port: 465, secure: true, user: '', pass: '', from: '' },
     webhook: { enabled: false, url: '', method: 'POST', headers: '' },
@@ -83,7 +86,10 @@ export function settingsFromLegacy(values: Record<string, string>): ForumNotific
     skipAdminMod: bool(key('skip_admin_mod')),
     channels: {
       wecom: { enabled: bool(key('wecom_enabled')), webhook: key('wecom_webhook_url') },
-      dingtalk: { enabled: bool(key('dingtalk_enabled')), webhook: key('dingtalk_webhook_url'), secret: key('dingtalk_secret') },
+      dingtalk: {
+        enabled: bool(key('dingtalk_enabled')), webhook: key('dingtalk_webhook_url'),
+        secret: key('dingtalk_secret'), messageStyle: 'markdown', imageUrl: '',
+      },
       serverchan: { enabled: bool(key('serverchan_enabled')), uid: '', sendKey: key('serverchan_send_key') },
       email: {
         enabled: bool(key('email_enabled')),

@@ -9,7 +9,10 @@ const {
   settingsFromLegacy,
   shouldSendForumEvent,
 } = require('../dist/services/forumNotificationService.js')
-const { notificationService } = require('../dist/services/notificationService.js')
+const {
+  buildDingtalkMessage,
+  notificationService,
+} = require('../dist/services/notificationService.js')
 
 function encode(value) {
   return Buffer.from(JSON.stringify(value), 'utf8').toString('base64url')
@@ -92,6 +95,8 @@ test('legacy Notify Push settings migrate into independent forum channels', () =
   assert.equal(settings.skipAdminMod, true)
   assert.equal(settings.channels.wecom.enabled, true)
   assert.equal(settings.channels.dingtalk.secret, 'SEC-test')
+  assert.equal(settings.channels.dingtalk.messageStyle, 'markdown')
+  assert.equal(settings.channels.dingtalk.imageUrl, '')
   assert.equal(settings.channels.serverchan.sendKey, 'SCT-test')
   assert.equal(settings.channels.email.host, 'smtp.example.com')
   assert.equal(settings.channels.email.secure, true)
@@ -150,6 +155,136 @@ test('DingTalk does not append an invalid signature when the optional secret is 
     }, { title: '测试', content: '测试内容', markdown: '**测试**' })
     assert.equal(result.success, true)
     assert.equal(requestUrl, 'https://oapi.dingtalk.com/robot/send?access_token=test')
+  } finally {
+    global.fetch = originalFetch
+  }
+})
+
+test('legacy DingTalk configs keep the classic Markdown message style', () => {
+  const body = buildDingtalkMessage({
+    enabled: true,
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=test',
+    secret: '',
+  }, {
+    title: '论坛新回复',
+    content: '测试内容',
+    markdown: '**内容：** 测试内容',
+    actionUrl: 'https://forum.example.com/d/12/3',
+    actionLabel: '查看详情',
+  })
+
+  assert.equal(body.msgtype, 'markdown')
+  assert.match(body.markdown.text, /\[🔗 查看详情\]\(https:\/\/forum\.example\.com\/d\/12\/3\)/)
+})
+
+test('DingTalk ActionCard includes an optional brand image and native action button', () => {
+  const body = buildDingtalkMessage({
+    enabled: true,
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=test',
+    secret: '',
+    messageStyle: 'actionCard',
+    imageUrl: 'https://cdn.example.com/forum-brand.png',
+  }, {
+    title: '论坛新主题',
+    content: '测试内容',
+    markdown: '**作者：** member',
+    actionUrl: 'https://forum.example.com/d/12',
+    actionLabel: '查看详情',
+  })
+
+  assert.equal(body.msgtype, 'actionCard')
+  assert.match(body.actionCard.text, /^!\[论坛新主题\]\(https:\/\/cdn\.example\.com\/forum-brand\.png\)/)
+  assert.equal(body.actionCard.singleTitle, '查看详情')
+  assert.equal(body.actionCard.singleURL, 'https://forum.example.com/d/12')
+})
+
+test('DingTalk Link uses a compact summary, thumbnail and whole-card destination', () => {
+  const body = buildDingtalkMessage({
+    enabled: true,
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=test',
+    secret: '',
+    messageStyle: 'link',
+    imageUrl: 'https://cdn.example.com/forum-thumb.png',
+  }, {
+    title: '论坛新回复',
+    content: '第一行\n第二行',
+    actionUrl: 'https://forum.example.com/d/12/3',
+  })
+
+  assert.deepEqual(body, {
+    msgtype: 'link',
+    link: {
+      title: '论坛新回复',
+      text: '第一行 第二行',
+      picUrl: 'https://cdn.example.com/forum-thumb.png',
+      messageUrl: 'https://forum.example.com/d/12/3',
+    },
+  })
+})
+
+test('DingTalk card styles reject unsafe image URLs and fall back without a safe destination', () => {
+  const safeDestination = buildDingtalkMessage({
+    enabled: true,
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=test',
+    secret: '',
+    messageStyle: 'link',
+    imageUrl: 'javascript:alert(1)',
+  }, {
+    title: '论坛新回复',
+    content: '测试内容',
+    actionUrl: 'https://forum.example.com/d/12/3',
+  })
+  assert.equal(safeDestination.msgtype, 'link')
+  assert.equal(Object.hasOwn(safeDestination.link, 'picUrl'), false)
+
+  const invalidDestination = buildDingtalkMessage({
+    enabled: true,
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=test',
+    secret: '',
+    messageStyle: 'actionCard',
+  }, {
+    title: '论坛新回复',
+    content: '测试内容',
+    markdown: '**内容：** 测试内容',
+    actionUrl: 'javascript:alert(1)',
+  })
+  assert.equal(invalidDestination.msgtype, 'markdown')
+})
+
+test('DingTalk channel API rejects invalid card configuration', async () => {
+  await assert.rejects(() => notificationService.sendChannel('dingtalk', {
+    enabled: true,
+    webhook: 'https://oapi.dingtalk.com/robot/send?access_token=test',
+    secret: '',
+    messageStyle: 'link',
+    imageUrl: 'data:image/png;base64,test',
+  }, {
+    title: '测试',
+    content: '测试内容',
+    actionUrl: 'https://forum.example.com',
+  }), /HTTP\(S\) URL/)
+})
+
+test('Feishu remains on its native interactive card when DingTalk styles are enabled', async () => {
+  const originalFetch = global.fetch
+  let requestBody
+  global.fetch = async (_url, options) => {
+    requestBody = JSON.parse(options.body)
+    return { ok: true, json: async () => ({ code: 0 }) }
+  }
+  try {
+    const result = await notificationService.sendChannel('feishu', {
+      enabled: true,
+      webhook: 'https://open.feishu.cn/test',
+    }, {
+      title: '论坛新回复',
+      content: '测试内容',
+      markdown: '**内容：** 测试内容',
+      actionUrl: 'https://forum.example.com/d/12/3',
+    })
+    assert.equal(result.success, true)
+    assert.equal(requestBody.msg_type, 'interactive')
+    assert.equal(requestBody.card.elements[1].actions[0].url, 'https://forum.example.com/d/12/3')
   } finally {
     global.fetch = originalFetch
   }
