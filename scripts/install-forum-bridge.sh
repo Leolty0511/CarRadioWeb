@@ -77,6 +77,27 @@ forum_composer() {
   docker exec --user "$FORUM_RUNTIME_USER" -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer "$@"
 }
 
+sync_bridge_runtime_settings() {
+  docker exec --user "$FORUM_RUNTIME_USER" \
+    -e CARRADIOWEB_SYNC_EVENT_URL="$FORUM_EVENT_URL" \
+    -e CARRADIOWEB_SYNC_SECRET="$BRIDGE_SECRET" \
+    -w /opt/flarum flarum_app php -r '
+      $url=trim((string) getenv("CARRADIOWEB_SYNC_EVENT_URL"));
+      $secret=trim((string) getenv("CARRADIOWEB_SYNC_SECRET"));
+      $scheme=strtolower((string) parse_url($url, PHP_URL_SCHEME));
+      if (!filter_var($url, FILTER_VALIDATE_URL) || !in_array($scheme, ["http", "https"], true) || strlen($secret) < 32) {
+        fwrite(STDERR, "Forum event transport settings are invalid.\n");
+        exit(1);
+      }
+      $site=require "site.php";
+      $site->bootApp();
+      $container=Illuminate\Container\Container::getInstance();
+      $settings=$container->make(Flarum\Settings\SettingsRepositoryInterface::class);
+      $settings->set("carradioweb-forum-bridge.event_url", $url);
+      $settings->set("carradioweb-forum-bridge.bridge_secret", $secret);
+    '
+}
+
 fix_forum_runtime_permissions() {
   docker exec --user 0:0 -e FORUM_RUNTIME_USER="$FORUM_RUNTIME_USER" flarum_app sh -lc '
     set -eu
@@ -419,6 +440,12 @@ fi
 # change Flarum's extensions_enabled setting. Put it back exactly as it was
 # before the update, while keeping the two extensions required for the bridge.
 restore_forum_enabled_state || true
+
+# PHP-FPM does not guarantee that arbitrary container environment variables
+# are visible to web workers. Persist the event transport values through
+# Flarum's settings repository, matching the runtime pattern used by native
+# extensions while retaining environment variables as a compatibility fallback.
+sync_bridge_runtime_settings
 
 # The main application now owns forum notifications. Keep the legacy package
 # and all of its settings for rollback, but disable its event subscriber so a

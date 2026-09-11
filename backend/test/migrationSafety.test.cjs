@@ -235,3 +235,14 @@ test('forum notification management APIs require super administrator access', ()
   assert.match(routes, /router\.put\('\/notifications', authenticateUser, requireSuperAdmin,/)
   assert.match(routes, /router\.post\('\/notifications\/test', authenticateUser, requireSuperAdmin,/)
 })
+
+test('forum event transport settings are available to PHP-FPM through Flarum settings', () => {
+  const installer = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'install-forum-bridge.sh'), 'utf8')
+  const forwarder = fs.readFileSync(path.join(__dirname, '..', '..', 'forum-extensions', 'carradioweb-forum-bridge', 'src', 'ForumEventForwarder.php'), 'utf8')
+
+  assert.match(installer, /sync_bridge_runtime_settings/)
+  assert.match(installer, /carradioweb-forum-bridge\.event_url/)
+  assert.match(installer, /carradioweb-forum-bridge\.bridge_secret/)
+  assert.match(forwarder, /SettingsRepositoryInterface/)
+  assert.match(forwarder, /Event forwarding failed/)
+})
