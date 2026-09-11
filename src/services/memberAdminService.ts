@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient'
+import type { MemberVehicleFilterOption } from '@/components/admin/MemberVehicleFilter'
 
 export interface MemberRecord {
   _id: string
@@ -54,4 +55,5 @@ export const getOnlineMembers = () => apiClient.get<{
   since: string
   items: Pick<MemberRecord, 'nickname' | 'email' | 'avatar' | 'lastSeenAt' | 'lastSeenIp' | 'lastSeenDeviceType' | 'lastSeenOs' | 'lastSeenBrowser' | 'lastSeenBrowserVersion' | 'registrationCountry' | 'registrationRegion' | 'registrationCity'>[]
 }>('/members/online')
+export const getMemberVehicleFilterOptions = () => apiClient.get<MemberVehicleFilterOption[]>('/members/vehicle-filter-options')
 export const setMemberStatus = (id: string, status: string, reviewNote = '') => apiClient.put(`/members/${id}/status`, { status, reviewNote })

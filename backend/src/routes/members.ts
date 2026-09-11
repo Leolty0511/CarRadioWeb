@@ -1,6 +1,8 @@
 import { Router } from 'express'
+import { Types } from 'mongoose'
 import Member from '../models/Member'
 import MemberVehicle from '../models/MemberVehicle'
+import { buildMemberSearchConditions, buildMemberVehicleFilter } from '../utils/memberAdminFilters'
 
 const router = Router()
 
@@ -14,12 +16,53 @@ router.get('/online', async (_req, res) => {
   res.json({ success: true, data: { count: items.length, since, items } })
 })
 
+router.get('/vehicle-filter-options', async (_req, res, next) => {
+  try {
+    const items = await MemberVehicle.aggregate([
+      {
+        $group: {
+          _id: '$vehicleId',
+          brand: { $first: '$brand' },
+          modelName: { $first: '$modelName' },
+          yearRange: { $first: '$yearRange' },
+          generation: { $first: '$generation' },
+          memberCount: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          _id: 0,
+          vehicleId: '$_id',
+          brand: 1,
+          modelName: 1,
+          yearRange: 1,
+          generation: 1,
+          memberCount: 1,
+        },
+      },
+      { $limit: 2000 },
+    ])
+    res.json({ success: true, data: items })
+  } catch (error) {
+    next(error)
+  }
+})
+
 router.get('/', async (req, res) => {
   await Member.updateMany({ status: { $in: ['pending', 'rejected'] } }, { $set: { status: 'active', reviewNote: '', approvedAt: new Date() } })
   const page = Math.max(1, Number(req.query.page) || 1)
   const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30))
   const search = String(req.query.search || '').trim()
+  const vehicleId = String(req.query.vehicleId || '').trim()
+  const vehicleBrand = String(req.query.vehicleBrand || '').trim()
+  const vehicleModel = String(req.query.vehicleModel || '').trim()
   const status = String(req.query.status || '')
+  if (search.length > 200 || vehicleBrand.length > 100 || vehicleModel.length > 150) {
+    return res.status(400).json({ success: false, error: 'search_too_long' })
+  }
+  if (vehicleId && !Types.ObjectId.isValid(vehicleId)) {
+    return res.status(400).json({ success: false, error: 'invalid_vehicle_id' })
+  }
   const filter: Record<string, unknown> = {}
   const onlineSince = new Date(Date.now() - 5 * 60 * 1000)
   if (status === 'suspended') {
@@ -39,11 +82,16 @@ router.get('/', async (req, res) => {
   } else if (status === 'active') {
     filter.status = 'active'
   }
-  if (search) filter.$or = [
-    { email: { $regex: search, $options: 'i' } },
-    { nickname: { $regex: search, $options: 'i' } },
-    { registrationIp: { $regex: search, $options: 'i' } },
-  ]
+  if (search) filter.$or = buildMemberSearchConditions(search)
+  if (vehicleId || vehicleBrand) {
+    const vehicleFilter = buildMemberVehicleFilter({
+      vehicleId: vehicleId ? new Types.ObjectId(vehicleId) : undefined,
+      brand: vehicleBrand,
+      modelName: vehicleModel,
+    })
+    const memberIds = vehicleFilter ? await MemberVehicle.distinct('memberId', vehicleFilter) : []
+    filter._id = { $in: memberIds }
+  }
   const [items, total, allMembers, active, online] = await Promise.all([
     Member.find(filter).select('-passwordHash').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
     Member.countDocuments(filter),

@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/Input'
 import { Badge } from '@/components/ui/Badge'
 import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/Toast'
-import { getMembers, setMemberStatus, type MemberRecord } from '@/services/memberAdminService'
+import { MemberVehicleFilter, type MemberVehicleFilterOption, type MemberVehicleFilterValue } from '@/components/admin/MemberVehicleFilter'
+import { getMembers, getMemberVehicleFilterOptions, setMemberStatus, type MemberRecord } from '@/services/memberAdminService'
 
 const DEVICE_LABELS: Record<MemberRecord['lastSeenDeviceType'], string> = { desktop: '电脑', mobile: '手机', tablet: '平板', unknown: '未知设备' }
 const formatDate = (value?: string | null) => value ? new Date(value).toLocaleString('zh-CN') : '暂无记录'
@@ -26,13 +27,24 @@ export function MemberManagement() {
   const [total, setTotal] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState('')
+  const [vehicleOptions, setVehicleOptions] = useState<MemberVehicleFilterOption[]>([])
+  const [vehicleOptionsLoading, setVehicleOptionsLoading] = useState(true)
+  const [vehicleFilter, setVehicleFilter] = useState<MemberVehicleFilterValue>({ brand: '', modelName: '', vehicleId: '' })
   const [statusFilter, setStatusFilter] = useState('')
   const [selectedMember, setSelectedMember] = useState<MemberRecord | null>(null)
 
   const load = async (requestedPage = page) => {
     setLoading(true)
     try {
-      const result = await getMembers({ page: requestedPage, limit: 20, search: search.trim() || undefined, status: statusFilter || undefined })
+      const result = await getMembers({
+        page: requestedPage,
+        limit: 20,
+        search: search.trim() || undefined,
+        vehicleId: vehicleFilter.vehicleId || undefined,
+        vehicleBrand: vehicleFilter.brand || undefined,
+        vehicleModel: vehicleFilter.modelName || undefined,
+        status: statusFilter || undefined,
+      })
       if (result.success && result.data) {
         setMembers(result.data.items || [])
         setPage(result.data.page || requestedPage)
@@ -50,7 +62,18 @@ export function MemberManagement() {
   useEffect(() => {
     const timer = window.setTimeout(() => void load(1), 250)
     return () => window.clearTimeout(timer)
-  }, [search, statusFilter])
+  }, [search, vehicleFilter, statusFilter])
+
+  useEffect(() => {
+    getMemberVehicleFilterOptions()
+      .then((result) => {
+        if (result.success) {
+          setVehicleOptions(result.data || [])
+        }
+      })
+      .catch(() => showToast({ type: 'error', title: '车辆筛选选项加载失败' }))
+      .finally(() => setVehicleOptionsLoading(false))
+  }, [showToast])
 
   const updateStatus = async (member: MemberRecord, status: 'active' | 'suspended') => {
     const result = await setMemberStatus(member._id, status)
@@ -80,11 +103,12 @@ export function MemberManagement() {
         <CardHeader className="gap-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-lg">会员账号 <span className="text-sm font-normal text-slate-500">{total}</span></CardTitle>
-            <div className="flex w-full gap-2 sm:w-auto">
+            <div className="grid w-full gap-2 sm:grid-cols-[minmax(16rem,18rem)_auto] xl:w-auto">
               <div className="relative min-w-0 flex-1 sm:w-72"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><Input className="pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="搜索邮箱、昵称或 IP" /></div>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-900"><option value="">全部状态</option><option value="online">在线</option><option value="offline">离线</option><option value="suspended">已停用</option></select>
             </div>
           </div>
+          <MemberVehicleFilter options={vehicleOptions} value={vehicleFilter} loading={vehicleOptionsLoading} onChange={setVehicleFilter} />
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto">
