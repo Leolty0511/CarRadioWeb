@@ -174,8 +174,7 @@ router.get('/notification/status', requirePermission(PERMISSIONS.notifications.r
   }
 });
 
-// Get notification event switches. Legacy events default on; forum forwarding
-// defaults off until an existing forum notifier has been disabled.
+// Get notification event switches for main-site business events.
 router.get('/notification/events', requirePermission(PERMISSIONS.notifications.read), async (_req: Request, res: Response) => {
   try {
     const settings = await notificationService.getEventSettings();
@@ -200,35 +199,6 @@ router.put('/notification/events', requirePermission(PERMISSIONS.notifications.u
     res.status(500).json({
       success: false,
       error: error instanceof Error ? error.message : 'Failed to update notification event settings'
-    });
-  }
-});
-
-// Send one forum-style message through every currently enabled channel.
-router.post('/notification/events/forum/test', requirePermission(PERMISSIONS.notifications.update), async (_req: Request, res: Response) => {
-  try {
-    const results = await notificationService.notifyAll({
-      title: '论坛消息推送测试',
-      content: '这是一条来自 CarRadioWeb 后台的论坛消息测试通知。\n事件：新用户、发布主题、回复\n状态：推送渠道连接正常',
-      markdown: '**事件：** 论坛消息推送测试\n**包含：** 新用户、发布主题、回复\n**状态：** 推送渠道连接正常',
-    });
-    if (results.length === 0) {
-      res.status(400).json({ success: false, error: '请先启用至少一种推送方式' });
-      return;
-    }
-    const failed = results.filter((item) => !item.success);
-    res.status(failed.length === 0 ? 200 : 502).json({
-      success: failed.length === 0,
-      data: results,
-      message: failed.length === 0
-        ? `测试通知已发送到 ${results.length} 个渠道`
-        : `${results.length - failed.length} 个渠道成功，${failed.length} 个渠道失败`,
-    });
-  } catch (error) {
-    logger.error({ error }, 'Failed to send forum notification test');
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : '论坛消息测试失败'
     });
   }
 });

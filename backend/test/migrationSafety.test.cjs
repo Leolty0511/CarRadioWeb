@@ -219,3 +219,19 @@ test('forum installer never runs writable Flarum commands as root', () => {
   assert.doesNotMatch(installer, /docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer/)
   assert.doesNotMatch(installer, /--user 1000:1000/)
 })
+
+test('forum installer disables the legacy notifier without uninstalling it', () => {
+  const installer = fs.readFileSync(path.join(__dirname, '..', '..', 'scripts', 'install-forum-bridge.sh'), 'utf8')
+
+  assert.match(installer, /forum_composer show leo-t\/flarum-notify-push/)
+  assert.match(installer, /forum_cli extension:disable leo-t-notify-push/)
+  assert.doesNotMatch(installer, /composer remove leo-t\/flarum-notify-push/)
+})
+
+test('forum notification management APIs require super administrator access', () => {
+  const routes = fs.readFileSync(path.join(__dirname, '..', 'src', 'routes', 'forum.ts'), 'utf8')
+
+  assert.match(routes, /router\.get\('\/notifications', authenticateUser, requireSuperAdmin,/)
+  assert.match(routes, /router\.put\('\/notifications', authenticateUser, requireSuperAdmin,/)
+  assert.match(routes, /router\.post\('\/notifications\/test', authenticateUser, requireSuperAdmin,/)
+})

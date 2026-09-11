@@ -420,6 +420,14 @@ fi
 # before the update, while keeping the two extensions required for the bridge.
 restore_forum_enabled_state || true
 
+# The main application now owns forum notifications. Keep the legacy package
+# and all of its settings for rollback, but disable its event subscriber so a
+# forum action cannot bypass the built-in forum channels or send duplicates.
+if forum_composer show leo-t/flarum-notify-push >/dev/null 2>&1; then
+  forum_cli extension:disable leo-t-notify-push
+  echo "Disabled the legacy forum notifier; its package and settings were preserved."
+fi
+
 # Composer files restored with docker cp are owned by root. The Flarum web
 # process must be able to read them when it discovers extensions and compiles
 # locale assets, otherwise forum-en.js is generated as an empty translation set.

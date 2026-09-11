@@ -9,13 +9,9 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export type NotificationChannelType = 'dingtalk' | 'wecom' | 'feishu' | 'serverchan' | 'smtp' | 'webhook';
 
 export interface NotificationEventSettings {
-  forumActivity: boolean;
   memberRegistration: boolean;
   knowledgeFeedback: boolean;
 }
-
-// All config types stored in system_configs collection
-export type SystemConfigType = NotificationChannelType | 'notification_events' | 'oss';
 
 // Dingtalk robot config
 export interface DingtalkConfig {
@@ -61,7 +57,7 @@ export interface SmtpConfig {
 // Generic webhook config
 export interface WebhookConfig {
   url: string;
-  method: 'GET' | 'POST';
+  method: 'GET' | 'POST' | 'PUT';
   headers: string;
   bodyTemplate: string;
   enabled: boolean;
@@ -80,10 +76,38 @@ export interface OSSConfig {
 // Union of all notification channel configs
 export type NotificationConfig = DingtalkConfig | WecomConfig | FeishuConfig | ServerChanConfig | SmtpConfig | WebhookConfig;
 
+export type ForumNotificationChannelType = 'wecom' | 'dingtalk' | 'serverchan' | 'email' | 'webhook';
+
+export interface ForumNotificationSettings {
+  enabled: boolean;
+  locale: 'en' | 'zh-hans';
+  timezone: string;
+  skipAdminMod: boolean;
+  channels: {
+    wecom: WecomConfig;
+    dingtalk: DingtalkConfig;
+    serverchan: ServerChanConfig;
+    email: {
+      enabled: boolean;
+      recipients: string;
+      host: string;
+      port: number;
+      secure: boolean;
+      user: string;
+      pass: string;
+      from: string;
+    };
+    webhook: { enabled: boolean; url: string; method: 'POST' | 'PUT'; headers: string };
+  };
+}
+
+// All config types stored in system_configs collection
+export type SystemConfigType = NotificationChannelType | 'notification_events' | 'forum_notification' | 'oss';
+
 // System config document interface
 export interface ISystemConfig extends Document {
   configType: SystemConfigType;
-  config: NotificationConfig | NotificationEventSettings | OSSConfig;
+  config: NotificationConfig | NotificationEventSettings | ForumNotificationSettings | OSSConfig;
   createdAt: Date;
   updatedAt: Date;
   createdBy?: string;
@@ -92,15 +116,15 @@ export interface ISystemConfig extends Document {
 
 // Static methods interface
 export interface ISystemConfigModel extends Model<ISystemConfig> {
-  getConfig(configType: SystemConfigType): Promise<NotificationConfig | NotificationEventSettings | OSSConfig | null>;
+  getConfig(configType: SystemConfigType): Promise<NotificationConfig | NotificationEventSettings | ForumNotificationSettings | OSSConfig | null>;
   updateConfig(
     configType: SystemConfigType,
-    newConfig: NotificationConfig | NotificationEventSettings | OSSConfig,
+    newConfig: NotificationConfig | NotificationEventSettings | ForumNotificationSettings | OSSConfig,
     updatedBy?: string
   ): Promise<ISystemConfig>;
 }
 
-const VALID_CONFIG_TYPES: SystemConfigType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook', 'notification_events', 'oss'];
+const VALID_CONFIG_TYPES: SystemConfigType[] = ['dingtalk', 'wecom', 'feishu', 'serverchan', 'smtp', 'webhook', 'notification_events', 'forum_notification', 'oss'];
 
 const SystemConfigSchema = new Schema<ISystemConfig>({
   configType: {
@@ -126,9 +150,6 @@ const SystemConfigSchema = new Schema<ISystemConfig>({
   collection: 'system_configs'
 });
 
-// Index
-SystemConfigSchema.index({ configType: 1 }, { unique: true });
-
 // Static method: get config
 SystemConfigSchema.statics.getConfig = async function(configType: SystemConfigType) {
   const config = await this.findOne({ configType });
@@ -138,7 +159,7 @@ SystemConfigSchema.statics.getConfig = async function(configType: SystemConfigTy
 // Static method: update config (upsert)
 SystemConfigSchema.statics.updateConfig = async function(
   configType: SystemConfigType,
-  newConfig: NotificationConfig | NotificationEventSettings | OSSConfig,
+  newConfig: NotificationConfig | NotificationEventSettings | ForumNotificationSettings | OSSConfig,
   updatedBy: string = 'system'
 ) {
   const result = await this.findOneAndUpdate(

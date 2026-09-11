@@ -23,14 +23,18 @@ import { createLogger } from '../utils/logger';
 
 const logger = createLogger('notification');
 
-interface NotificationPayload {
+export interface NotificationPayload {
   title: string;
   content: string;
   /** Optional markdown content (used by channels that support it) */
   markdown?: string;
+  /** Optional absolute HTTP(S) link shown as the notification action. */
+  actionUrl?: string;
+  actionLabel?: string;
+  timestamp?: string;
 }
 
-interface SendResult {
+export interface SendResult {
   channel: NotificationChannelType;
   success: boolean;
   message: string;
@@ -39,7 +43,6 @@ interface SendResult {
 export type NotificationEventType = keyof NotificationEventSettings;
 
 const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
-  forumActivity: false,
   memberRegistration: true,
   knowledgeFeedback: true,
 };
@@ -47,6 +50,31 @@ const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000;
 
 function notificationRequestSignal(): AbortSignal {
   return AbortSignal.timeout(NOTIFICATION_REQUEST_TIMEOUT_MS);
+}
+
+function normalizeActionUrl(value?: string): string | undefined {
+  if (!value || value.length > 1000) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function markdownWithAction(payload: NotificationPayload): string | undefined {
+  if (!payload.markdown) return undefined;
+  const actionUrl = normalizeActionUrl(payload.actionUrl);
+  return actionUrl ? `${payload.markdown}\n\n[🔗 ${payload.actionLabel || '查看详情'}](${actionUrl})` : payload.markdown;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 // ==================== Channel senders ====================
@@ -57,15 +85,21 @@ function notificationRequestSignal(): AbortSignal {
 async function sendDingtalk(config: DingtalkConfig, payload: NotificationPayload): Promise<SendResult> {
   const channel: NotificationChannelType = 'dingtalk';
   try {
-    const timestamp = Date.now();
-    const stringToSign = `${timestamp}\n${config.secret}`;
-    const hmac = crypto.createHmac('sha256', config.secret);
-    const sign = encodeURIComponent(hmac.update(stringToSign).digest('base64'));
-    const url = `${config.webhook}&timestamp=${timestamp}&sign=${sign}`;
+    let url = config.webhook;
+    if (config.secret?.trim()) {
+      const timestamp = Date.now();
+      const secret = config.secret.trim();
+      const stringToSign = `${timestamp}\n${secret}`;
+      const hmac = crypto.createHmac('sha256', secret);
+      const sign = encodeURIComponent(hmac.update(stringToSign).digest('base64'));
+      const separator = url.includes('?') ? '&' : '?';
+      url = `${url}${separator}timestamp=${timestamp}&sign=${sign}`;
+    }
 
     // DingTalk markdown: single \n doesn't break lines, use \n\n for paragraphs
-    const body = payload.markdown
-      ? { msgtype: 'markdown', markdown: { title: payload.title, text: payload.markdown.replace(/\n/g, '\n\n') } }
+    const markdown = markdownWithAction(payload);
+    const body = markdown
+      ? { msgtype: 'markdown', markdown: { title: payload.title, text: `## ${payload.title}\n${markdown}`.replace(/\n/g, '\n\n') } }
       : { msgtype: 'text', text: { content: `${payload.title}\n${payload.content}` } };
 
     const res = await fetch(url, {
@@ -93,8 +127,9 @@ async function sendWecom(config: WecomConfig, payload: NotificationPayload): Pro
   const channel: NotificationChannelType = 'wecom';
   try {
     // WeCom markdown: single \n doesn't break lines, use \n\n for paragraphs
-    const body = payload.markdown
-      ? { msgtype: 'markdown', markdown: { content: `### ${payload.title}\n\n${payload.markdown.replace(/\n/g, '\n\n')}` } }
+    const markdown = markdownWithAction(payload);
+    const body = markdown
+      ? { msgtype: 'markdown', markdown: { content: `### ${payload.title}\n${markdown}`.replace(/\n/g, '\n\n') } }
       : { msgtype: 'text', text: { content: `${payload.title}\n${payload.content}` } };
 
     const res = await fetch(config.webhook, {
@@ -133,6 +168,30 @@ async function sendFeishu(config: FeishuConfig, payload: NotificationPayload): P
   const channel: NotificationChannelType = 'feishu';
   try {
     const timestamp = Math.floor(Date.now() / 1000);
+    const elements: Array<Record<string, unknown>> = [
+      {
+        tag: 'div',
+        text: {
+          tag: 'lark_md',
+          content: payload.markdown ?? payload.content,
+        },
+      },
+    ];
+    const actionUrl = normalizeActionUrl(payload.actionUrl);
+    if (actionUrl) {
+      elements.push({
+        tag: 'action',
+        actions: [
+          {
+            tag: 'button',
+            type: 'primary',
+            text: { tag: 'plain_text', content: payload.actionLabel || '查看详情' },
+            url: actionUrl,
+          },
+        ],
+      });
+    }
+
     const body: Record<string, unknown> = {
       msg_type: 'interactive',
       card: {
@@ -140,15 +199,7 @@ async function sendFeishu(config: FeishuConfig, payload: NotificationPayload): P
           template: 'blue',
           title: { tag: 'plain_text', content: payload.title },
         },
-        elements: [
-          {
-            tag: 'div',
-            text: {
-              tag: 'lark_md',
-              content: payload.markdown ?? payload.content,
-            },
-          },
-        ],
+        elements,
       },
     };
 
@@ -208,7 +259,7 @@ async function sendServerChan(config: ServerChanConfig, payload: NotificationPay
 
     // ServerChan desp field renders Markdown, where single \n doesn't break lines.
     // Convert \n to \n\n (paragraph breaks) for proper line separation.
-    const rawDesp = payload.markdown ?? payload.content;
+    const rawDesp = markdownWithAction(payload) ?? payload.content;
     const desp = rawDesp.replace(/\n/g, '\n\n');
 
     const body = new URLSearchParams({
@@ -244,20 +295,24 @@ async function sendSmtp(config: SmtpConfig, payload: NotificationPayload): Promi
       host: config.host,
       port: config.port,
       secure: config.secure,
-      auth: { user: config.user, pass: config.pass },
+      auth: config.user || config.pass ? { user: config.user, pass: config.pass } : undefined,
       connectionTimeout: NOTIFICATION_REQUEST_TIMEOUT_MS,
       greetingTimeout: NOTIFICATION_REQUEST_TIMEOUT_MS,
       socketTimeout: NOTIFICATION_REQUEST_TIMEOUT_MS,
     });
+
+    const actionUrl = normalizeActionUrl(payload.actionUrl);
+    const htmlContent = escapeHtml(payload.content).replace(/\n/g, '<br>');
+    const actionHtml = actionUrl
+      ? `<p><a href="${escapeHtml(actionUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(payload.actionLabel || '查看详情')}</a></p>`
+      : '';
 
     await transporter.sendMail({
       from: config.from || config.user,
       to: config.to,
       subject: payload.title,
       text: payload.content,
-      html: payload.markdown
-        ? `<h3>${payload.title}</h3><div>${payload.markdown.replace(/\n/g, '<br>')}</div>`
-        : undefined,
+      html: `<h3>${escapeHtml(payload.title)}</h3><div>${htmlContent}</div>${actionHtml}`,
     });
 
     return { channel, success: true, message: 'Email sent' };
@@ -274,11 +329,15 @@ async function sendWebhook(config: WebhookConfig, payload: NotificationPayload):
   const channel: NotificationChannelType = 'webhook';
   try {
     // Replace template variables in body, escaping for JSON safety
-    let body = config.bodyTemplate || '{"title":"{{title}}","content":"{{content}}"}';
+    let body = config.bodyTemplate || '{"title":"{{title}}","content":"{{content}}","url":"{{url}}"}';
     const safeTitle = payload.title.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
     const safeContent = payload.content.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n');
+    const safeUrl = (normalizeActionUrl(payload.actionUrl) ?? '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+    const safeTimestamp = String(payload.timestamp || new Date().toISOString()).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
     body = body.replace(/\{\{title\}\}/g, safeTitle);
     body = body.replace(/\{\{content\}\}/g, safeContent);
+    body = body.replace(/\{\{url\}\}/g, safeUrl);
+    body = body.replace(/\{\{timestamp\}\}/g, safeTimestamp);
 
     // Parse custom headers
     let headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -293,7 +352,7 @@ async function sendWebhook(config: WebhookConfig, payload: NotificationPayload):
     const res = await fetch(config.url, {
       method: config.method,
       headers,
-      body: config.method === 'POST' ? body : undefined,
+      body: config.method === 'POST' || config.method === 'PUT' ? body : undefined,
       signal: notificationRequestSignal(),
     });
 
@@ -329,9 +388,6 @@ class NotificationService {
   async getEventSettings(): Promise<NotificationEventSettings> {
     const stored = (await SystemConfig.getConfig('notification_events')) as Partial<NotificationEventSettings> | null;
     return {
-      // Keep this off for existing installations until the legacy forum
-      // notifier has been disabled, otherwise the same event is sent twice.
-      forumActivity: stored?.forumActivity === true,
       memberRegistration: stored?.memberRegistration !== false,
       knowledgeFeedback: stored?.knowledgeFeedback !== false,
     };
@@ -344,9 +400,6 @@ class NotificationService {
     const current = await this.getEventSettings();
     const input = updates && typeof updates === 'object' ? updates : {};
     const settings: NotificationEventSettings = {
-      forumActivity: typeof input.forumActivity === 'boolean'
-        ? input.forumActivity
-        : current.forumActivity,
       memberRegistration: typeof input.memberRegistration === 'boolean'
         ? input.memberRegistration
         : current.memberRegistration,
@@ -396,6 +449,16 @@ class NotificationService {
 
     logger.info({ results }, 'Notification dispatch complete');
     return results;
+  }
+
+  async sendChannel(
+    channel: NotificationChannelType,
+    config: NotificationConfig,
+    payload: NotificationPayload
+  ): Promise<SendResult> {
+    const sender = CHANNEL_SENDERS[channel];
+    if (!sender) return { channel, success: false, message: `Unknown channel: ${channel}` };
+    return sender(config, payload);
   }
 
   /**
@@ -465,7 +528,7 @@ class NotificationService {
    * 订阅确认、群发等外发邮件：使用 GlobalSiteSettings.newsletterSmtp（与「消息推送」里的系统通知 SMTP 分离）
    */
   async sendTransactionalEmail(
-    to: string,
+    to: string | string[],
     subject: string,
     text: string,
     html?: string,

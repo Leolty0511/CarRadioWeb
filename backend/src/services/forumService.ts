@@ -204,6 +204,30 @@ export const getForumDeployCredentials = (): { dbPassword: string } => {
   }
 };
 
+/** Read the legacy notifier's own settings from the running Flarum database.
+ * Values are returned only to the server-side migration service and are never
+ * logged or exposed through the generic forum status endpoint.
+ */
+export async function getLegacyForumNotificationSettings(): Promise<Record<string, string> | null> {
+  const phpCode = [
+    '$h=getenv("DB_HOST");$n=getenv("DB_NAME");$u=getenv("DB_USER");$pw=getenv("DB_PASSWORD");$pf=getenv("DB_PREFIX")?:"flarum_";',
+    'if(!$h||!$n||!$u){exit(2);}',
+    '$pdo=new PDO("mysql:host=".$h.";dbname=".$n.";charset=utf8mb4",$u,$pw,[PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION]);',
+    '$q=$pdo->prepare("SELECT `key`,`value` FROM `".$pf."settings` WHERE `key` LIKE ? OR `key` IN (\"mail_driver\",\"mail_host\",\"mail_port\",\"mail_encryption\",\"mail_username\",\"mail_password\",\"mail_from\")");$q->execute(["leo-t-notify-push.%"]);',
+    '$out=[];foreach($q->fetchAll(PDO::FETCH_ASSOC) as $row){$out[(string)$row["key"]]=(string)$row["value"];}echo json_encode($out,JSON_UNESCAPED_SLASHES);',
+  ].join('')
+  try {
+    const result = await spawnDockerExec(['php', '-r', phpCode], {})
+    if (result.code !== 0) return null
+    const parsed = JSON.parse(result.stdout.trim() || '{}')
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return Object.fromEntries(Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string'))
+  } catch (error) {
+    logger.warn({ error: error instanceof Error ? error.message : String(error) }, 'Unable to read legacy forum notification settings')
+    return null
+  }
+}
+
 /** Read the small notification summary needed by the member profile.
  * Flarum remains the source of truth; no forum credentials leave the backend.
  */

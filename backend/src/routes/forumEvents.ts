@@ -1,15 +1,12 @@
 import express, { type NextFunction, type Request, type Response } from 'express'
-import { notificationService } from '../services/notificationService'
 import {
-  formatForumEventNotification,
   parseForumEvent,
   reserveForumEvent,
   verifyForumEventSignature,
 } from '../services/forumEventService'
-import { createLogger } from '../utils/logger'
+import { forumNotificationService } from '../services/forumNotificationService'
 
 const router = express.Router()
-const logger = createLogger('forum-events')
 const RATE_WINDOW_MS = 60_000
 const RATE_LIMIT = 180
 const MAX_RATE_BUCKETS = 1024
@@ -57,11 +54,7 @@ router.post('/', async (req: Request, res: Response) => {
     }
 
     res.status(202).json({ success: true })
-    setImmediate(() => {
-      void notificationService.notifyEvent('forumActivity', formatForumEventNotification(event)).catch((error) => {
-        logger.error({ error, eventId: event.eventId }, 'Forum event notification failed')
-      })
-    })
+    forumNotificationService.enqueue(event)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'invalid_payload'
     res.status(400).json({ success: false, error: message })

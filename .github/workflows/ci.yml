@@ -194,7 +194,13 @@ jobs:
 
       - name: Validate release installer shell syntax
         working-directory: .
-        run: bash -n scripts/install-latest-release.sh
+        run: |
+          bash -n scripts/install-latest-release.sh
+          bash -n scripts/install-forum-bridge.sh
+
+      - name: Validate forum extension PHP syntax
+        working-directory: .
+        run: find forum-extensions -type f -name '*.php' -print0 | xargs -0 -n1 php -l
 
       - name: Validate Docker Compose configuration
         working-directory: .
@@ -214,7 +220,7 @@ jobs:
         run: npm run build
 
       - name: Test backend update and migration scripts
-        run: node --test test/updateBackupDiscovery.test.cjs test/migrationModules.test.cjs test/migrationSafety.test.cjs
+        run: node --test test/updateBackupDiscovery.test.cjs test/migrationModules.test.cjs test/migrationSafety.test.cjs test/forumEventService.test.cjs
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

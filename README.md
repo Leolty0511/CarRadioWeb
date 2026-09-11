@@ -220,9 +220,9 @@ Docker Compose 默认包含 Web、MongoDB、Redis、Mailpit 和 Nginx。生产�
 
 Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose 和桥接扩展位于 [`docker-compose.flarum.yml`](docker-compose.flarum.yml) 与 [`forum-extensions/`](forum-extensions/)，部署脚本位于 [`scripts/`](scripts/)。
 
-论坛通知已经内置到现有桥接扩展。Flarum 发生新用户注册、新主题或新回复时，以 `FORUM_SSO_BRIDGE_SECRET` 对短时事件签名后提交到主站 `/api/forum-events`，主站再投递到“消息推送设置”中已启用的渠道，不把渠道密钥交给论坛容器，也不会同步论坛用户邮箱。`FORUM_EVENT_URL` 由论坛部署/桥接脚本写入 `.env.flarum`；主站使用 `FORUM_BASE_URL`（未设置时回退到 `FORUM_OAUTH_REDIRECT_URI` 的来源）限制通知链接只能指向当前论坛。后台可直接点击“测试推送”验证所有已启用渠道。
+论坛通知已经内置到现有桥接扩展。Flarum 发生新用户注册、新主题或新回复时，以 `FORUM_SSO_BRIDGE_SECRET` 对短时事件签名后提交到主站 `/api/forum-events`，再由“功能设置 → 论坛 → 论坛推送”中的独立渠道发送；论坛渠道与主站通用“消息推送”配置互不共用。支持企业微信、钉钉、Server酱、SMTP 邮件和自定义 Webhook，以及中英文消息、IANA 当地时区和管理员/版主发帖过滤。`FORUM_EVENT_URL` 由论坛部署/桥接脚本写入 `.env.flarum`；主站限制通知链接只能指向当前论坛。
 
-为防止升级后双重通知，“论坛消息推送”对现有安装默认关闭，并且升级脚本不会自动修改原 `leo-t/flarum-notify-push` 的启用状态或设置。生产操作顺序为：先点击主站测试按钮，确认已启用渠道正常；再停用旧 Notify Push；最后打开“论坛消息推送”并保存。此功能只发送事件发生时的一次小请求，没有轮询；Redis 去重键有效 10 分钟且内存降级最多 1000 条。
+现有生产环境首次打开论坛推送页时，会从 Flarum 的实际数据库环境读取 `leo-t-notify-push.*` 和论坛 SMTP 设置并一次性导入主站 MongoDB。论坛相关更新成功后旧 `leo-t/flarum-notify-push` 扩展会被停用以避免重复发送，但插件包和原设置不会删除，回滚时仍可恢复。机器人消息使用带标题、信息分区、双时区和详情入口的卡片式 Markdown；新用户通知沿用旧插件行为，将注册邮箱发送到这些管理员渠道。此功能没有轮询，配置缓存 60 秒；事件队列最多暂存 100 个、同时处理 2 个，Redis 去重键有效 10 分钟且内存降级最多 1000 条。
 
 ### 常用命令
 

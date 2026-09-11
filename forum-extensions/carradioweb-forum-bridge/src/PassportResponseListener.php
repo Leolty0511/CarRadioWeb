@@ -61,8 +61,8 @@ final class PassportResponseListener
             }
             if ($mainSiteRole !== null && method_exists($user, 'groups')) {
                 $group = $mainSiteRole === 'administrator'
-                    ? Group::whereIn('name_singular', ['Administrator', 'Admin'])->first() ?: Group::find(1)
-                    : Group::whereIn('name_singular', ['Moderator', 'Mod'])->first() ?: Group::find(4);
+                    ? (Group::whereIn('name_singular', ['Administrator', 'Admin'])->first() ?: Group::find(1))
+                    : (Group::whereIn('name_singular', ['Moderator', 'Mod'])->first() ?: Group::find(4));
                 if ($group) {
                     // Main-site role is authoritative for managed groups. Native
                     // Flarum users (without a Passport identity) are untouched.

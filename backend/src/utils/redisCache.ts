@@ -232,7 +232,7 @@ function getMemoryCache<T>(key: string): T | null {
 }
 
 // 定期清理过期的内存缓存
-setInterval(() => {
+const memoryCacheCleanupTimer = setInterval(() => {
   const now = Date.now();
   for (const [key, item] of memoryCache.entries()) {
     if (now > item.expiry) {
@@ -240,6 +240,7 @@ setInterval(() => {
     }
   }
 }, 60000); // 每分钟清理一次
+memoryCacheCleanupTimer.unref();
 
 /**
  * 获取缓存统计
@@ -286,4 +287,3 @@ export default {
   getRedisClient,
   CACHE_CONFIG
 };
-

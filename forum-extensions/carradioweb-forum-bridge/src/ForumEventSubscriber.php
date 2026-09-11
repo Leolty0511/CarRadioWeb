@@ -3,6 +3,7 @@
 namespace CarRadioWeb\ForumBridge;
 
 use Flarum\Discussion\Event\Started as DiscussionStarted;
+use Flarum\Group\Group;
 use Flarum\Post\Event\Posted as PostCreated;
 use Flarum\User\Event\Registered as UserRegistered;
 use Illuminate\Contracts\Events\Dispatcher;
@@ -27,6 +28,7 @@ final class ForumEventSubscriber
             'eventId' => 'forum:user:' . $user->id . ':' . $this->timestamp($user->joined_at),
             'type' => 'user_registered',
             'username' => $this->username($user),
+            'email' => $this->limit((string) ($user->email ?? ''), 320),
             'occurredAt' => $this->isoTime($user->joined_at),
             'url' => $this->forumUrl(),
         ]);
@@ -43,6 +45,7 @@ final class ForumEventSubscriber
             'content' => $this->limit($this->plainText((string) ($discussion->firstPost->content ?? '')), 2000),
             'occurredAt' => $this->isoTime($discussion->created_at),
             'url' => $this->modelUrl($discussion, 'd/' . $discussion->id),
+            'isPrivileged' => $this->isPrivileged($event->actor),
         ]);
     }
 
@@ -61,6 +64,7 @@ final class ForumEventSubscriber
             'content' => $this->limit($this->plainText((string) ($post->content ?? '')), 2000),
             'occurredAt' => $this->isoTime($post->created_at),
             'url' => $this->modelUrl($post, 'd/' . $discussion->id . '/' . $post->number),
+            'isPrivileged' => $this->isPrivileged($event->actor),
         ]);
     }
 
@@ -75,6 +79,16 @@ final class ForumEventSubscriber
     private function plainText(string $value): string
     {
         return trim(html_entity_decode(strip_tags($value), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
+    private function isPrivileged($user): bool
+    {
+        if (!is_object($user) || !isset($user->groups)) {
+            return false;
+        }
+        $groupIds = $user->groups->pluck('id')->map(static fn ($id) => (int) $id)->all();
+        return in_array(Group::ADMINISTRATOR_ID, $groupIds, true)
+            || in_array(Group::MODERATOR_ID, $groupIds, true);
     }
 
     private function limit(string $value, int $length): string

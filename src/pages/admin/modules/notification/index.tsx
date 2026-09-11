@@ -22,7 +22,6 @@ import {
   Webhook,
   Bell,
   AlertCircle,
-  MessagesSquare,
   UserPlus,
   MessageCircle,
 } from 'lucide-react'
@@ -55,7 +54,6 @@ interface TestResult {
 }
 
 interface NotificationEventSettings {
-  forumActivity: boolean
   memberRegistration: boolean
   knowledgeFeedback: boolean
 }
@@ -79,11 +77,10 @@ const DEFAULT_CONFIGS: Record<ChannelType, Record<string, unknown>> = {
   feishu: { webhook: '', secret: '', enabled: false },
   serverchan: { uid: '', sendKey: '', enabled: false },
   smtp: { host: '', port: 465, secure: true, user: '', pass: '', to: '', enabled: false },
-  webhook: { url: '', method: 'POST', headers: '', bodyTemplate: '{"title":"{{title}}","content":"{{content}}"}', enabled: false },
+  webhook: { url: '', method: 'POST', headers: '', bodyTemplate: '{"title":"{{title}}","content":"{{content}}","url":"{{url}}"}', enabled: false },
 }
 
 const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
-  forumActivity: false,
   memberRegistration: true,
   knowledgeFeedback: true,
 }
@@ -373,12 +370,12 @@ function WebhookFields({ config, setConfig }: { config: Record<string, unknown>;
         <textarea
           value={(config.bodyTemplate as string) || ''}
           onChange={(e) => setConfig({ ...config, bodyTemplate: e.target.value })}
-          placeholder='{"title":"{{title}}","content":"{{content}}"}'
+          placeholder='{"title":"{{title}}","content":"{{content}}","url":"{{url}}"}'
           rows={4}
           className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 focus:outline-none font-mono"
         />
         <p className="text-xs text-slate-500 dark:text-gray-500 mt-1">
-          支持变量：{'{{title}}'} 和 {'{{content}}'}
+          支持变量：{'{{title}}'}、{'{{content}}'} 和 {'{{url}}'}
         </p>
       </div>
     </>
@@ -455,7 +452,6 @@ export function NotificationManagement() {
   const [savingChannel, setSavingChannel] = useState<ChannelType | null>(null)
   const [testingChannel, setTestingChannel] = useState<ChannelType | null>(null)
   const [savingEvents, setSavingEvents] = useState(false)
-  const [testingForumEvent, setTestingForumEvent] = useState(false)
   const [testResults, setTestResults] = useState<Record<string, TestResult>>({})
 
   // Load all channel status + configs for enabled/selected channels
@@ -519,21 +515,6 @@ export function NotificationManagement() {
       showToast({ type: 'error', title: '保存失败', description: err instanceof Error ? err.message : '' })
     } finally {
       setSavingEvents(false)
-    }
-  }
-
-  const testForumEvent = async () => {
-    try {
-      setTestingForumEvent(true)
-      const res = await apiClient.post('/system-config/notification/events/forum/test', {})
-      if (!res.success) {
-        throw new Error(res.error || res.message || '测试失败')
-      }
-      showToast({ type: 'success', title: '论坛测试通知已发送', description: res.message || '' })
-    } catch (err) {
-      showToast({ type: 'error', title: '论坛消息测试失败', description: err instanceof Error ? err.message : '' })
-    } finally {
-      setTestingForumEvent(false)
     }
   }
 
@@ -619,7 +600,7 @@ export function NotificationManagement() {
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">消息推送设置</h2>
           <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
-            配置通知渠道，会员、知识库和论坛事件会推送到已启用的渠道
+            配置主站通知渠道，会员和知识库事件会推送到已启用的渠道
           </p>
         </div>
       </div>
@@ -635,33 +616,6 @@ export function NotificationManagement() {
           </Button>
         </CardHeader>
         <CardContent className="divide-y divide-slate-200 dark:divide-gray-700">
-          <div className="flex flex-col items-stretch gap-4 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-3 sm:flex-1">
-              <MessagesSquare className="mt-0.5 h-5 w-5 flex-shrink-0 text-violet-500" />
-              <div>
-                <p className="text-sm font-medium text-slate-800 dark:text-white">论坛消息推送</p>
-                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">论坛有新用户、发布新主题或新增回复时推送；启用前请停用旧 Notify Push，避免重复通知</p>
-              </div>
-            </div>
-            <div className="flex flex-shrink-0 items-center justify-between gap-3 sm:justify-end">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={testForumEvent}
-                disabled={testingForumEvent || savingEvents}
-              >
-                <Send className="mr-1.5 h-4 w-4" />
-                {testingForumEvent ? '测试中...' : '测试推送'}
-              </Button>
-              <Toggle
-                checked={eventSettings.forumActivity}
-                onChange={(forumActivity) => setEventSettings((prev) => ({ ...prev, forumActivity }))}
-                label="论坛消息推送"
-                disabled={savingEvents}
-              />
-            </div>
-          </div>
           <div className="flex items-center justify-between gap-4 py-4 first:pt-0">
             <div className="flex min-w-0 items-start gap-3">
               <UserPlus className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
