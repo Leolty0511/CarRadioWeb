@@ -3,6 +3,7 @@
 namespace CarRadioWeb\ForumBridge;
 
 use Flarum\Discussion\Event\Started as DiscussionStarted;
+use Flarum\Foundation\Config;
 use Flarum\Group\Group;
 use Flarum\Post\Event\Posted as PostCreated;
 use Flarum\User\Event\Registered as UserRegistered;
@@ -10,8 +11,10 @@ use Illuminate\Contracts\Events\Dispatcher;
 
 final class ForumEventSubscriber
 {
-    public function __construct(private ForumEventForwarder $forwarder)
-    {
+    public function __construct(
+        private ForumEventForwarder $forwarder,
+        private Config $config
+    ) {
     }
 
     public function subscribe(Dispatcher $events): void
@@ -108,7 +111,7 @@ final class ForumEventSubscriber
 
     private function forumUrl(): string
     {
-        return rtrim((string) getenv('FLARUM_BASE_URL'), '/');
+        return rtrim((string) $this->config->url(), '/');
     }
 
     private function modelUrl(object $model, string $fallback): string

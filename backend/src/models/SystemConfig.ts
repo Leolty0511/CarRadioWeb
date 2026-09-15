@@ -11,6 +11,10 @@ export type NotificationChannelType = 'dingtalk' | 'wecom' | 'feishu' | 'serverc
 export interface NotificationEventSettings {
   memberRegistration: boolean;
   knowledgeFeedback: boolean;
+  forumUserRegistered: boolean;
+  forumDiscussionStarted: boolean;
+  forumPostCreated: boolean;
+  forumSkipAdminMod: boolean;
 }
 
 // Dingtalk robot config

@@ -57,6 +57,10 @@ interface TestResult {
 interface NotificationEventSettings {
   memberRegistration: boolean
   knowledgeFeedback: boolean
+  forumUserRegistered: boolean
+  forumDiscussionStarted: boolean
+  forumPostCreated: boolean
+  forumSkipAdminMod: boolean
 }
 
 // ==================== Constants ====================
@@ -84,6 +88,10 @@ const DEFAULT_CONFIGS: Record<ChannelType, Record<string, unknown>> = {
 const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
   memberRegistration: true,
   knowledgeFeedback: true,
+  forumUserRegistered: true,
+  forumDiscussionStarted: true,
+  forumPostCreated: true,
+  forumSkipAdminMod: false,
 }
 
 // ==================== Toggle component ====================
@@ -606,7 +614,7 @@ export function NotificationManagement() {
         <div>
           <h2 className="text-2xl font-bold text-slate-800 dark:text-white">消息推送设置</h2>
           <p className="text-sm text-slate-500 dark:text-gray-400 mt-1">
-            配置主站通知渠道，会员和知识库事件会推送到已启用的渠道
+            配置主站通知渠道。会员、知识库和论坛事件都会推送到已启用的渠道。
           </p>
         </div>
       </div>
@@ -637,7 +645,7 @@ export function NotificationManagement() {
               disabled={savingEvents}
             />
           </div>
-          <div className="flex items-center justify-between gap-4 py-4 last:pb-0">
+          <div className="flex items-center justify-between gap-4 py-4">
             <div className="flex min-w-0 items-start gap-3">
               <MessageCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
               <div>
@@ -649,6 +657,66 @@ export function NotificationManagement() {
               checked={eventSettings.knowledgeFeedback}
               onChange={(knowledgeFeedback) => setEventSettings((prev) => ({ ...prev, knowledgeFeedback }))}
               label="知识库留言通知"
+              disabled={savingEvents}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <UserPlus className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-white">论坛新用户注册</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">论坛有新用户注册时，使用本页渠道推送</p>
+              </div>
+            </div>
+            <Toggle
+              checked={eventSettings.forumUserRegistered}
+              onChange={(forumUserRegistered) => setEventSettings((prev) => ({ ...prev, forumUserRegistered }))}
+              label="论坛新用户注册"
+              disabled={savingEvents}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <MessageCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-white">论坛新主题</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">论坛发布新主题时，使用本页渠道推送</p>
+              </div>
+            </div>
+            <Toggle
+              checked={eventSettings.forumDiscussionStarted}
+              onChange={(forumDiscussionStarted) => setEventSettings((prev) => ({ ...prev, forumDiscussionStarted }))}
+              label="论坛新主题"
+              disabled={savingEvents}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4">
+            <div className="flex min-w-0 items-start gap-3">
+              <MessageCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-white">论坛新回复</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">论坛出现新回复时，使用本页渠道推送</p>
+              </div>
+            </div>
+            <Toggle
+              checked={eventSettings.forumPostCreated}
+              onChange={(forumPostCreated) => setEventSettings((prev) => ({ ...prev, forumPostCreated }))}
+              label="论坛新回复"
+              disabled={savingEvents}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-4 py-4 last:pb-0">
+            <div className="flex min-w-0 items-start gap-3">
+              <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-white">忽略管理员和版主发帖</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">仅影响论坛新主题和回复，论坛用户注册仍会通知</p>
+              </div>
+            </div>
+            <Toggle
+              checked={eventSettings.forumSkipAdminMod}
+              onChange={(forumSkipAdminMod) => setEventSettings((prev) => ({ ...prev, forumSkipAdminMod }))}
+              label="忽略管理员和版主发帖"
               disabled={savingEvents}
             />
           </div>

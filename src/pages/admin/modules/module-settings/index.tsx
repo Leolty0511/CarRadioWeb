@@ -31,7 +31,6 @@ import {
   ChevronUp,
   Copy,
   Package,
-  Bell,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -61,7 +60,6 @@ import {
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 import { apiClient } from '@/services/apiClient'
 import type { DataLanguage } from '../../hooks/useDataLanguage'
-import { ForumNotificationPanel } from './ForumNotificationPanel'
 
 // ==================== Types ====================
 
@@ -405,7 +403,7 @@ function ForumPanel({ dataLanguage, showToast, refreshSiteSettings }: PanelProps
   type ExtensionItem = { id: string; name: string; nameZh: string; description: string; descriptionZh: string; developer?: string; composerPackage: string; installed: boolean };
   const [extensionsData, setExtensionsData] = useState<{ list: ExtensionItem[]; available: boolean } | null>(null);
   const [extensionActionId, setExtensionActionId] = useState<string | null>(null);
-  const [forumSubTab, setForumSubTab] = useState<'deploy' | 'plugins' | 'notifications'>('deploy');
+  const [forumSubTab, setForumSubTab] = useState<'deploy' | 'plugins'>('deploy');
   const [forumExtensionFilter, setForumExtensionFilter] = useState<'all' | 'installed' | 'not-installed'>('all');
   const prevDeployStatusRef = useRef<string>('not_deployed');
 
@@ -771,18 +769,6 @@ function ForumPanel({ dataLanguage, showToast, refreshSiteSettings }: PanelProps
           <Package className="w-4 h-4" />
           <span>论坛插件管理</span>
         </button>
-        <button
-          type="button"
-          onClick={() => setForumSubTab('notifications')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${
-            forumSubTab === 'notifications'
-              ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-              : 'border-transparent text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-gray-300'
-          }`}
-        >
-          <Bell className="w-4 h-4" />
-          <span>论坛推送</span>
-        </button>
       </div>
 
       {forumSubTab === 'deploy' && (
@@ -937,9 +923,6 @@ function ForumPanel({ dataLanguage, showToast, refreshSiteSettings }: PanelProps
           </CardContent>
         </Card>
       )}
-
-      {forumSubTab === 'notifications' && <ForumNotificationPanel showToast={showToast} />}
-
     </div>
   );
 }

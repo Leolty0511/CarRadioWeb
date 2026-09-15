@@ -46,6 +46,10 @@ export type NotificationEventType = keyof NotificationEventSettings;
 const DEFAULT_EVENT_SETTINGS: NotificationEventSettings = {
   memberRegistration: true,
   knowledgeFeedback: true,
+  forumUserRegistered: true,
+  forumDiscussionStarted: true,
+  forumPostCreated: true,
+  forumSkipAdminMod: false,
 };
 const NOTIFICATION_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -458,6 +462,10 @@ class NotificationService {
     return {
       memberRegistration: stored?.memberRegistration !== false,
       knowledgeFeedback: stored?.knowledgeFeedback !== false,
+      forumUserRegistered: stored?.forumUserRegistered !== false,
+      forumDiscussionStarted: stored?.forumDiscussionStarted !== false,
+      forumPostCreated: stored?.forumPostCreated !== false,
+      forumSkipAdminMod: stored?.forumSkipAdminMod === true,
     };
   }
 
@@ -474,6 +482,18 @@ class NotificationService {
       knowledgeFeedback: typeof input.knowledgeFeedback === 'boolean'
         ? input.knowledgeFeedback
         : current.knowledgeFeedback,
+      forumUserRegistered: typeof input.forumUserRegistered === 'boolean'
+        ? input.forumUserRegistered
+        : current.forumUserRegistered,
+      forumDiscussionStarted: typeof input.forumDiscussionStarted === 'boolean'
+        ? input.forumDiscussionStarted
+        : current.forumDiscussionStarted,
+      forumPostCreated: typeof input.forumPostCreated === 'boolean'
+        ? input.forumPostCreated
+        : current.forumPostCreated,
+      forumSkipAdminMod: typeof input.forumSkipAdminMod === 'boolean'
+        ? input.forumSkipAdminMod
+        : current.forumSkipAdminMod,
     };
     const result = await SystemConfig.updateConfig('notification_events', settings, updatedBy);
     return result.config as NotificationEventSettings;

@@ -1,8 +1,6 @@
 import express from 'express';
 import { authenticateUser, requireSuperAdmin } from '../middleware/auth';
 import { deployForum, getForumStatus, getForumDeployCredentials, cancelDeploy, startForumContainers, uninstallForum, getForumExtensions, installForumExtension, uninstallForumExtension, fixFlarumStoragePermissions, flarumCacheClearAndPublishAssets, getForumLogs, repairForumBoot, fixForumOneShot } from '../services/forumService';
-import { forumNotificationService } from '../services/forumNotificationService';
-import type { ForumNotificationChannelType } from '../models/SystemConfig';
 
 const router = express.Router();
 
@@ -54,34 +52,6 @@ router.get('/status', authenticateUser, requireSuperAdmin, async (_req, res) => 
     res.json({ success: true, data: { ...status, dbPassword: credentials.dbPassword } });
   } catch (error) {
     res.status(500).json({ success: false, error: 'Failed to get forum status.' });
-  }
-});
-
-router.get('/notifications', authenticateUser, requireSuperAdmin, async (_req, res) => {
-  try {
-    res.json({ success: true, data: await forumNotificationService.getSettings() });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error instanceof Error ? error.message : '读取论坛推送设置失败' });
-  }
-});
-
-router.put('/notifications', authenticateUser, requireSuperAdmin, async (req, res) => {
-  try {
-    const operator = req.user?.nickname || req.user?.email || req.user?.loginUsername || 'admin';
-    const settings = await forumNotificationService.updateSettings(req.body, operator);
-    res.json({ success: true, data: settings, message: '论坛推送设置已保存' });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error instanceof Error ? error.message : '论坛推送设置无效' });
-  }
-});
-
-router.post('/notifications/test', authenticateUser, requireSuperAdmin, async (req, res) => {
-  try {
-    const channel = String(req.body?.channel || '') as ForumNotificationChannelType;
-    const result = await forumNotificationService.test(req.body?.settings, channel);
-    res.status(result.success ? 200 : 502).json({ success: result.success, data: result, message: result.message });
-  } catch (error) {
-    res.status(400).json({ success: false, error: error instanceof Error ? error.message : '论坛推送测试失败' });
   }
 });
 

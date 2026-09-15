@@ -3,12 +3,10 @@ const test = require('node:test')
 
 const {
   formatForumEventNotification,
+  forumNotificationEventType,
   parseForumEvent,
-} = require('../dist/services/forumEventService.js')
-const {
-  settingsFromLegacy,
   shouldSendForumEvent,
-} = require('../dist/services/forumNotificationService.js')
+} = require('../dist/services/forumEventService.js')
 const {
   buildDingtalkMessage,
   notificationService,
@@ -64,56 +62,26 @@ test('forum event links cannot leave the configured forum origin', () => {
   }), 'https://forum.example.com'), /invalid_event_url/)
 })
 
-test('legacy Notify Push settings migrate into independent forum channels', () => {
-  const settings = settingsFromLegacy({
-    'leo-t-notify-push.push_locale': 'en',
-    'leo-t-notify-push.push_timezone': 'America/New_York',
-    'leo-t-notify-push.skip_admin_mod': '1',
-    'leo-t-notify-push.wecom_enabled': '1',
-    'leo-t-notify-push.wecom_webhook_url': 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test',
-    'leo-t-notify-push.dingtalk_enabled': '1',
-    'leo-t-notify-push.dingtalk_webhook_url': 'https://oapi.dingtalk.com/robot/send?access_token=test',
-    'leo-t-notify-push.dingtalk_secret': 'SEC-test',
-    'leo-t-notify-push.serverchan_enabled': '1',
-    'leo-t-notify-push.serverchan_send_key': 'SCT-test',
-    'leo-t-notify-push.email_enabled': '1',
-    'leo-t-notify-push.email_recipients': 'admin@example.com',
-    'leo-t-notify-push.webhook_enabled': '1',
-    'leo-t-notify-push.webhook_url': 'https://hooks.example.com/forum',
-    'leo-t-notify-push.webhook_method': 'PUT',
-    'leo-t-notify-push.webhook_headers': 'Authorization: Bearer test',
-    mail_host: 'smtp.example.com',
-    mail_port: '465',
-    mail_encryption: 'ssl',
-    mail_username: 'forum@example.com',
-    mail_password: 'secret',
-    mail_from: 'forum@example.com',
-  })
-
-  assert.equal(settings.enabled, true)
-  assert.equal(settings.locale, 'en')
-  assert.equal(settings.skipAdminMod, true)
-  assert.equal(settings.channels.wecom.enabled, true)
-  assert.equal(settings.channels.dingtalk.secret, 'SEC-test')
-  assert.equal(settings.channels.dingtalk.messageStyle, 'markdown')
-  assert.equal(settings.channels.dingtalk.imageUrl, '')
-  assert.equal(settings.channels.serverchan.sendKey, 'SCT-test')
-  assert.equal(settings.channels.email.host, 'smtp.example.com')
-  assert.equal(settings.channels.email.secure, true)
-  assert.equal(settings.channels.webhook.method, 'PUT')
-  assert.equal(settings.channels.webhook.headers, 'Authorization: Bearer test')
+test('forum events map onto main-site notification event switches', () => {
+  assert.equal(forumNotificationEventType('user_registered'), 'forumUserRegistered')
+  assert.equal(forumNotificationEventType('discussion_started'), 'forumDiscussionStarted')
+  assert.equal(forumNotificationEventType('post_created'), 'forumPostCreated')
 })
 
-test('admin and moderator filter skips posts but not registrations', () => {
-  const settings = settingsFromLegacy({
-    'leo-t-notify-push.skip_admin_mod': '1',
-    'leo-t-notify-push.wecom_enabled': '1',
-    'leo-t-notify-push.wecom_webhook_url': 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=test',
-  })
-  const common = { eventId: 'forum:test:123456', username: 'admin', occurredAt: '2026-09-11T01:00:00.000Z', isPrivileged: true }
-  assert.equal(shouldSendForumEvent(settings, { ...common, type: 'discussion_started' }), false)
-  assert.equal(shouldSendForumEvent(settings, { ...common, type: 'post_created' }), false)
+test('main-site notification settings control forum posts and the admin filter', () => {
+  const settings = {
+    memberRegistration: true,
+    knowledgeFeedback: true,
+    forumUserRegistered: true,
+    forumDiscussionStarted: true,
+    forumPostCreated: false,
+    forumSkipAdminMod: true,
+  }
+  const common = { eventId: 'forum:test:123456', username: 'admin', occurredAt: '2026-09-11T01:00:00.000Z' }
   assert.equal(shouldSendForumEvent(settings, { ...common, type: 'user_registered' }), true)
+  assert.equal(shouldSendForumEvent(settings, { ...common, type: 'discussion_started', isPrivileged: true }), false)
+  assert.equal(shouldSendForumEvent(settings, { ...common, type: 'discussion_started', isPrivileged: false }), true)
+  assert.equal(shouldSendForumEvent(settings, { ...common, type: 'post_created', isPrivileged: false }), false)
 })
 
 test('main notification channels receive a clickable forum action', async () => {

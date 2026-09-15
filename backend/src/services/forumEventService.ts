@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { z } from 'zod'
+import type { NotificationEventSettings } from '../models/SystemConfig'
 import { getRedisClient } from '../utils/redisCache'
 
 export const FORUM_EVENT_MAX_CLOCK_SKEW_SECONDS = 300
@@ -19,6 +20,23 @@ const forumEventSchema = z.object({
 }).strict()
 
 export type ForumEventPayload = z.infer<typeof forumEventSchema>
+
+export const FORUM_EVENT_NOTIFICATION_TYPES = {
+  user_registered: 'forumUserRegistered',
+  discussion_started: 'forumDiscussionStarted',
+  post_created: 'forumPostCreated',
+} as const
+
+export type ForumNotificationEventType = typeof FORUM_EVENT_NOTIFICATION_TYPES[ForumEventPayload['type']]
+
+export function forumNotificationEventType(type: ForumEventPayload['type']): ForumNotificationEventType {
+  return FORUM_EVENT_NOTIFICATION_TYPES[type]
+}
+
+export function shouldSendForumEvent(settings: NotificationEventSettings, event: ForumEventPayload): boolean {
+  if (settings.forumSkipAdminMod && event.type !== 'user_registered' && event.isPrivileged) return false
+  return settings[FORUM_EVENT_NOTIFICATION_TYPES[event.type]] !== false
+}
 
 const localDedupe = new Map<string, number>()
 
