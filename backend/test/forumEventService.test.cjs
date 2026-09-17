@@ -8,6 +8,10 @@ const {
   shouldSendForumEvent,
 } = require('../dist/services/forumEventService.js')
 const {
+  contactFormEmailStatusText,
+  resolveContactFormEmailRecipient,
+} = require('../dist/services/contactFormNotificationService.js')
+const {
   buildDingtalkMessage,
   notificationService,
 } = require('../dist/services/notificationService.js')
@@ -82,6 +86,21 @@ test('main-site notification settings control forum posts and the admin filter',
   assert.equal(shouldSendForumEvent(settings, { ...common, type: 'discussion_started', isPrivileged: true }), false)
   assert.equal(shouldSendForumEvent(settings, { ...common, type: 'discussion_started', isPrivileged: false }), true)
   assert.equal(shouldSendForumEvent(settings, { ...common, type: 'post_created', isPrivileged: false }), false)
+})
+
+test('contact form email status uses the configured SMTP account without hardcoding', () => {
+  assert.equal(resolveContactFormEmailRecipient({
+    newsletterSmtp: { user: 'inbox@example.com' },
+    contactFormEmailTo: 'fallback@example.com',
+  }), 'inbox@example.com')
+  assert.equal(resolveContactFormEmailRecipient({
+    newsletterSmtp: { user: '' },
+    contactFormEmailTo: 'fallback@example.com',
+  }), 'fallback@example.com')
+  assert.equal(contactFormEmailStatusText({ status: 'sent', recipient: 'inbox@example.com' }), '邮件通知状态：已发送至 inbox@example.com')
+  assert.equal(contactFormEmailStatusText({ status: 'disabled' }), '邮件通知状态：未开启，表单仅保存在网站后台')
+  assert.equal(contactFormEmailStatusText({ status: 'misconfigured' }), '邮件通知状态：配置不完整，未发送')
+  assert.equal(contactFormEmailStatusText({ status: 'failed' }), '邮件通知状态：发送失败，请在网站后台查看表单')
 })
 
 test('main notification channels receive a clickable forum action', async () => {

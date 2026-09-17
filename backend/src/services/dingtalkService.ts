@@ -95,6 +95,7 @@ class DingtalkService {
     name?: string;
     title?: string;
     content: any;
+    emailStatus?: string;
     email?: string;
     phone?: string;
     orderNumber?: string;
@@ -184,7 +185,7 @@ class DingtalkService {
       text: `${contentText}
 
 ---
-⏰ 提交时间: ${data.timestamp || new Date().toLocaleString('zh-CN')}`,
+⏰ 提交时间: ${data.timestamp || new Date().toLocaleString('zh-CN')}${data.emailStatus ? `\n\n---\n${data.emailStatus}` : ''}`,
     };
   }
 

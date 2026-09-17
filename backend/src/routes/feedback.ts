@@ -16,6 +16,11 @@ import dingtalkService from '../services/dingtalkService'
 import { getClientIP, getGeoWithTimezone, getDualTime, formatDualTime } from '../services/geoLocationService'
 import { createLogger } from '../utils/logger'
 import GlobalSiteSettings from '../models/GlobalSiteSettings'
+import {
+  contactFormEmailStatusText,
+  resolveContactFormEmailRecipient,
+  type ContactFormEmailStatus,
+} from '../services/contactFormNotificationService'
 
 const logger = createLogger('feedback-route')
 import { notificationService } from '../services/notificationService'
@@ -142,30 +147,30 @@ router.post('/', feedbackRateLimit, async (req, res) => {
       ? `⏰ 北京时间: ${dt.beijing}\n🌍 用户当地: ${dt.local} (${dt.localTz})`
       : `⏰ 北京时间: ${dt.beijing}`;
 
-    // Send notification to all enabled channels (async, non-blocking)
-    notificationService.notifyAll({
-      title: '新的表单提交',
-      content: `姓名: ${name}\n邮箱: ${email}\n主题: ${subject}\n内容: ${message}\n所在地: ${geo.location}\n时间: ${timeDisplay}`,
-      markdown: `**姓名**: ${name}\n**邮箱**: ${email || '未提供'}\n${orderNumber ? `**参考信息**: ${orderNumber}\n` : ''}**主题**: ${subject}\n**所在地**: ${geo.location}\n**内容**:\n${message}\n---\n${mdTime}`,
-    }).catch(() => {
-      // Silent fail - notification errors should not affect main flow
-    })
+    const sendInternalNotification = (emailStatus: ContactFormEmailStatus) => {
+      const statusText = contactFormEmailStatusText(emailStatus)
+      notificationService.notifyAll({
+        title: '新的表单提交',
+        content: `姓名: ${name}\n邮箱: ${normalizedEmail}\n参考信息: ${normalizedOrderNumber}\n主题: ${subject}\n所在地: ${geo.location}\n内容:\n${message}\n\n${timeDisplay}\n${statusText}`,
+        markdown: `**姓名**: ${name}\n**邮箱**: ${normalizedEmail}\n**参考信息**: ${normalizedOrderNumber}\n**主题**: ${subject}\n**所在地**: ${geo.location}\n**内容**:\n${message}\n---\n${mdTime}\n\n---\n${statusText}`,
+      }).catch(() => undefined)
 
-    // Legacy DingTalk fallback (reads from env vars)
-    dingtalkService.notifyFormSubmission({
-      type: 'feedback',
-      name,
-      title: subject,
-      content: message,
-      email,
-      orderNumber,
-      location: geo.location,
-      timestamp: timeDisplay
-    }).catch(() => {
-      // 静默处理钉钉发送错误
-    })
+      // Legacy DingTalk fallback (reads from environment variables).
+      dingtalkService.notifyFormSubmission({
+        type: 'feedback',
+        name,
+        title: subject,
+        content: message,
+        emailStatus: statusText,
+        email: normalizedEmail,
+        orderNumber: normalizedOrderNumber,
+        location: geo.location,
+        timestamp: timeDisplay
+      }).catch(() => undefined)
+    }
 
-    // 联系表单邮件通知：使用后台配置的 Newsletter SMTP，发送失败不影响表单提交。
+    // Send the email first so the internal notification reports its real result.
+    // This task remains detached from the HTTP response, so SMTP does not delay the visitor.
     void (async () => {
       try {
         const settings = await GlobalSiteSettings.findOne().lean() as {
@@ -177,14 +182,20 @@ router.post('/', feedbackRateLimit, async (req, res) => {
           }
         } | null
         const smtp = settings?.newsletterSmtp
-        if (!settings?.contactFormEmailEnabled || !smtp?.enabled) {
+        if (!settings?.contactFormEmailEnabled) {
+          sendInternalNotification({ status: 'disabled' })
+          return
+        }
+        if (!smtp?.enabled) {
+          sendInternalNotification({ status: 'misconfigured' })
           return
         }
 
-        // 直接发送到 SMTP 登录账号邮箱，确保管理员使用该账号即可接收并回复。
-        const recipient = String(smtp.user || settings.contactFormEmailTo || '').trim()
+        // Prefer the SMTP login account so the configured compliance/leads mailbox receives it.
+        const recipient = resolveContactFormEmailRecipient(settings)
         if (!EMAIL_PATTERN.test(recipient)) {
           logger.warn({ recipient: recipient ? '[configured]' : '[missing]' }, '联系表单邮件未发送：收件地址无效')
+          sendInternalNotification({ status: 'misconfigured' })
           return
         }
 
@@ -242,9 +253,13 @@ router.post('/', feedbackRateLimit, async (req, res) => {
         )
         if (!result.ok) {
           logger.warn({ error: result.error }, '联系表单邮件发送失败')
+          sendInternalNotification({ status: 'failed' })
+          return
         }
+        sendInternalNotification({ status: 'sent', recipient })
       } catch (error) {
         logger.error({ error }, '联系表单邮件通知处理失败')
+        sendInternalNotification({ status: 'failed' })
       }
     })()
 
