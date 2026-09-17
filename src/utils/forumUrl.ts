@@ -12,3 +12,19 @@ export function getForumBaseUrl(): string {
   const domain = host.replace(/^www\./, '');
   return `https://forum.${domain}`;
 }
+
+/** Direct Flarum entry: logged-in users go through main-site SSO. */
+export function getForumEntryUrl(isLoggedIn: boolean): string {
+  const base = getForumBaseUrl()
+  if (!base) return '/forum'
+  return isLoggedIn ? `${base}/auth/passport` : base
+}
+
+/** Jump straight to Flarum when it is installed. Returns false so the caller can use /forum. */
+export function goToForumIfReady(deployed: boolean | null, isLoggedIn: boolean): boolean {
+  if (deployed !== true) return false
+  const url = getForumEntryUrl(isLoggedIn)
+  if (!url || url === '/forum') return false
+  window.location.assign(url)
+  return true
+}

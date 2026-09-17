@@ -17,6 +17,7 @@ import { CookieConsentBanner } from '@/components/compliance/CookieConsentBanner
 import OnlineMembersBubble from '@/components/knowledge/OnlineMembersBubble'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { useGuideViewSession } from '@/hooks/useGuideViewSession'
+import { useForumDeployed } from '@/hooks/useForumDeployed'
 
 // 需要隐藏 Footer 的路由模式
 const HIDE_FOOTER_PATTERNS = [
@@ -42,6 +43,7 @@ const Layout: React.FC = () => {
   const { siteSettings, pagesEnabled } = useSiteSettings()
   const location = useLocation()
   const { isPublicGuide, ready: guideViewReady } = useGuideViewSession()
+  useForumDeployed(siteSettings?.externalLinks?.forum?.enabled ?? false)
   const lastTrackedPath = useRef<string>('')
 
   // 公告状态

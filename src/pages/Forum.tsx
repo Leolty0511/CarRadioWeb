@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSiteSettings } from '@/contexts/SiteSettingsContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { getForumBaseUrl } from '@/utils/forumUrl'
+import { useForumDeployed } from '@/hooks/useForumDeployed'
 import { MessageCircle } from 'lucide-react'
 
 /**
@@ -15,29 +16,8 @@ const Forum = () => {
   const { siteSettings, loading } = useSiteSettings()
   const { user, loading: authLoading } = useAuth()
   const forumEnabled = siteSettings?.externalLinks?.forum?.enabled ?? false
-  const [deployed, setDeployed] = useState<boolean | null>(null)
+  const deployed = useForumDeployed(forumEnabled)
   const forumUrl = getForumBaseUrl()
-
-  useEffect(() => {
-    if (!forumEnabled) {
-      setDeployed(null)
-      return
-    }
-    let cancelled = false
-    fetch('/api/v1/forum/public-status')
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled && data?.success === true) {
-          setDeployed(data.deployed === true)
-        } else if (!cancelled) {
-          setDeployed(false)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {setDeployed(false)}
-      })
-    return () => { cancelled = true }
-  }, [forumEnabled])
 
   useEffect(() => {
     if (!forumEnabled || deployed !== true || !forumUrl || authLoading) {return}

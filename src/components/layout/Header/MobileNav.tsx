@@ -12,6 +12,9 @@ import { Logo } from '@/components/ui/Logo'
 import type { NavItem } from '@/config/navigation'
 import { useLanguage } from '@/hooks/useLanguage'
 import { getApiBaseUrl } from '@/services/apiClient'
+import { useAuth } from '@/contexts/AuthContext'
+import { useForumDeployed } from '@/hooks/useForumDeployed'
+import { goToForumIfReady } from '@/utils/forumUrl'
 
 interface MobileNavProps {
   items: NavItem[]
@@ -24,10 +27,17 @@ export const MobileNav: React.FC<MobileNavProps> = ({ items, isOpen, onClose }) 
   const location = useLocation()
   const navigate = useNavigate()
   const { getLocalizedPath } = useLanguage()
+  const { user } = useAuth()
+  const forumEnabled = items.some((item) => item.name === 'forum')
+  const forumDeployed = useForumDeployed(forumEnabled)
 
   // 处理导航（当前在 forum 子域名时，站内链接跳回主站）
-  const handleNavigation = (href: string) => {
+  const handleNavigation = (href: string, itemName?: string) => {
     if (href === '#' || href === '') {return}
+    if (itemName === 'forum' && goToForumIfReady(forumDeployed, Boolean(user))) {
+      onClose()
+      return
+    }
 
     if (href.startsWith('http://') || href.startsWith('https://')) {
       window.open(href, '_blank', 'noopener,noreferrer')
@@ -142,7 +152,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ items, isOpen, onClose }) 
                 return (
                   <button
                     key={item.name}
-                    onClick={() => handleNavigation(item.href)}
+                    onClick={() => handleNavigation(item.href, item.name)}
                     className={cn(
                       'group flex w-full items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200',
                       isActive
