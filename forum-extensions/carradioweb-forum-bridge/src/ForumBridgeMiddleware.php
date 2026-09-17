@@ -5,6 +5,7 @@ namespace CarRadioWeb\ForumBridge;
 use Flarum\Foundation\Config;
 use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
+use GuzzleHttp\Client;
 use Laminas\Diactoros\Stream;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -16,6 +17,9 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
     private const COOKIE_NAME = 'carradioweb_forum_bridge';
     private const TTL_SECONDS = 120;
     private const SETTING_SITE_URL = 'carradioweb-forum-bridge.site_url';
+    private const SETTING_SITE_BRAND = 'carradioweb-forum-bridge.site_brand';
+    private const SETTING_SITE_BRAND_FETCHED_AT = 'carradioweb-forum-bridge.site_brand_fetched_at';
+    private const SITE_BRAND_CACHE_SECONDS = 300;
 
     public function __construct(
         private SettingsRepositoryInterface $settings,
@@ -144,8 +148,10 @@ HTML;
             return $response;
         }
 
-        $homeJson = json_encode($home, JSON_UNESCAPED_SLASHES);
-        $script = '<script>(function(){if(window.__carradiowebHomeNavigation)return;window.__carradiowebHomeNavigation=true;var home=' . $homeJson . ';var label=(document.documentElement.lang||"").toLowerCase().indexOf("zh")===0?"返回主站":"Main site";var add=function(){if(document.querySelector(".carradioweb-home-link"))return;var nav=document.querySelector(".Header-controls");if(!nav)return;var li=document.createElement("li");li.className="item-carradioweb-home";var a=document.createElement("a");a.className="Button Button--link carradioweb-home-link";a.href=home;a.textContent=label;li.appendChild(a);nav.insertBefore(li,nav.firstChild);};add();if(document.body)new MutationObserver(add).observe(document.body,{childList:true,subtree:true});}());</script>';
+        $jsonFlags = JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+        $homeJson = json_encode($home, $jsonFlags);
+        $brandJson = json_encode($this->mainSiteBrand($home), $jsonFlags);
+        $script = '<script>(function(){if(window.__carradiowebHomeNavigation)return;window.__carradiowebHomeNavigation=true;var home=' . $homeJson . ';var brand=' . $brandJson . ';var zh=(document.documentElement.lang||"").toLowerCase().indexOf("zh")===0;var label=brand?(zh?"返回 "+brand+" 官网":"Back to "+brand):(zh?"返回官网":"Back to Website");var add=function(){if(document.querySelector(".carradioweb-home-link"))return;var nav=document.querySelector(".Header-controls");if(!nav)return;var li=document.createElement("li");li.className="item-carradioweb-home";var a=document.createElement("a");a.className="Button Button--link carradioweb-home-link";a.href=home;a.textContent=label;li.appendChild(a);nav.insertBefore(li,nav.firstChild);};add();if(document.body)new MutationObserver(add).observe(document.body,{childList:true,subtree:true});}());</script>';
         $updated = preg_replace('~</body>~i', $script . '</body>', $body, 1);
         if (!is_string($updated) || $updated === $body) {
             return $response;
@@ -156,6 +162,45 @@ HTML;
         $stream->rewind();
 
         return $response->withoutHeader('Content-Length')->withBody($stream);
+    }
+
+    private function mainSiteBrand(string $home): string
+    {
+        $cached = trim((string) $this->settings->get(self::SETTING_SITE_BRAND, ''));
+        $fetchedAt = (int) $this->settings->get(self::SETTING_SITE_BRAND_FETCHED_AT, '0');
+        if ($fetchedAt > 0 && time() - $fetchedAt < self::SITE_BRAND_CACHE_SECONDS) {
+            return $cached;
+        }
+
+        try {
+            $response = (new Client())->get($home . '/api/site-settings?language=en', [
+                'connect_timeout' => 0.5,
+                'timeout' => 1.0,
+                'http_errors' => false,
+                'headers' => ['Accept' => 'application/json'],
+            ]);
+            if ($response->getStatusCode() < 200 || $response->getStatusCode() >= 300) {
+                return $cached;
+            }
+            $payload = json_decode((string) $response->getBody(), true);
+            $data = is_array($payload) && is_array($payload['data'] ?? null) ? $payload['data'] : [];
+            foreach (['logoText', 'siteName'] as $key) {
+                $value = trim((string) ($data[$key] ?? ''));
+                if ($value !== '') {
+                    $brand = function_exists('mb_substr') ? mb_substr($value, 0, 50) : substr($value, 0, 50);
+                    $this->settings->set(self::SETTING_SITE_BRAND, $brand);
+                    $this->settings->set(self::SETTING_SITE_BRAND_FETCHED_AT, (string) time());
+                    return $brand;
+                }
+            }
+            $this->settings->set(self::SETTING_SITE_BRAND, '');
+            $this->settings->set(self::SETTING_SITE_BRAND_FETCHED_AT, (string) time());
+        } catch (\Throwable) {
+            // The forum must remain usable when the main site is unavailable.
+            return $cached;
+        }
+
+        return '';
     }
 
     private function mainSiteUrl(): string
