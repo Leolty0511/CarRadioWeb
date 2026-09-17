@@ -47,7 +47,7 @@ test('forum registration notifications retain the legacy email detail', () => {
   }), 'https://forum.example.com')
 
   const notification = formatForumEventNotification(event, { locale: 'zh-hans' })
-  assert.match(notification.title, /新用户注册/)
+  assert.match(notification.title, /论坛新用户注册/)
   assert.match(notification.content, /member@example\.com/)
   assert.match(notification.markdown, /member@example\\\.com/)
 })

@@ -144,9 +144,9 @@ router.post('/', feedbackRateLimit, async (req, res) => {
 
     // Send notification to all enabled channels (async, non-blocking)
     notificationService.notifyAll({
-      title: `🔔 新的用户反馈`,
+      title: '新的表单提交',
       content: `姓名: ${name}\n邮箱: ${email}\n主题: ${subject}\n内容: ${message}\n所在地: ${geo.location}\n时间: ${timeDisplay}`,
-      markdown: `### 🔔 新的用户反馈\n**姓名**: ${name}\n**邮箱**: ${email || '未提供'}\n${orderNumber ? `**参考信息**: ${orderNumber}\n` : ''}**主题**: ${subject}\n**所在地**: ${geo.location}\n**内容**:\n${message}\n---\n${mdTime}`,
+      markdown: `**姓名**: ${name}\n**邮箱**: ${email || '未提供'}\n${orderNumber ? `**参考信息**: ${orderNumber}\n` : ''}**主题**: ${subject}\n**所在地**: ${geo.location}\n**内容**:\n${message}\n---\n${mdTime}`,
     }).catch(() => {
       // Silent fail - notification errors should not affect main flow
     })

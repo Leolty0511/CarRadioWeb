@@ -116,11 +116,11 @@ export function formatForumEventNotification(
 } {
   const zh = options.locale !== 'en'
   const text = zh ? {
-    titles: { user_registered: '新用户注册', discussion_started: '新帖发布', post_created: '新回复' },
+    titles: { user_registered: '论坛新用户注册', discussion_started: '论坛新主题', post_created: '论坛新回复' },
     icons: { user_registered: '📢', discussion_started: '📝', post_created: '💬' },
     user: '用户名', author: '发帖人', email: '邮箱', topic: '标题', content: '内容', beijing: '北京时间', local: '当地时间', view: '查看',
   } : {
-    titles: { user_registered: 'New User Registered', discussion_started: 'New Discussion', post_created: 'New Reply' },
+    titles: { user_registered: 'Forum: New User Registered', discussion_started: 'Forum: New Discussion', post_created: 'Forum: New Reply' },
     icons: { user_registered: '📢', discussion_started: '📝', post_created: '💬' },
     user: 'Username', author: 'Author', email: 'Email', topic: 'Topic', content: 'Content', beijing: 'Beijing Time', local: 'Local Time', view: 'View',
   }
@@ -149,7 +149,7 @@ export function formatForumEventNotification(
     ...(localTime ? [`🌐 **${text.local} (${escapeMarkdown(options.timezone || '')})**  ${escapeMarkdown(localTime)}`] : []),
   ]
   return {
-    title: `${text.icons[event.type]} ${text.titles[event.type]}`,
+    title: text.titles[event.type],
     content: lines.join('\n'),
     markdown: markdownLines.join('\n'),
     ...(event.url ? { actionUrl: event.url } : {}),

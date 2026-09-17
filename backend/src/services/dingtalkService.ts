@@ -103,8 +103,8 @@ class DingtalkService {
     documentType?: 'structured' | 'video' | 'image-text' | 'unknown' | 'wiring' | 'installation-video' | 'device-operation' | 'canbus';
   }): Promise<boolean> {
     const typeMap = {
-      feedback: '用户反馈',
-      'document-feedback': '文档留言',
+      feedback: '表单提交',
+      'document-feedback': '知识库留言',
     };
 
     // 根据文档类型生成更具体的标签
@@ -180,10 +180,8 @@ class DingtalkService {
     }
 
     return {
-      title: `🔔 新的${typeLabel}`,
-      text: `### 🔔 新的${typeLabel}提交
-
-${contentText}
+      title: `新的${typeLabel}`,
+      text: `${contentText}
 
 ---
 ⏰ 提交时间: ${data.timestamp || new Date().toLocaleString('zh-CN')}`,

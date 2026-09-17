@@ -81,9 +81,11 @@ sync_bridge_runtime_settings() {
   docker exec --user "$FORUM_RUNTIME_USER" \
     -e CARRADIOWEB_SYNC_EVENT_URL="$FORUM_EVENT_URL" \
     -e CARRADIOWEB_SYNC_SECRET="$BRIDGE_SECRET" \
+    -e CARRADIOWEB_SYNC_SITE_URL="${FRONTEND_URL%/}" \
     -w /opt/flarum flarum_app php -r '
       $url=trim((string) getenv("CARRADIOWEB_SYNC_EVENT_URL"));
       $secret=trim((string) getenv("CARRADIOWEB_SYNC_SECRET"));
+      $home=trim((string) getenv("CARRADIOWEB_SYNC_SITE_URL"));
       $scheme=strtolower((string) parse_url($url, PHP_URL_SCHEME));
       if (!filter_var($url, FILTER_VALIDATE_URL) || !in_array($scheme, ["http", "https"], true) || strlen($secret) < 32) {
         fwrite(STDERR, "Forum event transport settings are invalid.\n");
@@ -95,6 +97,10 @@ sync_bridge_runtime_settings() {
       $settings=$container->make(Flarum\Settings\SettingsRepositoryInterface::class);
       $settings->set("carradioweb-forum-bridge.event_url", $url);
       $settings->set("carradioweb-forum-bridge.bridge_secret", $secret);
+      $homeScheme=strtolower((string) parse_url($home, PHP_URL_SCHEME));
+      if (filter_var($home, FILTER_VALIDATE_URL) && in_array($homeScheme, ["http", "https"], true)) {
+        $settings->set("carradioweb-forum-bridge.site_url", rtrim($home, "/"));
+      }
     '
 }
 

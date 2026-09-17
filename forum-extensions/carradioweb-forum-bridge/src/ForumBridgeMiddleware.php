@@ -2,6 +2,8 @@
 
 namespace CarRadioWeb\ForumBridge;
 
+use Flarum\Foundation\Config;
+use Flarum\Settings\SettingsRepositoryInterface;
 use Flarum\User\User;
 use Laminas\Diactoros\Stream;
 use Psr\Http\Message\ResponseInterface;
@@ -13,11 +15,19 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
 {
     private const COOKIE_NAME = 'carradioweb_forum_bridge';
     private const TTL_SECONDS = 120;
+    private const SETTING_SITE_URL = 'carradioweb-forum-bridge.site_url';
+
+    public function __construct(
+        private SettingsRepositoryInterface $settings,
+        private Config $config
+    ) {
+    }
 
     public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
     {
         $response = $handler->handle($request);
         $response = $this->normalizePassportLoginButton($response);
+        $response = $this->injectHomeSiteLink($response);
         $response = $this->normalizePassportResponse($request, $response);
         $secret = trim((string) getenv('CARRADIOWEB_FORUM_BRIDGE_SECRET'));
         $actor = $request->getAttribute('actor');
@@ -67,7 +77,7 @@ final class ForumBridgeMiddleware implements MiddlewareInterface
         }
 
         $body = (string) $response->getBody();
-        $pattern = '~<script[^>]*>.*?window\.opener\.app\.authenticationComplete\((.*?)\);.*?</script>~is';
+        $pattern = '~<script[^>]*>.*?window\\.opener\\.app\\.authenticationComplete\\((.*?)\\);.*?</script>~is';
         if (!preg_match($pattern, $body, $matches)) {
             return $response;
         }
@@ -115,6 +125,69 @@ HTML;
         $stream->rewind();
 
         return $response->withoutHeader('Content-Length')->withBody($stream);
+    }
+
+    private function injectHomeSiteLink(ResponseInterface $response): ResponseInterface
+    {
+        $contentType = strtolower($response->getHeaderLine('Content-Type'));
+        if ($contentType !== '' && strpos($contentType, 'text/html') === false) {
+            return $response;
+        }
+
+        $home = $this->mainSiteUrl();
+        if ($home === '') {
+            return $response;
+        }
+
+        $body = (string) $response->getBody();
+        if (stripos($body, 'carradiowebHomeNavigation') !== false) {
+            return $response;
+        }
+
+        $homeJson = json_encode($home, JSON_UNESCAPED_SLASHES);
+        $script = '<script>(function(){if(window.__carradiowebHomeNavigation)return;window.__carradiowebHomeNavigation=true;var home=' . $homeJson . ';var label=(document.documentElement.lang||"").toLowerCase().indexOf("zh")===0?"返回主站":"Main site";var add=function(){if(document.querySelector(".carradioweb-home-link"))return;var nav=document.querySelector(".Header-controls");if(!nav)return;var li=document.createElement("li");li.className="item-carradioweb-home";var a=document.createElement("a");a.className="Button Button--link carradioweb-home-link";a.href=home;a.textContent=label;li.appendChild(a);nav.insertBefore(li,nav.firstChild);};add();if(document.body)new MutationObserver(add).observe(document.body,{childList:true,subtree:true});}());</script>';
+        $updated = preg_replace('~</body>~i', $script . '</body>', $body, 1);
+        if (!is_string($updated) || $updated === $body) {
+            return $response;
+        }
+
+        $stream = new Stream('php://memory', 'wb+');
+        $stream->write($updated);
+        $stream->rewind();
+
+        return $response->withoutHeader('Content-Length')->withBody($stream);
+    }
+
+    private function mainSiteUrl(): string
+    {
+        $candidates = [
+            trim((string) $this->settings->get(self::SETTING_SITE_URL, '')),
+            trim((string) getenv('CARRADIOWEB_FRONTEND_URL')),
+            trim((string) getenv('FRONTEND_URL')),
+        ];
+        foreach ($candidates as $candidate) {
+            if ($this->isHttpUrl($candidate)) {
+                return rtrim($candidate, '/');
+            }
+        }
+
+        $forum = rtrim((string) $this->config->url(), '/');
+        $derived = (string) preg_replace('#://forum\\.#i', '://', $forum);
+        if ($this->isHttpUrl($derived) && strcasecmp($derived, $forum) !== 0) {
+            return $derived;
+        }
+
+        return '';
+    }
+
+    private function isHttpUrl(string $value): bool
+    {
+        if ($value === '' || filter_var($value, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+        $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+
+        return $scheme === 'http' || $scheme === 'https';
     }
 
     private function base64UrlEncode(string $value): string

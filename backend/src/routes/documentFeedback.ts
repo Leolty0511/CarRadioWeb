@@ -245,9 +245,9 @@ router.post('/', authenticateContentAccess, docFeedbackRateLimit, async (req, re
       if (!enabled) return
 
       notificationService.notifyAll({
-        title: `🔔 新的文档留言`,
+        title: '新的知识库留言',
         content: `文档: ${docTitle}\n提交者: ${author}\n内容: ${content}\n所在地: ${geo.location}\n时间: ${timeDisplay}`,
-        markdown: `### 🔔 新的文档留言\n**文档**: ${docTitle}\n**提交者**: ${author || '匿名'}\n**所在地**: ${geo.location}\n**内容**:\n${content}\n---\n${mdTime}`,
+        markdown: `**文档**: ${docTitle}\n**提交者**: ${author || '匿名'}\n**所在地**: ${geo.location}\n**内容**:\n${content}\n---\n${mdTime}`,
       }).catch(() => undefined)
 
       dingtalkService.notifyFormSubmission({
