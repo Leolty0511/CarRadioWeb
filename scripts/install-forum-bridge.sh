@@ -113,7 +113,10 @@ fix_forum_runtime_permissions() {
     chmod 0644 /opt/flarum/composer.json /opt/flarum/composer.lock 2>/dev/null || true
     for path in /data/storage /data/extensions /data/assets /opt/flarum/vendor; do
       [ -e "$path" ] || continue
-      find "$path" \( ! -user "$runtime_uid" -o ! -group "$runtime_gid" \) \
+      # Composer path repositories create symlinks into the read-only
+      # /extensions mount. Never pass those links to chown because BusyBox
+      # chown follows them and fails with "Read-only file system".
+      find "$path" -type l -prune -o \( ! -user "$runtime_uid" -o ! -group "$runtime_gid" \) \
         -exec chown "$runtime_uid:$runtime_gid" {} +
     done
     chown -h "$runtime_uid:$runtime_gid" /opt/flarum/storage /opt/flarum/extensions /opt/flarum/public/assets 2>/dev/null || true

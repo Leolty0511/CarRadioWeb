@@ -5,11 +5,11 @@ let memory: boolean | null = null
 let inflight: Promise<boolean> | null = null
 
 function readCached(): boolean | null {
-  if (memory !== null) return memory
+  if (memory !== null) {return memory}
   try {
     const cached = sessionStorage.getItem(STORAGE_KEY)
-    if (cached === '1') return true
-    if (cached === '0') return false
+    if (cached === '1') {return true}
+    if (cached === '0') {return false}
   } catch {
     // sessionStorage may be blocked
   }
@@ -26,7 +26,7 @@ function writeCached(value: boolean): void {
 }
 
 function loadForumDeployed(): Promise<boolean> {
-  if (inflight) return inflight
+  if (inflight) {return inflight}
   inflight = fetch('/api/v1/forum/public-status')
     .then((res) => res.json())
     .then((data) => data?.success === true && data.deployed === true)
@@ -48,10 +48,10 @@ export function useForumDeployed(enabled: boolean): boolean | null {
     }
     let cancelled = false
     const cached = readCached()
-    if (cached !== null) setDeployed(cached)
+    if (cached !== null) {setDeployed(cached)}
     void loadForumDeployed().then((value) => {
       writeCached(value)
-      if (!cancelled) setDeployed(value)
+      if (!cancelled) {setDeployed(value)}
     })
     return () => {
       cancelled = true

@@ -215,6 +215,7 @@ test('forum installer never runs writable Flarum commands as root', () => {
   assert.match(installer, /docker exec --user 0:0 -e FORUM_RUNTIME_USER=/)
   assert.match(installer, /docker exec --user "\$FORUM_RUNTIME_USER" flarum_app php flarum "\$@"/)
   assert.match(installer, /docker exec --user "\$FORUM_RUNTIME_USER" -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer "\$@"/)
+  assert.match(installer, /-type l -prune -o/)
   assert.doesNotMatch(installer, /docker exec flarum_app php flarum/)
   assert.doesNotMatch(installer, /docker exec -e COMPOSER_MEMORY_LIMIT=-1 flarum_app composer/)
   assert.doesNotMatch(installer, /--user 1000:1000/)
