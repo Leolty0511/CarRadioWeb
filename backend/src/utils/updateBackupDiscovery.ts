@@ -17,6 +17,14 @@ export interface DockerComposeServiceInfo {
   environment: Record<string, string>
 }
 
+interface MongoDumpArgsOptions {
+  container: string
+  database: string
+  username?: string
+  password?: string
+  authenticationDatabase?: string
+}
+
 type SpawnSyncLike = typeof spawnSync
 
 interface DiscoverOptions {
@@ -29,6 +37,24 @@ interface DiscoverOptions {
 
 const MAX_DISCOVERY_CONTAINERS = 100
 const SAFE_CONTAINER_NAME = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/
+
+export function buildMongoDumpArgs(options: MongoDumpArgsOptions): string[] {
+  if (!SAFE_CONTAINER_NAME.test(options.container)) throw new Error('Invalid MongoDB container name')
+  if (!options.database.trim()) throw new Error('MongoDB database name is required')
+  const args = [
+    'exec',
+    options.container,
+    'mongodump',
+    `--db=${options.database}`,
+    '--archive',
+    '--gzip',
+    '--numParallelCollections=1',
+  ]
+  if (options.username) args.push(`--username=${options.username}`)
+  if (options.password) args.push(`--password=${options.password}`)
+  if (options.username) args.push(`--authenticationDatabase=${options.authenticationDatabase || 'admin'}`)
+  return args
+}
 
 export function mongoDatabaseFromUri(uri?: string): string | undefined {
   if (!uri) return undefined

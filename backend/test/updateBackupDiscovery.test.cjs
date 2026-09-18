@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict')
 const test = require('node:test')
-const { discoverDockerContainer, mongoDatabaseFromUri, readDockerComposeService } = require('../dist/utils/updateBackupDiscovery.js')
+const { buildMongoDumpArgs, discoverDockerContainer, mongoDatabaseFromUri, readDockerComposeService } = require('../dist/utils/updateBackupDiscovery.js')
 
 function createContainer({ id, name, image, running = true, labels = {}, environment = [] }) {
   return {
@@ -56,6 +56,33 @@ test('reads the production database name from a MongoDB connection URI', () => {
     'production-database'
   )
   assert.equal(mongoDatabaseFromUri('mongodb://127.0.0.1:27017'), undefined)
+})
+
+test('builds a single-collection native MongoDB archive command', () => {
+  assert.deepEqual(buildMongoDumpArgs({
+    container: 'caradio-mongo',
+    database: 'knowledge-base',
+    username: 'admin',
+    password: 'secret',
+  }), [
+    'exec',
+    'caradio-mongo',
+    'mongodump',
+    '--db=knowledge-base',
+    '--archive',
+    '--gzip',
+    '--numParallelCollections=1',
+    '--username=admin',
+    '--password=secret',
+    '--authenticationDatabase=admin',
+  ])
+})
+
+test('rejects unsafe container names in MongoDB backup commands', () => {
+  assert.throws(() => buildMongoDumpArgs({
+    container: 'caradio-mongo;rm',
+    database: 'knowledge-base',
+  }), /Invalid MongoDB container name/)
 })
 
 test('reads resolved service settings from Docker Compose JSON', () => {

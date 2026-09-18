@@ -216,7 +216,8 @@ Docker Compose 默认包含 Web、MongoDB、Redis、Mailpit 和 Nginx。生产�
 - IP 安全中心使用 Redis 保存分钟级计数和临时封禁，MongoDB 保存事件、聚合 IP、封禁历史和白名单；访问明细默认 7 天、事件默认 90 天 TTL。
 - 生产建议在 Nginx 前接入 CrowdSec；没有 CrowdSec 时，CarRadioWeb 仍提供应用层封禁兜底，但它不替代边界拦截。
 - 后台一键更新会在拉取资源包或合并代码前自动备份 MongoDB、Flarum 数据库和主站上传文件；可选备份 Flarum `/data`。生产环境默认开启，任一必需备份失败会阻止更新。
-- 将 `UPDATE_BACKUP_DIR` 挂载到独立、持久化的磁盘目录。MongoDB 始终以生产目录现有 `backend/config.env` 中的 `MONGODB_URI` 为准，使用单连接、小批次、限速的压缩 EJSON 流式导出；Flarum 从项目根目录 `.env.flarum` 与 Docker Compose 的实际解析结果读取数据库参数。更新器不猜测数据库或容器名称，也不会改名或新建替代生产数据库，配置不完整时会停止更新。Flarum 的 InnoDB 数据使用一致性事务备份，Docker 重建后仍须保留备份目录。
+- 将 `UPDATE_BACKUP_DIR` 挂载到独立、持久化的磁盘目录。MongoDB 始终以生产目录现有 `backend/config.env` 中的 `MONGODB_URI` 为准；当前项目存在 MongoDB 容器时优先使用单集合并发的原生 `mongodump`，其他环境才使用单连接、小批次、限速的压缩 EJSON 流式导出。Flarum 从项目根目录 `.env.flarum` 与 Docker Compose 的实际解析结果读取数据库参数。更新器不猜测数据库或容器名称，也不会改名或新建替代生产数据库，配置不完整时会停止更新。Flarum 的 InnoDB 数据使用一致性事务备份，Docker 重建后仍须保留备份目录。
+- 低内存服务器默认要求更新前 `MemAvailable` 至少为 384 MiB，并把更新器 V8 堆限制为 128 MiB；备份写盘默认限速 2 MiB/s。阈值可通过 `UPDATE_MIN_AVAILABLE_MEMORY_MB`、`UPDATE_RUNNER_MAX_OLD_SPACE_MB` 和 `UPDATE_BACKUP_MAX_BYTES_PER_SECOND` 调整。后台更新状态持久化在 `.update-state/admin-update.json`，即使服务器重启也能保留中断原因。Swap 策略属于操作系统配置，1-2 GiB 服务器应确认 `swapon --show` 有效且 `vm.swappiness` 不为 0。
 - 备份目录内会生成 `backup-manifest.json`，默认保留最近 7 份，可用 `UPDATE_BACKUP_RETENTION_COUNT` 调整。备份只保护数据，不会自动把数据库恢复到旧版本；代码回滚和数据恢复是两个独立动作，仍建议额外做异地/云端备份。
 
 Flarum 生产基线为 1.8.17、PHP 8.4.x、MariaDB/MySQL。论坛相关 Compose 和桥接扩展位于 [`docker-compose.flarum.yml`](docker-compose.flarum.yml) 与 [`forum-extensions/`](forum-extensions/)，部署脚本位于 [`scripts/`](scripts/)。

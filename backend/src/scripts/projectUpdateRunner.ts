@@ -9,7 +9,8 @@ import { Readable, Transform } from 'stream'
 import { pipeline } from 'stream/promises'
 import { createGzip } from 'zlib'
 import mongoose from 'mongoose'
-import { discoverDockerContainer, mongoDatabaseFromUri, readDockerComposeService } from '../utils/updateBackupDiscovery'
+import { buildMongoDumpArgs, discoverDockerContainer, mongoDatabaseFromUri, readDockerComposeService } from '../utils/updateBackupDiscovery'
+import { clampUpdateMemoryLimitMb, formatMemoryMb, parseLinuxMeminfo } from '../utils/updateResourceSafety'
 
 interface RunnerPayload {
   jobId: string
@@ -94,12 +95,13 @@ const backupEnabled = process.env.UPDATE_BACKUP_ENABLED === 'true' || (process.e
 const backupRequired = process.env.UPDATE_BACKUP_REQUIRED !== 'false'
 const backupRoot = path.resolve(process.env.UPDATE_BACKUP_DIR?.trim() || path.join(payload.repoRoot, '.update-backups'))
 const backupRetentionCount = Math.max(1, Number.parseInt(process.env.UPDATE_BACKUP_RETENTION_COUNT || '7', 10) || 7)
-const mongoBackupBatchSize = Math.min(100, Math.max(10, Number.parseInt(process.env.UPDATE_MONGO_BACKUP_BATCH_SIZE || '25', 10) || 25))
-const mongoBackupThrottleMs = Math.min(1_000, Math.max(0, Number.parseInt(process.env.UPDATE_MONGO_BACKUP_THROTTLE_MS || '10', 10) || 0))
+const mongoBackupBatchSize = Math.min(100, Math.max(5, Number.parseInt(process.env.UPDATE_MONGO_BACKUP_BATCH_SIZE || '10', 10) || 10))
+const mongoBackupThrottleMs = Math.min(1_000, Math.max(0, Number.parseInt(process.env.UPDATE_MONGO_BACKUP_THROTTLE_MS || '25', 10) || 0))
 const backupMaxBytesPerSecond = Math.min(
   64 * 1024 * 1024,
-  Math.max(1024 * 1024, Number.parseInt(process.env.UPDATE_BACKUP_MAX_BYTES_PER_SECOND || `${8 * 1024 * 1024}`, 10) || 8 * 1024 * 1024)
+  Math.max(1024 * 1024, Number.parseInt(process.env.UPDATE_BACKUP_MAX_BYTES_PER_SECOND || `${2 * 1024 * 1024}`, 10) || 2 * 1024 * 1024)
 )
+const minimumAvailableMemoryMb = clampUpdateMemoryLimitMb(process.env.UPDATE_MIN_AVAILABLE_MEMORY_MB, 384, 128, 4096)
 let lastConsoleStatus = ''
 
 interface BackupManifestItem {
@@ -285,6 +287,38 @@ async function backupMongoDatabase(directory: string): Promise<BackupManifestIte
   const archiveOutput = path.join(directory, 'mongodb.archive.gz')
   const uri = process.env.MONGODB_URI?.trim()
   const failures: string[] = []
+  const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
+  const mongoContainer = commandAvailable(docker) ? discoverDockerContainer({
+    docker,
+    repoRoot: payload.repoRoot,
+    kind: 'mongo',
+    explicitName: process.env.UPDATE_MONGO_CONTAINER,
+  }) : null
+
+  // Prefer the database-native binary dump when this deployment owns a MongoDB
+  // container. This keeps BSON serialization outside the constrained Node.js
+  // updater heap and preserves indexes and BSON types in one archive.
+  if (mongoContainer) {
+    try {
+      const database = process.env.UPDATE_MONGO_DATABASE?.trim() || mongoDatabaseFromUri(uri) || mongoContainer.environment.MONGO_INITDB_DATABASE
+      if (!database) throw new Error('MongoDB database name is unavailable in local configuration and container environment')
+      const username = process.env.UPDATE_MONGO_USERNAME?.trim() || mongoContainer.environment.MONGO_INITDB_ROOT_USERNAME
+      const password = process.env.UPDATE_MONGO_PASSWORD || mongoContainer.environment.MONGO_INITDB_ROOT_PASSWORD
+      const args = buildMongoDumpArgs({
+        container: mongoContainer.name,
+        database,
+        username,
+        password,
+        authenticationDatabase: process.env.UPDATE_MONGO_AUTH_DATABASE?.trim() || 'admin',
+      })
+      await runCaptureToFile(docker, args, archiveOutput, 30 * 60_000, payload.repoRoot, undefined, '正在以单集合模式低资源备份 MongoDB')
+      return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'docker exec mongodump (single collection)' }
+    } catch (error) {
+      failures.push(`Docker mongodump: ${error instanceof Error ? error.message : String(error)}`)
+      await fs.rm(archiveOutput, { force: true })
+    }
+  }
+
   if (uri) {
     const streamOutput = path.join(directory, 'mongodb.ejson.ndjson.gz')
     const client = new mongoose.mongo.MongoClient(uri, {
@@ -340,33 +374,29 @@ async function backupMongoDatabase(directory: string): Promise<BackupManifestIte
     }
   }
 
-  const docker = process.env.UPDATE_DOCKER_COMMAND?.trim() || 'docker'
-  const mongoContainer = commandAvailable(docker) ? discoverDockerContainer({
-    docker,
-    repoRoot: payload.repoRoot,
-    kind: 'mongo',
-    explicitName: process.env.UPDATE_MONGO_CONTAINER,
-  }) : null
-  if (mongoContainer) {
-    try {
-      const database = process.env.UPDATE_MONGO_DATABASE?.trim() || mongoDatabaseFromUri(uri) || mongoContainer.environment.MONGO_INITDB_DATABASE
-      if (!database) throw new Error('MongoDB database name is unavailable in local configuration and container environment')
-      const args = ['exec', mongoContainer.name, 'mongodump', `--db=${database}`, '--archive', '--gzip', '--numParallelCollections=1']
-      const username = process.env.UPDATE_MONGO_USERNAME?.trim() || mongoContainer.environment.MONGO_INITDB_ROOT_USERNAME
-      const password = process.env.UPDATE_MONGO_PASSWORD || mongoContainer.environment.MONGO_INITDB_ROOT_PASSWORD
-      if (username) args.push(`--username=${username}`)
-      if (password) args.push(`--password=${password}`)
-      if (username) args.push(`--authenticationDatabase=${process.env.UPDATE_MONGO_AUTH_DATABASE?.trim() || 'admin'}`)
-      await runCaptureToFile(docker, args, archiveOutput, 30 * 60_000, payload.repoRoot, undefined, '正在以单集合模式备份 MongoDB（Docker 兜底）')
-      return { name: 'mongodb', status: 'completed', path: 'mongodb.archive.gz', method: 'docker exec mongodump' }
-    } catch (error) {
-      failures.push(`Docker mongodump: ${error instanceof Error ? error.message : String(error)}`)
-      await fs.rm(archiveOutput, { force: true })
-    }
-  }
-
-  const unavailable = 'MONGODB_URI is not configured and no running MongoDB container could be detected'
+  const unavailable = 'MONGODB_URI is not configured and no project-owned MongoDB container could be detected'
   return { name: 'mongodb', status: 'failed', error: failures.length > 0 ? failures.join('; ') : unavailable }
+}
+
+async function ensureUpdateResources(): Promise<void> {
+  if (process.platform !== 'linux') return
+  let snapshot: ReturnType<typeof parseLinuxMeminfo>
+  try {
+    snapshot = parseLinuxMeminfo(await fs.readFile('/proc/meminfo', 'utf8'))
+  } catch {
+    return
+  }
+  if (!snapshot) return
+
+  const availableMb = formatMemoryMb(snapshot.availableBytes)
+  const swapFreeMb = formatMemoryMb(snapshot.swapFreeBytes)
+  await writeStatus({
+    stage: 'checking_resources',
+    message: `检查服务器资源：可用内存 ${availableMb} MiB，空闲 Swap ${swapFreeMb} MiB`,
+  })
+  if (availableMb < minimumAvailableMemoryMb) {
+    throw new Error(`服务器可用内存仅 ${availableMb} MiB，低于更新安全线 ${minimumAvailableMemoryMb} MiB；已在备份前停止更新，请释放内存后重试`)
+  }
 }
 
 async function backupFlarumDatabase(directory: string): Promise<BackupManifestItem> {
@@ -808,6 +838,7 @@ async function rollbackLegacy(reason: string): Promise<void> {
 
 async function main(): Promise<void> {
   try {
+    await ensureUpdateResources()
     await createDataBackup()
     if (payload.artifactUrl || payload.artifactFile) {
       await writeStatus({ stage: 'downloading', message: 'Downloading the prebuilt package from GitHub' })

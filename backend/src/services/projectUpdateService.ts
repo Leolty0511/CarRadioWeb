@@ -2,7 +2,6 @@ import { execFile } from 'child_process'
 import { randomUUID } from 'crypto'
 import fs from 'fs'
 import { promises as fsPromises } from 'fs'
-import os from 'os'
 import path from 'path'
 import { createLogger } from '../utils/logger'
 
@@ -15,7 +14,8 @@ const COMMAND_TIMEOUT_MS = 60_000
 const AUTO_CHECK_INTERVAL_MS = 3 * 24 * 60 * 60 * 1000
 const AUTO_CHECK_START_DELAY_MS = 10_000
 const REPO_ROOT = path.resolve(__dirname, '../../..')
-const STATUS_FILE = process.env.UPDATE_STATUS_FILE || path.join(os.tmpdir(), 'carradioweb-update-status.json')
+const STATUS_FILE = process.env.UPDATE_STATUS_FILE || path.join(REPO_ROOT, '.update-state', 'admin-update.json')
+const RUNNER_MAX_OLD_SPACE_MB = Math.min(512, Math.max(64, Number.parseInt(process.env.UPDATE_RUNNER_MAX_OLD_SPACE_MB || '128', 10) || 128))
 const logger = createLogger('project-update-service')
 
 let lastRemoteCheckedAt: string | null = null
@@ -604,7 +604,7 @@ export async function startProjectUpdate(): Promise<UpdateJobStatus> {
     githubToken: process.env.UPDATE_GITHUB_TOKEN?.trim() || undefined,
   })).toString('base64url')
 
-  const child = require('child_process').spawn(process.execPath, [runnerPath, payload], {
+  const child = require('child_process').spawn(process.execPath, [`--max-old-space-size=${RUNNER_MAX_OLD_SPACE_MB}`, runnerPath, payload], {
     cwd: REPO_ROOT,
     detached: true,
     stdio: 'ignore',

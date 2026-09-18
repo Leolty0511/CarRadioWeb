@@ -80,8 +80,12 @@ process.stdout.write(Buffer.from(JSON.stringify(payload)).toString("base64url"))
 ')"
 
 echo "Backing up production data and installing commit $target_commit..."
+runner_heap_mb="${UPDATE_RUNNER_MAX_OLD_SPACE_MB:-128}"
+if ! [[ "$runner_heap_mb" =~ ^[0-9]+$ ]] || (( runner_heap_mb < 64 || runner_heap_mb > 512 )); then
+  runner_heap_mb=128
+fi
 if ! NODE_ENV=production UPDATE_BACKUP_ENABLED=true UPDATE_BACKUP_REQUIRED=true UPDATE_RUNNER_CONSOLE=true \
-  node "$runner" "$payload"; then
+  node --max-old-space-size="$runner_heap_mb" "$runner" "$payload"; then
   echo "CarRadioWeb update failed. Status: $status_file" >&2
   if [[ -f "$status_file" ]]; then
     cat "$status_file" >&2
