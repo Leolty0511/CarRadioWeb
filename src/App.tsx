@@ -38,12 +38,15 @@ const StripContentPrefixRedirect = () => {
 }
 
 const AppRoutes = () => {
-  const { Admin, NotFound } = routeComponents
+  const { Admin, NotFound, QrLinkLanding } = routeComponents
 
   return (
     <Routes>
       {/* 兼容旧说明书二维码：即使服务器将旧地址回退到 SPA，也直接进入首页 */}
       <Route path="/product.html" element={<Navigate to="/" replace />} />
+
+      {/* 后台二维码工具生成的隐藏扫码页，不使用主站 Header/Footer */}
+      <Route path="/r/:token" element={<QrLinkLanding />} />
 
       {/* 兼容旧链接：剥离 /en /ru 前缀后跳转 */}
       <Route path="/en/*" element={<StripContentPrefixRedirect />} />
@@ -77,7 +80,9 @@ const AppRoutes = () => {
 
 function App() {
   const { t, i18n: i18nInstance } = useTranslation()
+  const location = useLocation()
   const [searchOpen, setSearchOpen] = useState(false)
+  const isQrLanding = /^\/r\/[A-Za-z0-9_-]+\/?$/.test(location.pathname)
 
   // 监听语言变化，同步更新 PrimeReact locale
   useEffect(() => {
@@ -100,6 +105,10 @@ function App() {
 
   // Global keyboard shortcut for search (Cmd/Ctrl + K)
   useEffect(() => {
+    if (isQrLanding) {
+      setSearchOpen(false)
+      return
+    }
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault()
@@ -109,7 +118,17 @@ function App() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [isQrLanding])
+
+  if (isQrLanding) {
+    return (
+      <ErrorBoundary fallback={<div className="p-6 text-red-600">Unable to load this resource.</div>}>
+        <Suspense fallback={<div className="p-6 text-slate-500">Loading...</div>}>
+          <AppRoutes />
+        </Suspense>
+      </ErrorBoundary>
+    )
+  }
 
   return (
     <I18nextProvider i18n={i18n}>

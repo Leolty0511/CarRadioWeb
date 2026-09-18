@@ -36,6 +36,8 @@ import {
   ScrollText,
   Scale,
   ShieldAlert,
+  QrCode,
+  Wrench,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -98,6 +100,7 @@ export const NAV_TAB_PAGE_PERMISSION: Record<string, string> = {
   'compliance-hub': 'pages:compliance-hub',
   'system-monitor': 'pages:system-monitor',
   settings: 'pages:settings',
+  'qr-codes': 'pages:qr-codes',
 }
 
 /** Permissions required to open a page, beyond its pages:* visibility flag. */
@@ -107,9 +110,19 @@ export const NAV_TAB_RESOURCE_PERMISSIONS: Partial<Record<string, string[]>> = {
   'user-manual': ['resources:read'],
   'resource-links': ['resources:read'],
   downloads: ['software:read'],
+  'qr-codes': ['qr-codes:read'],
 }
 
 export const NAV_CONFIG: NavGroup[] = [
+  {
+    group: 'tools',
+    label: '工具',
+    icon: Wrench,
+    defaultExpanded: true,
+    items: [
+      { id: 'qr-codes', label: '二维码制作', icon: QrCode },
+    ]
+  },
   {
     group: 'content',
     label: '内容',

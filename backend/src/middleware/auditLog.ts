@@ -36,6 +36,7 @@ const RESOURCE_LABELS: Record<string, string> = {
   announcements: '公告',
   software: '软件',
   resources: '资源链接',
+  'qr-links': '二维码工具',
   feedback: '反馈',
   contact: '联系方式',
   settings: '设置',

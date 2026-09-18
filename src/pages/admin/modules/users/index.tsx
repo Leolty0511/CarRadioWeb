@@ -62,6 +62,7 @@ const PERMISSION_GROUP_LABELS: Record<string, string> = {
   seo: 'SEO',
   content: '内容',
   visitors: '访客',
+  'qr-codes': '二维码工具',
 }
 
 const PERMISSION_ACTION_LABELS: Record<string, string> = {
@@ -100,6 +101,7 @@ const PAGE_LABELS: Record<string, string> = {
   notification: '消息推送',
   'compliance-hub': '合规与线索',
   'system-monitor': '系统监控',
+  'qr-codes': '二维码制作',
 }
 
 function groupPermissions(perms: string[]): Record<string, string[]> {

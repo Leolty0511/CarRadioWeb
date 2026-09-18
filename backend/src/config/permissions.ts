@@ -39,6 +39,7 @@ export const PERMISSIONS = {
     notification: 'pages:notification',
     complianceHub: 'pages:compliance-hub',
     systemMonitor: 'pages:system-monitor',
+    qrCodes: 'pages:qr-codes',
   },
   // CRUD operations
   documents: {
@@ -89,6 +90,12 @@ export const PERMISSIONS = {
     read: 'resources:read',
     update: 'resources:update',
     delete: 'resources:delete',
+  },
+  qrCodes: {
+    create: 'qr-codes:create',
+    read: 'qr-codes:read',
+    update: 'qr-codes:update',
+    delete: 'qr-codes:delete',
   },
   feedback: {
     read: 'feedback:read',

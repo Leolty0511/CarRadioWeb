@@ -32,6 +32,7 @@ const Disclaimer = lazy(() => import('@/pages/Disclaimer'));
 const NewsletterUnsubscribe = lazy(() => import('@/pages/NewsletterUnsubscribe'));
 const MemberAccess = lazy(() => import('@/pages/MemberAccess'));
 const MemberProfile = lazy(() => import('@/pages/MemberProfile'));
+const QrLinkLanding = lazy(() => import('@/pages/QrLinkLanding'));
 
 // 企业官网页面
 const Products = lazy(() => import('@/pages/Products'));
@@ -128,4 +129,5 @@ export const adminRoutes = [
 export const routeComponents = {
   Admin,
   NotFound,
+  QrLinkLanding,
 };

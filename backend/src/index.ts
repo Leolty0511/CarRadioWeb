@@ -29,6 +29,7 @@ import canbusSettingsRouter from './routes/canbusSettings';
 import vehiclesRouter from './routes/vehicles';
 import systemConfigRouter from './routes/systemConfig';
 import resourceLinksRouter from './routes/resourceLinks';
+import qrLinksRouter from './routes/qrLinks';
 import siteImagesRouter from './routes/siteImages';
 import languageRouter from './routes/language';
 // 新增：产品和Hero Banner路由
@@ -196,7 +197,7 @@ app.use(requestTracing());
 app.use(csrfMiddleware);
 
 app.use((req, res, next) => {
-  if (/^\/(?:zh\/)?guide(?:\/|$)/.test(req.path) || req.path.startsWith('/api/guide-view')) {
+  if (/^\/(?:zh\/)?guide(?:\/|$)/.test(req.path) || /^\/r\/[A-Za-z0-9_-]+\/?$/.test(req.path) || req.path.startsWith('/api/guide-view') || req.path.startsWith('/api/qr-links/public/')) {
     res.set('X-Robots-Tag', 'noindex, nofollow')
   }
   next()
@@ -473,6 +474,7 @@ app.use('/api/search', searchRouter);
 app.use('/api/user-manual', authenticateContentOrGuideView, userManualRouter);
 app.use('/api/page-content', pageContentRouter);
 app.use('/api/resource-links', resourceLinksRouter);
+app.use('/api/qr-links', qrLinksRouter);
 app.use('/api/site-settings', siteSettingsRouter);
 app.use('/api/legal-versions', legalVersionsRouter);
 app.use('/api/newsletter', newsletterRouter);

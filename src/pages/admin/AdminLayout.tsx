@@ -48,6 +48,7 @@ import { MemberManagement } from './modules/members'
 import { AuditLogManagement } from './modules/audit-log'
 import { ComplianceHubManagement } from './modules/compliance-hub'
 import { IpSecurityManagement } from './modules/ip-security'
+import { QrCodeManagement } from './modules/qr-codes'
 import { ChangePasswordDialog } from './components/ChangePasswordDialog'
 import { getFirstAccessibleNavTab, getRequiredPermissionsForNavId } from './constants/navConfig'
 import { userHasPermission } from '@/services/authService'
@@ -84,6 +85,7 @@ const PAGE_TITLES: Record<string, string> = {
   'audit-log': '操作日志',
   'compliance-hub': '合规与线索',
   'ip-security': 'IP 安全防护中心',
+  'qr-codes': '二维码制作',
 }
 
 /** localStorage key for sidebar state */
@@ -334,6 +336,8 @@ export const AdminLayout: React.FC = () => {
         return <ComplianceHubManagement />
       case 'ip-security':
         return <IpSecurityManagement user={user} />
+      case 'qr-codes':
+        return <QrCodeManagement user={user} />
       default:
         return <DashboardPage dataLanguage={dataLanguage} onNavigate={setActiveTab} />
     }
